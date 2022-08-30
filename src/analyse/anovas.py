@@ -3,7 +3,7 @@ import warnings
 import matplotlib.pyplot as plt
 from bioinfokit.analys import stat
 import scipy.stats as stats
-from data_preparation import generate_df
+from prepare_data import generate_df
 from linear_regressions import combine_dfs_from_all_trials
 
 

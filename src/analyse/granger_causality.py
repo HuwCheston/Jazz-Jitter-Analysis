@@ -1,43 +1,14 @@
 import numpy as np
 import pandas as pd
 import operator
+import statsmodels.formula.api as smf
+import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import grangercausalitytests, adfuller
 from statsmodels.tsa.api import VAR
-import seaborn as sns
-import matplotlib.pyplot as plt
-from data_preparation import generate_df
+from prepare_data import generate_df, append_zoom_array, extract_event_density, zip_same_conditions_together, ioi_nearest_neighbours_one
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
-
-
-def extract_event_density(bpm: pd.DataFrame, raw: pd.DataFrame) -> pd.DataFrame:
-    """Appends a column to performance dataframe showing number of actual notes per extracted crotchet"""
-    # Function to subset dataframe column and convert to array
-    fn = lambda a: a['onset'].to_numpy()
-    # Iterate through successive values in bpm array and calculate number of notes in raw array between these
-    density = [len([i for i in fn(raw) if first <= i <= second]) for first, second in zip(fn(bpm), fn(bpm)[1:])]
-    # Insert nan as the first element of density list so that it aligns with pre-existing columns
-    density.insert(0, np.nan)
-    # Append event density list as new column in performance dataframe
-    bpm['density'] = density
-    return bpm
-
-
-def append_zoom_array(perf_df: pd.DataFrame, zoom_arr: np.array) -> pd.DataFrame:
-    """Appends a column to a dataframe showing the approx amount of latency applied at each moment in a performance"""
-    # Create a new array with our Zoom latency times and the approx timestamp they were applied to the performance
-    # 8 = performance start time (after count-in, 0.75 = refresh rate
-    z = np.c_[zoom_arr, np.linspace(8, 8 + (len(zoom_arr) * 0.75), num=len(zoom_arr), endpoint=False)]
-    # Initialise an empty column in our performance dataframe
-    perf_df['lat'] = np.nan
-    # Loop through successive timestamps in our zoom dataframe
-    for first, second in zip(z, z[1:]):
-        # Set any rows in the performance dataframe between our timestamps to the respective latency time
-        perf_df.loc[perf_df['onset'].between(first[1], second[1]), 'lat'] = first[0]
-    # Create a new column with rolling latency standard deviation
-    perf_df['lat_std'] = perf_df['lat'].rolling(4).std()
-    return perf_df
 
 
 def test_stationary(array: pd.Series) -> pd.Series:
@@ -101,8 +72,8 @@ def generate_granger_causality_df(gc_list: list[tuple]) -> pd.DataFrame:
     One tuple provided per condition. Returns a dataframe of all trials.
     """
     return (pd.DataFrame(gc_list, columns=['trial', 'block', 'instrument', 'latency', 'jitter', 'f', 'p', 'lag'])
-              .sort_values(by=['trial', 'block', 'latency', 'jitter'])
-              .set_index('trial'))
+            .sort_values(by=['trial', 'block', 'latency', 'jitter'])
+            .set_index('trial'))
 
 
 def gc_event_density_vs_latency_var(raw_data: list, output_dir: str):
@@ -147,4 +118,29 @@ def gc_ioi_var_vs_latency_var(raw_data: list, output_dir: str):
                 mx = return_largest_grang(li=res)
                 all_trials.append((con['trial'], con['block'], con['instrument'], con['latency'], con['jitter'], *mx))
     bigdf = generate_granger_causality_df(gc_list=all_trials)
-    bigdf.to_csv(f'{output_dir}\\gc_bpm.csv', sep=';')
+
+
+def pearson_r_ioi_var_vs_latency_var(raw_data: list):
+    # Zip same conditions for each trial together
+    all_trials = zip_same_conditions_together(raw_data)
+
+    for i in all_trials:
+        for c1, c2 in i:
+            # Extract MIDI bpm array
+            a1 = c1['midi_bpm'][:, 0]
+            a2 = c2['midi_bpm'][:, 0]
+            keys_nn = ioi_nearest_neighbours_one(a1, a2)
+            df = pd.DataFrame(keys_nn, columns=[c1['instrument'], c2['instrument']]).sort_values(by='Keys').reset_index(drop=True)
+            df['keys_ioi'] = df['Keys'].diff()
+            df['drums_ioi'] = df['Drums'].diff()
+            df['keys_next_ioi'] = df['keys_ioi'].shift(-1)
+            df['keys_drums_ioi'] = df['drums_ioi'] - df['keys_ioi']
+            md = smf.ols('keys_ioi~keys_next_ioi+keys_drums_ioi', data=df).fit()
+            # print(md.summary())
+            # print(c1['latency'], c1['jitter'])
+            # print(df)
+            # df['offset'] = df.iloc[:, 1] - df.iloc[:, 0]
+            if c1['jitter'] == 1:
+                plt.plot(df['keys_drums_ioi'])
+                plt.title(f'{c1["latency"]}, {c1["jitter"]}')
+                plt.show()

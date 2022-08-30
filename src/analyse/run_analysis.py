@@ -4,9 +4,9 @@ import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 from load_data import load_data
-from data_preparation import generate_tempo_slopes
+from prepare_data import generate_tempo_slopes
 from linear_regressions import lr_tempo_slope, lr_beat_variance
-from granger_causality import gc_event_density_vs_latency_var, gc_ioi_var_vs_latency_var
+from granger_causality import gc_event_density_vs_latency_var, gc_ioi_var_vs_latency_var, pearson_r_ioi_var_vs_latency_var
 from anovas import analyse_beat_variance, anova_ts_lat_jit
 
 
@@ -28,14 +28,16 @@ def main(input_filepath, output_filepath):
     logger.info(f'loaded data from {len(data)} trials!')
 
     # LINEAR REGRESSIONS #
-    logger.info(f'Conducting linear regressions...')
+    # logger.info(f'Conducting linear regressions...')
     # lr_ts = lr_tempo_slope(tempo_slopes_data=ts_raw, output_dir=output_filepath)
-    lr_bv = lr_beat_variance(raw_data=data, output_dir=output_filepath)
+    # lr_bv = lr_beat_variance(raw_data=data, output_dir=output_filepath)
 
     # GRANGER CAUSALITY
     # logger.info(f'Estimating Granger causality...')
     # gc_ed = gc_event_density_vs_latency_var(raw_data=data, output_dir=output_filepath)
     # gc_bv = gc_ioi_var_vs_latency_var(raw_data=data, output_dir=output_filepath)
+
+    pearson_r_ioi_var_vs_latency_var(raw_data=data)
 
     # ANOVAS
     # logger.info(f'Conducting ANOVAS...')
