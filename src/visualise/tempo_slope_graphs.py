@@ -5,6 +5,10 @@ from src.analyse.prepare_data import generate_df, average_bpms, zip_same_conditi
 
 
 def gen_tempo_slope_graph(raw_data, output_dir):
+    """
+    Creates a graph with subplots showing the average tempo trajectory of every condition in a trial.
+    Repeats of one condition are plotted as different coloured lines on the same subplot.
+    """
     # For each condition, generate the rolling BPM average across the ensemble
     b = zip_same_conditions_together(raw_data)
     s = lambda c: (c['trial'], c['block'], c['condition'], c['latency'], c['jitter'])   # to subset the raw data
@@ -26,7 +30,6 @@ def gen_tempo_slope_graph(raw_data, output_dir):
     fig = format_figure(fig=fig, data=data)
     # Save the result to the output_filepath
     fig.savefig(f'{output_dir}\\figures\\tempo_slopes.png')
-    plt.show()
 
 
 def plot_avg_tempo_for_condition(num_iter: int, condition_data: tuple, ax: plt.Axes, n_conditions: int = 13):
@@ -52,7 +55,10 @@ def plot_avg_tempo_for_condition(num_iter: int, condition_data: tuple, ax: plt.A
         condition_axis.axhline(y=120, color='r', linestyle='--', alpha=0.3, label='Metronome Tempo')
 
 
-def format_figure(fig: plt.Figure, data: list):
+def format_figure(fig: plt.Figure, data: list) -> plt.Figure:
+    """
+    Formats the overall figure, setting axis limits, adding labels/titles, configuring legend
+    """
     # Count-in offset for each performance
     offset = 8
     # Set x and y axis limit for figure according to max/min values of data
@@ -68,9 +74,9 @@ def format_figure(fig: plt.Figure, data: list):
     fig.supxlabel('Performance Duration (s)', y=0.05)
     fig.supylabel('Average tempo (BPM, four-beat rolling window)', x=0.01)
     fig.suptitle('Performance Tempo Slopes')
-    # Call tight_layout only once we've finished formatting
+    # Call tight_layout only once we've finished formatting but before we add the legend
     plt.tight_layout()
-    plt.subplots_adjust(bottom=0.11, wspace=0.05, hspace=0.05)
+    plt.subplots_adjust(bottom=0.11, wspace=0.05, hspace=0.05)  # Reduce the space between plots a bit
     # Add the legend
     handles, labels = plt.gca().get_legend_handles_labels()
     fig.legend(handles, labels, ncol=3, loc='lower center', bbox_to_anchor=(0.5, 0))
