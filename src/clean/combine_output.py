@@ -20,6 +20,7 @@ def scale_array(array, latency, jitter):
 def combine_output(input_dir, output_dir, **kwargs):
     """Combines data streams together into list of dictionaries per trial (one dictionary per condition/performer)"""
     zoom_arr = np.genfromtxt(f'{input_dir}\\latency_array.csv')
+    raw_data = []
     # Zip all iterables in kwargs together
     for num, values in enumerate(zip(*[a for a in kwargs.values()]), 1):
         # Merge all data into one dictionary
@@ -34,3 +35,5 @@ def combine_output(input_dir, output_dir, **kwargs):
             d['zoom_array'] = scale_array(zoom_arr, latency=d['latency'], jitter=d['jitter'])
         # Pickle the result
         pickle.dump(li, open(f"{output_dir}/trial_{num}.p", "wb"))
+        raw_data.append(li)
+    return raw_data

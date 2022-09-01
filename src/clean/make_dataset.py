@@ -13,8 +13,9 @@ from combine_output import combine_output
 @click.argument('input_filepath', type=click.Path(exists=True))
 @click.argument('output_filepath', type=click.Path(exists=True))
 def main(input_filepath, output_filepath):
-    """ Runs data processing scripts to turn raw data from (../raw) into
-        cleaned data ready to be analyzed (saved in ../processed).
+    """
+    Runs data processing scripts to turn raw data from (../raw) into
+    cleaned data ready to be analyzed (saved in ../processed).
     """
     # Initialise logger and output dictionary
     logger = logging.getLogger(__name__)
@@ -38,8 +39,9 @@ def main(input_filepath, output_filepath):
 
     # Combine outputs, save, and cleanup
     logger.info('combining all outputs and saving...')
-    combine_output(input_dir=input_filepath, output_dir=output_filepath, **output)
+    raw_data = combine_output(input_dir=input_filepath, output_dir=output_filepath, **output)
     logger.info(f'final data set saved in {output_filepath}')
+    return raw_data
 
 
 if __name__ == '__main__':

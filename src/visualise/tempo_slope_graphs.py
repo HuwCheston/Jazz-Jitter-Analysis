@@ -79,5 +79,5 @@ def format_figure(fig: plt.Figure, data: list) -> plt.Figure:
     plt.subplots_adjust(bottom=0.11, wspace=0.05, hspace=0.05)  # Reduce the space between plots a bit
     # Add the legend
     handles, labels = plt.gca().get_legend_handles_labels()
-    fig.legend(handles, labels, ncol=3, loc='lower center', bbox_to_anchor=(0.5, 0))
+    fig.legend(handles, labels, ncol=3, loc='lower center', bbox_to_anchor=(0.5, 0), frameon=False)
     return fig

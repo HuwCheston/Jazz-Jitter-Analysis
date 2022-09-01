@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import statsmodels.formula.api as smf
 from prepare_data import zip_same_conditions_together, generate_df, append_zoom_array, reg_func
+from src.visualise.phase_correction_graphs import create_plots
 
 
 def delay_event_onset_by_latency(df: pd.DataFrame) -> pd.DataFrame:
@@ -73,34 +72,17 @@ def construct_phase_correction_model(df: pd.DataFrame) -> tuple:
     """
     Construct linear phase correction model by predicting next IOI of live musician from previous IOI of live musician
     and IOI difference between live and delayed musician.
-    Returns a tuple of coefficients for both predictors and rsquared value.
+    Returns a tuple containing coefficients for all predictors and rsquared value.
     """
     md = smf.ols('live_next_ioi~live_prev_ioi+live_delayed_ioi', data=df).fit()
     return *md.params.iloc[1:].values, md.rsquared
 
 
-def plot_phase_correction(df, output):
-    fig, ax = plt.subplots(nrows=1, ncols=5, sharex='all', sharey='all', figsize=(15, 5))
-    # We do a double for loop here to get separate x and y values to subset axes object with
-    for y, (_, g) in enumerate(df.groupby('trial')):
-        # Extremely fucking hacky way of iterating in order of keys-drums, rather than drums-keys (default with groupby)
-        for x, (idx, grp) in enumerate(reversed(tuple(g.groupby('instrument')))):
-            means = grp.groupby('latency').mean()
-            c = "#1f77b4" if idx == 'Keys' else '#ff7f0e'
-            sns.barplot(data=means, x=means.index, y='live_delay_diff_coeff', ax=ax[x, y], color=c)
-            sns.swarmplot(data=grp, x='latency', y='live_delay_diff_coeff', ax=ax[x, y], s=2, color='#000000')
-            ax[x, y].tick_params(axis='both', which='both', bottom=False, left=False,)
-            ax[x, y].set_xlabel('')
-            ax[x, y].set_ylabel(f'{idx}' if y == 0 else '', rotation=90)
-            ax[x, y].set_title(f'Duo {y + 1}' if x == 0 else '')
-    fig.supylabel('Phase Correction Coefficient')
-    fig.supxlabel('Latency (ms)')
-    plt.tight_layout()
-    plt.subplots_adjust(wspace=0.05, hspace=0.05)
-    fig.savefig(f'{output}\\figures\\phase_correction_by_latency.png')
-
-
 def pc_live_ioi_delayed_ioi(raw_data, output_dir):
+    """
+    Creates a phase correction model for all performances.
+    """
+    # TODO: sort docstring and comments here
     zipped_data = zip_same_conditions_together(raw_data=raw_data)
     res = []
     for z in zipped_data:
@@ -129,18 +111,16 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir):
                     live_i=c2['instrument'], delayed_i=c1['instrument']
                 )
             )
-            res.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], c1['instrument'],
-                        *construct_phase_correction_model(keys_nn), reg_func(df=keys, xcol='bpm', ycol='onset').params.iloc[1:].values[0]))
-            res.append((c2['trial'], c2['block'], c2['latency'], c2['jitter'], c2['instrument'],
-                        *construct_phase_correction_model(drms_nn), reg_func(df=drms, xcol='bpm', ycol='onset').params.iloc[1:].values[0]))
+            res.append(
+                (c1['trial'], c1['block'], c1['latency'], c1['jitter'], c1['instrument'],
+                 *construct_phase_correction_model(keys_nn),
+                 reg_func(df=keys, xcol='bpm', ycol='onset').params.iloc[1:].values[0])
+            )
+            res.append(
+                (c2['trial'], c2['block'], c2['latency'], c2['jitter'], c2['instrument'],
+                 *construct_phase_correction_model(drms_nn),
+                 reg_func(df=drms, xcol='bpm', ycol='onset').params.iloc[1:].values[0])
+            )
     df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument',
-                                    'live_prev_ioi_coeff', 'live_delay_diff_coeff', 'rsquared', 'tempo_slope'])
-
-    fig, ax = plt.subplots(ncols=5, nrows=1, sharex='all', sharey='all')
-    for num, (idx, grp) in enumerate(df.groupby('trial')):
-        md = smf.ols('tempo_slope~live_delay_diff_coeff', data=grp).fit()
-        b, m = md.params
-        ax[num].scatter(grp['live_delay_diff_coeff'], grp['tempo_slope'])
-        ax[num].axline(xy1=(0, b), slope=m, label=f'$y = {m:.1f}x {b:+.1f}$')
-    plt.tight_layout()
-    plt.show()
+                                    'correction_self', 'correction_partner', 'rsquared', 'tempo_slope'])
+    create_plots(df=df, output_dir=output_dir)
