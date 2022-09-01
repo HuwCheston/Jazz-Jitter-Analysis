@@ -3,7 +3,7 @@ import click
 import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
-from src.analyse.load_data import load_data
+from src.analyse.prepare_data import load_data
 from tempo_slope_graphs import gen_tempo_slope_graph
 
 

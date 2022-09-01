@@ -1,3 +1,5 @@
+import os
+import pickle
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -6,11 +8,24 @@ import collections
 import warnings
 
 
+def load_data(input_filepath: str) -> list:
+    """
+    Loads all pickled data from the processed data folder
+    """
+    return [pickle.load(open(f'{input_filepath}\\{f}', "rb")) for f in os.listdir(input_filepath) if f.endswith('.p')]
+
+
 def generate_df(data: np.array,
                 iqr_range: tuple = (0.05, 0.95),
                 threshold: float = 0,
                 keep_pitch_vel: bool = False) -> pd.DataFrame:
-    """Create dataframe of note onset times and IOIs"""
+    """
+    Create dataframe from MIDI performance data, either cleaned (just crotchet beats) or raw.
+    Optional keyword arguments:
+    iqr_range: Upper and lower quartile to clean IOI values by.
+    threshold: Value to remove IOI timings below
+    keep_pitch_vel: Keep pitch and velocity columns
+    """
     # Construct the dataframe
     df = pd.DataFrame(data, columns=['onset', 'pitch', 'velocity']).sort_values('onset')
     # Drop pitch and velocity columns if not needed (default)
@@ -31,8 +46,12 @@ def generate_df(data: np.array,
     return df.reset_index(drop=True)
 
 
-def iqr_filter(col: str, df: pd.DataFrame, iqr_range,) -> pd.Series:
-    """Filter duration values below a certain quartile to remove extraneous midi notes not cleaned in Reaper"""
+def iqr_filter(col: str,
+               df: pd.DataFrame,
+               iqr_range: tuple = (0.05, 0.95)) -> pd.Series:
+    """
+    Filter duration values below a certain quartile to remove extraneous midi notes not cleaned in Reaper
+    """
     # Get upper/lower quartiles and inter-quartile range
     q1, q3 = df[col].quantile(iqr_range)
     iqr = q3 - q1
@@ -42,7 +61,9 @@ def iqr_filter(col: str, df: pd.DataFrame, iqr_range,) -> pd.Series:
 
 
 def reg_func(df: pd.DataFrame, xcol: str, ycol: str) -> sm.regression.linear_model.RegressionResults:
-    """Calculates linear regression between elapsed time and given column, returns coefficient"""
+    """
+    Calculates linear regression between two given columns, returns results table
+    """
     # We can't have NA values in our regression
     df = df.dropna()
     # Get required columns from dataframe, as float dtype
@@ -56,13 +77,18 @@ def reg_func(df: pd.DataFrame, xcol: str, ycol: str) -> sm.regression.linear_mod
     return results
 
 
-def return_coeff(results: sm.regression.linear_model.RegressionResults) -> int:
-    """Formats the table returned by statsmodel to return only the regression coefficient as an integer"""
+def return_coeff_from_sm_output(results: sm.regression.linear_model.RegressionResults) -> int:
+    """
+    Formats the table returned by statsmodel to return only the regression coefficient as an integer
+    """
     return pd.read_html(results.summary().tables[1].as_html(), header=0, index_col=0)[0].iloc[1, 0]
 
 
-def return_average_coeffs(coeffs: list) -> list:
-    """Returns list of tuples containing average coefficient for keys/drums performance in a single trial"""
+def return_average_coeffs(coeffs: list) -> list[tuple]:
+    """
+    Returns list of tuples containing average coefficient for keys/drums performance in a single trial
+    Tuples take the form of those in generate_tempo_slopes, i.e. (trial, block, latency, jitter, avg. slope coefficient)
+    """
     # Define the grouper function
     func = lambda x: (x[0], x[1], x[2], x[3], x[4])
     # Groupby trial, block, latency and jitter, then average coefficients and return tuple in same form
@@ -70,7 +96,9 @@ def return_average_coeffs(coeffs: list) -> list:
 
 
 def extract_event_density(bpm: pd.DataFrame, raw: pd.DataFrame) -> pd.DataFrame:
-    """Appends a column to performance dataframe showing number of actual notes per extracted crotchet"""
+    """
+    Appends a column to performance dataframe showing number of actual notes per extracted crotchet
+    """
     # Function to subset dataframe column and convert to array
     fn = lambda a: a['onset'].to_numpy()
     # Iterate through successive values in bpm array and calculate number of notes in raw array between these
@@ -83,7 +111,9 @@ def extract_event_density(bpm: pd.DataFrame, raw: pd.DataFrame) -> pd.DataFrame:
 
 
 def append_zoom_array(perf_df: pd.DataFrame, zoom_arr: np.array) -> pd.DataFrame:
-    """Appends a column to a dataframe showing the approx amount of latency applied at each moment in a performance"""
+    """
+    Appends a column to a dataframe showing the approx amount of latency by AV-Manip for each event in a performance
+    """
     # Create a new array with our Zoom latency times and the approx timestamp they were applied to the performance
     # 8 = performance start time (after count-in, 0.75 = refresh rate
     z = np.c_[zoom_arr, np.linspace(8, 8 + (len(zoom_arr) * 0.75), num=len(zoom_arr), endpoint=False)]
@@ -98,8 +128,11 @@ def append_zoom_array(perf_df: pd.DataFrame, zoom_arr: np.array) -> pd.DataFrame
     return perf_df
 
 
-def generate_tempo_slopes(raw_data: list) -> list:
-    """Takes in raw data, returns list of tuples in form (trial, block, latency, jitter, avg. slope coefficient)"""
+def generate_tempo_slopes(raw_data: list) -> list[tuple]:
+    """
+    Returns average tempo slope coefficients for all performances as list of tuples in the form
+    (trial, block, latency, jitter, avg. slope coefficient)
+    """
     cs = []
     # Iterate through all trials
     for trial in raw_data:
@@ -110,14 +143,15 @@ def generate_tempo_slopes(raw_data: list) -> list:
             # Calculate the regression of elapsed time vs ioi
             res = reg_func(df, xcol='elapsed', ycol='ioi')
             # Construct the tuple and append to list
-            cs.append((con['trial'], con['block'], con['condition'], con['latency'], con['jitter'], con['instrument'], return_coeff(res)))
+            cs.append((con['trial'], con['block'], con['condition'], con['latency'], con['jitter'], con['instrument'], return_coeff_from_sm_output(res)))
     # Average coefficients for both performers in a single condition and return as list of tuples
     return return_average_coeffs(cs)
 
 
-def zip_same_conditions_together(raw_data: list) -> list:
+def zip_same_conditions_together(raw_data: list) -> list[zip]:
     """
-    Iterates through raw data and zips same conditions together
+    Iterates through raw data and zips keys/drums data from the same performance together
+    Returns a list of zip objects, each element of which is a tuple containing
     """
     all_trials = []
     for trial in raw_data:
@@ -128,6 +162,8 @@ def zip_same_conditions_together(raw_data: list) -> list:
             s = frozenset((x["block"], 100 if x['condition'] == 1 else x['condition']))
             d[s].append(x)
         for k, v in d.items():
+            # Sort the list so we always end up with keys first, drums last
+            v = sorted(v, key=lambda i: i['instrument'], reverse=True)
             all_trials.append(zip(v, v[1:]))
     return all_trials
 

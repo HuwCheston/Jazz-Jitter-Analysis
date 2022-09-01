@@ -3,12 +3,11 @@ import click
 import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
-from load_data import load_data
-from prepare_data import generate_tempo_slopes
+from prepare_data import generate_tempo_slopes, load_data
 from linear_regressions import lr_tempo_slope, lr_beat_variance
 from granger_causality import gc_event_density_vs_latency_var, gc_ioi_var_vs_latency_var, pearson_r_ioi_var_vs_latency_var
 from anovas import analyse_beat_variance, anova_ts_lat_jit
-
+from phase_correction_models import pc_live_ioi_delayed_ioi
 
 @click.command()
 @click.argument('input_filepath', type=click.Path(exists=True))
@@ -27,6 +26,10 @@ def main(input_filepath, output_filepath):
     ts_raw = generate_tempo_slopes(raw_data=data)
     logger.info(f'loaded data from {len(data)} trials!')
 
+    # SYNCHRONISATION MODELS
+    logger.info(f'Creating phase correction models...')
+    pc_live_ioi_delayed_ioi(raw_data=data, output_dir=output_filepath)
+
     # LINEAR REGRESSIONS #
     # logger.info(f'Conducting linear regressions...')
     # lr_ts = lr_tempo_slope(tempo_slopes_data=ts_raw, output_dir=output_filepath)
@@ -37,12 +40,8 @@ def main(input_filepath, output_filepath):
     # gc_ed = gc_event_density_vs_latency_var(raw_data=data, output_dir=output_filepath)
     # gc_bv = gc_ioi_var_vs_latency_var(raw_data=data, output_dir=output_filepath)
 
-    pearson_r_ioi_var_vs_latency_var(raw_data=data)
-
     # ANOVAS
     # logger.info(f'Conducting ANOVAS...')
-
-    # SYNCHRONISATION MODELS
 
     # QUESTIONNAIRES
 
