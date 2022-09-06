@@ -96,36 +96,41 @@ def plot_regplot(df, output, xvar: str = 'correction_partner', yvar: str = 'temp
     sns.move_legend(ax[-1], ncol=2, loc='lower center', bbox_to_anchor=(-1.75, -0.25), title=None, frameon=False)
     fig.savefig(f'{output}\\{xvar}_vs_{yvar}_regplot.png')
 
-def plot_pairgrid(df, output: str):
-    # Create pivot table
-    # piv = df.pivot_table('correction_partner', ['latency', 'jitter', 'instrument', 'block'], 'trial').reset_index(
-    #     drop=False).sort_values(by=['latency', 'jitter', 'block'])
-    # piv['abbrev'] = piv['latency'].astype(str) + '/' + round(piv['jitter'], 1).astype(str) + '/' + piv['block'].astype(
-    #     str)
-    # piv = piv.drop(columns=['latency', 'jitter', 'block'])
-    # Create the pairgrid
-    # g = sns.PairGrid(piv, x_vars=piv.columns[1:6], y_vars="abbrev", hue='instrument',
-    #                  height=10, aspect=0.25, hue_order=['Keys', 'Drums'],
-    #                  palette=sns.color_palette(["#1f77b4", '#ff7f0e']))
-    df['abbrev'] = df['latency'].astype('str') + '/' + round(df['jitter'], 1).astype('str')
-    g = sns.FacetGrid(df, hue='instrument', row='block', col='trial', hue_order=['Keys', 'Drums'],
-                      palette=sns.color_palette(["#1f77b4", '#ff7f0e']))
-    g.map(sns.stripplot, 'correction_partner', 'abbrev')
 
-
-    plt.show()
-    # # Use the same x axis limits on all columns and add better labels
-    # g.set(xlim=(-1, 1), xlabel="Correction to Partner", ylabel="")
-    # # Use semantically meaningful titles for the columns
-    # titles = [f"Duo {num}" for num in range(1, 6)]
-    # for ax, title in zip(g.axes.flat, titles):
-    #     # Set a different title for each axes
-    #     ax.set(title=title)
-    #     # Make the grid horizontal instead of vertical
-    #     ax.xaxis.grid(False)
-    #     ax.yaxis.grid(True)
-    # sns.despine(left=True, bottom=True)
-    # plt.show()
+def plot_pairgrid(df, output: str, xvar: str = 'correction_partner'):
+    """
+    Creates a figure showing pairs of coefficients obtained for each performer in a condition,
+    stratified by block and trial number
+    """
+    # Create the abbreviation column, showing latency and jitter
+    df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
+    # Create the facet grid and stripplot
+    g = sns.FacetGrid(df.sort_values(by=['latency', 'jitter']), hue='instrument', row='block', col='trial',
+                      hue_order=['Keys', 'Drums'], palette=sns.color_palette(["#1f77b4", '#ff7f0e']), )
+    g.map(sns.stripplot, xvar, 'abbrev')
+    # Format the axis by iterating through
+    for num in range(0, 5):
+        # When we want different formatting for each row
+        g.axes[0, num].set(title=f'Measure 1\nDuo {num + 1}' if num == 2 else f'\nDuo {num + 1}', ylabel='',
+                           xlim=(-1, 1), )
+        g.axes[0, num].tick_params(bottom=False)
+        g.axes[1, num].set(title='Measure 2' if num == 2 else '', ylabel='', xlabel='', xlim=(-1, 1))
+        # When we want the same formatting for both rows
+        for x in range(0, 2):
+            # Disable the grid
+            g.axes[x, num].xaxis.grid(False)
+            g.axes[x, num].yaxis.grid(True)
+            # Add on a vertical line at x=0
+            g.axes[x, num].axvline(alpha=.3, linestyle='-', color='#000000')
+    # Format the figure
+    g.despine(left=True, bottom=True)
+    g.fig.supxlabel(format_label(xvar), x=0.50, y=0.05)
+    g.fig.tight_layout()
+    g.fig.subplots_adjust(bottom=0.14)
+    # Add legend
+    g.add_legend()
+    sns.move_legend(g, ncol=2, loc='lower center', bbox_to_anchor=(0.5, -0), title=None, frameon=False)
+    g.savefig(f'{output}\\condition_vs_{xvar}_pointplot.png')
 
 
 def plot_kde(df, output: str, xvar: str = 'correction_partner', ):
@@ -157,7 +162,8 @@ def create_plots(df, output_dir):
     output_path = output_dir + '\\figures\\phase_correction_graphs'
     pathlib.Path(output_path).mkdir(parents=True, exist_ok=True)
     # Plot pairgrid
-    plot_pairgrid(df=df, output=output_path)
+    plot_pairgrid(df=df, output=output_path, xvar='correction_partner')
+    plot_pairgrid(df=df, output=output_path, xvar='correction_self')
     # # Create barplots (latency vs correction to partner/correction to self)
     # plot_barplot(df, output=output_path, xvar='latency', yvar='correction_partner')
     # plot_barplot(df, output=output_path, xvar='latency', yvar='correction_self')
