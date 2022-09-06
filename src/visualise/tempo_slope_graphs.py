@@ -1,10 +1,11 @@
 import matplotlib.pyplot as plt
+import seaborn as sns
 from operator import itemgetter
 from itertools import groupby
 from src.analyse.prepare_data import generate_df, average_bpms, zip_same_conditions_together
 
 
-def gen_tempo_slope_graph(raw_data, output_dir):
+def gen_tempo_slope_graph(raw_data, output_dir, regplot: bool = False):
     """
     Creates a graph with subplots showing the average tempo trajectory of every condition in a trial.
     Repeats of one condition are plotted as different coloured lines on the same subplot.
@@ -25,33 +26,38 @@ def gen_tempo_slope_graph(raw_data, output_dir):
         li = sorted(list(g), key=lambda e: (e[0], e[1], e[3], e[4]))
         # Iterate through each condition and plot
         for num, i in enumerate(li):
-            plot_avg_tempo_for_condition(num_iter=num, condition_data=i, ax=ax, n_conditions=n_conditions)
+            plot_avg_tempo_for_condition(num_iter=num, con_data=i, ax=ax, n_conditions=n_conditions, regplot=regplot)
     # Format the figure
     fig = format_figure(fig=fig, data=data)
     # Save the result to the output_filepath
-    fig.savefig(f'{output_dir}\\figures\\tempo_slopes.png')
+    fig.savefig(f'{output_dir}\\figures\\tempo_slopes_{"rolling_mean" if not regplot else "regression"}.png')
 
 
-def plot_avg_tempo_for_condition(num_iter: int, condition_data: tuple, ax: plt.Axes, n_conditions: int = 13):
+def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n_conditions: int = 13, regplot: bool = False):
     """
     Plots the data for one condition on one subplot of the overall figure
     """
     # Generate X and Y coordinates and subset axis object
-    x = condition_data[0] - 1
+    x = con_data[0] - 1
     y = num_iter if num_iter < n_conditions else num_iter - n_conditions    # Plot data from both blocks on one subplot
     condition_axis = ax[x, y]
+    con_data[5]['elapsed'] -= 8
+    cs = sns.color_palette(["#1f77b4", '#ff7f0e'])
     # Plot the data on required subplot
-    condition_axis.plot(condition_data[5]['elapsed'] - 8,
-                        condition_data[5]['bpm_rolling'],
-                        label=f'Measure {condition_data[1]}')
+    if not regplot:
+        condition_axis.plot(con_data[5]['elapsed'], con_data[5]['bpm_rolling'], label=f'Measure {con_data[1]}')
+    else:
+        sns.regplot(data=con_data[5], x='elapsed', y='bpm_rolling', scatter=False,
+                    ax=condition_axis, ci=None, color=cs[con_data[1] - 1])
+        condition_axis.set(ylabel='', xlabel='')
     condition_axis.tick_params(axis='both', which='both', bottom=False, left=False,)
     # If this condition is either in the first row or column, add the required label
     if x == 0:
-        condition_axis.set_title(f'{condition_data[3]}ms/{condition_data[4]}x')
+        condition_axis.set_title(f'{con_data[3]}ms/{con_data[4]}x')
     if num_iter == 0:
-        condition_axis.set_ylabel(f'Duo {condition_data[0]}', rotation=90)
+        condition_axis.set_ylabel(f'Duo {con_data[0]}', rotation=90)
     # Add the reference column as a horizontal line once for each subplot
-    if condition_data[1] == 2:
+    if con_data[1] == 2:
         condition_axis.axhline(y=120, color='r', linestyle='--', alpha=0.3, label='Metronome Tempo')
 
 

@@ -1,11 +1,12 @@
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
-from prepare_data import zip_same_conditions_together, generate_df, append_zoom_array, reg_func
+from pymer4.models import Lmer
+from prepare_data import zip_same_conditions_together, generate_df, append_zoom_array, reg_func, average_bpms
 from src.visualise.phase_correction_graphs import create_plots
 
 
-def delay_event_onset_by_latency(df: pd.DataFrame) -> pd.DataFrame:
+def delay_event_onset_by_latency(df: pd.DataFrame = object, ) -> pd.DataFrame:
     """
     Delays all event onsets in a performance by the amount of latency applied at that point.
     Replicates the performance as it would have been heard by each participant.
@@ -61,10 +62,20 @@ def format_df_for_phase_correction_model(df: pd.DataFrame) -> pd.DataFrame:
     """
     # Create our temporary output dataframe
     output_df = pd.DataFrame()
-    output_df['live_prev_ioi'] = df.iloc[:, 0].diff()
+    output_df['live_prev_onset'] = df.iloc[:, 0]
+    output_df['delayed_prev_onset'] = df.iloc[:, 1]
+    # Shift onsets
+    output_df['live_next_onset'] = output_df['live_prev_onset'].shift(periods=1)
+    output_df['delayed_next_onset'] = output_df['delayed_prev_onset'].shift(periods=1)
+    # Calculate IOIs
+    output_df['live_prev_ioi'] = output_df['live_prev_onset'].diff()
+    output_df['delayed_prev_ioi'] = output_df['delayed_prev_onset'].diff()
+    # Shift IOIs
     output_df['live_next_ioi'] = output_df['live_prev_ioi'].shift(periods=1)
-    output_df['delayed_prev_ioi'] = df.iloc[:, 1].diff()
-    output_df['live_delayed_ioi'] = output_df['delayed_prev_ioi'] - output_df['live_prev_ioi']
+    output_df['delayed_next_ioi'] = output_df['delayed_prev_ioi'].shift(periods=1)
+    # Calculate differences between live and delayed performers
+    output_df['live_delayed_ioi'] = output_df['live_prev_ioi'] - output_df['delayed_prev_ioi']
+    output_df['live_delayed_onset'] = output_df['live_prev_onset'] - output_df['delayed_prev_onset']
     return output_df
 
 
@@ -74,8 +85,22 @@ def construct_phase_correction_model(df: pd.DataFrame) -> tuple:
     and IOI difference between live and delayed musician.
     Returns a tuple containing coefficients for all predictors and rsquared value.
     """
-    md = smf.ols('live_next_ioi~live_prev_ioi+live_delayed_ioi', data=df).fit()
-    return *md.params.iloc[1:].values, md.rsquared
+    md_onset = smf.ols('live_next_ioi~live_prev_ioi+live_delayed_onset', data=df).fit()
+    return *md_onset.params.iloc[1:].values, md_onset.rsquared,
+
+
+def mixed_effects_model(df: pd.DataFrame):
+    for idx, grp in df.groupby('trial'):
+        md = Lmer(
+            'correction_partner~latency+jitter+instrument+(latency|block)+(jitter|block)', data=grp
+        ).fit(
+            factors={
+                "latency": ["0", "23", "45", "90", "180"],
+                "jitter": ["0.0", "0.5", "1.0", ],
+                "instrument": ['Keys', 'Drums'],
+            }
+        )
+        print(md)
 
 
 def pc_live_ioi_delayed_ioi(raw_data, output_dir):
@@ -111,16 +136,17 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir):
                     live_i=c2['instrument'], delayed_i=c1['instrument']
                 )
             )
+
+            averaged_bpms = average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm']))
+            tempo_slope = reg_func(averaged_bpms, ycol='bpm_avg', xcol='elapsed').params.iloc[1:].values[0]
             res.append(
                 (c1['trial'], c1['block'], c1['latency'], c1['jitter'], c1['instrument'],
-                 *construct_phase_correction_model(keys_nn),
-                 reg_func(df=keys, xcol='bpm', ycol='onset').params.iloc[1:].values[0])
+                 *construct_phase_correction_model(keys_nn), tempo_slope,)
             )
             res.append(
                 (c2['trial'], c2['block'], c2['latency'], c2['jitter'], c2['instrument'],
-                 *construct_phase_correction_model(drms_nn),
-                 reg_func(df=drms, xcol='bpm', ycol='onset').params.iloc[1:].values[0])
+                 *construct_phase_correction_model(drms_nn), tempo_slope,)
             )
-    df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument',
-                                    'correction_self', 'correction_partner', 'rsquared', 'tempo_slope'])
+    df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'correction_self',
+                                    'correction_partner', 'rsquared', 'tempo_slope'])
     create_plots(df=df, output_dir=output_dir)
