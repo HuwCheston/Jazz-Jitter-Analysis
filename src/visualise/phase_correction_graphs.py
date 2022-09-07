@@ -1,3 +1,4 @@
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pathlib
@@ -104,10 +105,12 @@ def plot_pairgrid(df, output: str, xvar: str = 'correction_partner'):
     """
     # Create the abbreviation column, showing latency and jitter
     df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
-    # Create the facet grid and stripplot
-    g = sns.FacetGrid(df.sort_values(by=['latency', 'jitter']), hue='instrument', row='block', col='trial',
-                      hue_order=['Keys', 'Drums'], palette=sns.color_palette(["#1f77b4", '#ff7f0e']), )
-    g.map(sns.stripplot, xvar, 'abbrev')
+    df = df.sort_values(by=['latency', 'jitter'])
+    # Create the plot
+    g = sns.catplot(
+        data=df, x=xvar, y='abbrev', row='block', col='trial', hue='instrument', hue_order=['Keys', 'Drums'],
+        palette=sns.color_palette(["#1f77b4", '#ff7f0e']), kind='strip', height=4, sharex=True, sharey=True, aspect=0.6
+    )
     # Format the axis by iterating through
     for num in range(0, 5):
         # When we want different formatting for each row
@@ -121,15 +124,13 @@ def plot_pairgrid(df, output: str, xvar: str = 'correction_partner'):
             g.axes[x, num].xaxis.grid(False)
             g.axes[x, num].yaxis.grid(True)
             # Add on a vertical line at x=0
-            g.axes[x, num].axvline(alpha=.3, linestyle='-', color='#000000')
+            g.axes[x, num].axvline(alpha=0.4, linestyle='-', color='#000000')
     # Format the figure
     g.despine(left=True, bottom=True)
-    g.fig.supxlabel(format_label(xvar), x=0.50, y=0.05)
-    g.fig.tight_layout()
-    g.fig.subplots_adjust(bottom=0.14)
-    # Add legend
-    g.add_legend()
-    sns.move_legend(g, ncol=2, loc='lower center', bbox_to_anchor=(0.5, -0), title=None, frameon=False)
+    g.fig.supxlabel(format_label(xvar), x=0.53, y=0.04)
+    g.fig.subplots_adjust(bottom=0.10, top=0.94, wspace=0.15, left=0.08, right=0.98)
+    g.legend.remove()
+    g.fig.get_axes()[0].legend(loc='lower center', ncol=2, bbox_to_anchor=(2.8, -1.36), title=None, frameon=False)
     g.savefig(f'{output}\\condition_vs_{xvar}_pointplot.png')
 
 
@@ -154,7 +155,7 @@ def plot_kde(df, output: str, xvar: str = 'correction_partner', ):
     fig.savefig(f'{output}\\{xvar}_kdeplot.png')
 
 
-def create_plots(df, output_dir):
+def create_plots(df: pd.DataFrame, output_dir: str):
     """
     Creates plots for phase correction models.
     """
@@ -170,3 +171,7 @@ def create_plots(df, output_dir):
     # # # Create barplots (jitter vs correction to partner/correction to self)
     # plot_barplot(df[df['latency'] != 0], output=output_path, xvar='jitter', yvar='correction_partner')
     # plot_barplot(df[df['latency'] != 0], output=output_path, xvar='jitter', yvar='correction_self')
+
+
+def create_prediction_plots(pred_list: list[tuple], output_dir: str):
+    pass
