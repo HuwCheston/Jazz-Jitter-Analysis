@@ -1,7 +1,14 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib
+from statistics import median
+import numpy as np
 import seaborn as sns
+import statsmodels.formula.api as smf
 import pathlib
+
+cmap = sns.color_palette('vlag_r', as_cmap=True)
+offset = 8
 
 
 def format_ax(ax: plt.Axes, duo_num: int = 0, set_margins: bool = False) -> None:
@@ -106,6 +113,9 @@ def plot_pairgrid(df, output: str, xvar: str = 'correction_partner'):
     # Create the abbreviation column, showing latency and jitter
     df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
     df = df.sort_values(by=['latency', 'jitter'])
+    # Sort the palette for the shading
+    slopes = df['tempo_slope']
+    norm = matplotlib.colors.TwoSlopeNorm(vmin=min(slopes), vcenter=median(slopes), vmax=max(slopes))
     # Create the plot
     g = sns.catplot(
         data=df, x=xvar, y='abbrev', row='block', col='trial', hue='instrument', hue_order=['Keys', 'Drums'],
@@ -125,6 +135,9 @@ def plot_pairgrid(df, output: str, xvar: str = 'correction_partner'):
             g.axes[x, num].yaxis.grid(True)
             # Add on a vertical line at x=0
             g.axes[x, num].axvline(alpha=0.4, linestyle='-', color='#000000')
+            for n in range(0, 13):
+                coef = cmap(norm(df[(df['trial'] == num+1) & (df['block'] == x+1) & (df['instrument'] == 'Keys')].sort_values(['latency', 'jitter'])['tempo_slope'].iloc[n]))
+                g.axes[x, num].axhspan(n-0.5, n+0.5, alpha=0.5, facecolor=coef)
     # Format the figure
     g.despine(left=True, bottom=True)
     g.fig.supxlabel(format_label(xvar), x=0.53, y=0.04)
@@ -163,8 +176,8 @@ def create_plots(df: pd.DataFrame, output_dir: str):
     output_path = output_dir + '\\figures\\phase_correction_graphs'
     pathlib.Path(output_path).mkdir(parents=True, exist_ok=True)
     # Plot pairgrid
-    plot_pairgrid(df=df, output=output_path, xvar='correction_partner')
-    plot_pairgrid(df=df, output=output_path, xvar='correction_self')
+    plot_pairgrid(df=df, output=output_path, xvar='correction_partner_onset')
+    plot_pairgrid(df=df, output=output_path, xvar='correction_partner_ioi')
     # # Create barplots (latency vs correction to partner/correction to self)
     # plot_barplot(df, output=output_path, xvar='latency', yvar='correction_partner')
     # plot_barplot(df, output=output_path, xvar='latency', yvar='correction_self')
@@ -175,3 +188,13 @@ def create_plots(df: pd.DataFrame, output_dir: str):
 
 def create_prediction_plots(pred_list: list[tuple], output_dir: str):
     pass
+    test_li = [item for item in pred_list if item[0] == 4 and item[1] == 1 and item[2] == 45 and item[3] == 0]
+    km = test_li[0][4]
+    md = smf.ols('live_next_ioi~live_prev_ioi+live_delayed_onset+live_delayed_ioi', data=km).fit()
+    f = lambda d: (60 / d.dropna()).rolling(8).mean()
+    plt.plot(f(km['live_prev_ioi']), label='Data')
+    plt.plot(f(pd.Series(
+        np.insert(np.cumsum(md.predict()) + km['live_prev_onset'].loc[0], 0, km['live_prev_onset'].loc[0])).diff()),
+             label='Predicted')
+    plt.legend()
+    plt.show()

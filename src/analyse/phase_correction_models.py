@@ -117,8 +117,7 @@ def phase_correction_lmer(df: pd.DataFrame,
 
 def compare_linear_mixed_model(df: pd.DataFrame,
                                linear_mod: str = 'correction_partner~C(latency)+C(jitter)+C(instrument)+C(block)',
-                               mixed_mod: str = 'correction_partner~latency+jitter+instrument+'
-                                                '(1+latency+jitter+instrument|block)') -> pd.DataFrame:
+                               mixed_mod: str = 'correction_partner~latency+jitter+instrument+(1+latency+jitter+instrument|block)') -> pd.DataFrame:
     """
     Compare a linear and mixed effects regression model.
     Returns a dataframe of AIC and log-likelihood values extracted from both models.
@@ -168,24 +167,34 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir):
             drms_nn = f2(drms['onset'].to_numpy(), keys['onset_delayed'].to_numpy(), c2['instrument'], c1['instrument'])
 
             # For each performer, create the phase correction model
-            keys_model = construct_phase_correction_model(keys_nn)
-            drms_model = construct_phase_correction_model(drms_nn)
+            keys_md1 = construct_phase_correction_model(keys_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_onset')
+            drms_md1 = construct_phase_correction_model(drms_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_onset')
+            keys_md2 = construct_phase_correction_model(keys_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_ioi')
+            drms_md2 = construct_phase_correction_model(drms_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_ioi')
 
-            # Create tempo slopes
             tempo_slope = reg_func(
                 average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm'])), ycol='bpm_avg', xcol='elapsed'
             ).params.iloc[1:].values[0]
 
-            # Append results to the list of summary statistics
-            f3 = lambda c, m: (c['trial'], c['block'], c['latency'], c['jitter'], c['instrument'],
-                               *m.params.iloc[1:].values, m.rsquared, tempo_slope)
-            res.append(f3(c1, keys_model))
-            res.append(f3(c2, drms_model))
-
-            # Append keys/drums predictions to list of models
-            models.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'],
-                           predict_from_model(keys_model, keys_nn), predict_from_model(drms_model, drms_nn)))
-    df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'correction_self',
-                                    'correction_partner', 'rsquared', 'tempo_slope'])
+            f3 = lambda c, m1, m2: (c['trial'], c['block'], c['latency'], c['jitter'], c['instrument'], tempo_slope,
+                                    *m1.params.iloc[1:].values, *m2.params.iloc[1:].values, )
+            res.append(f3(c1, keys_md1, keys_md2))
+            res.append(f3(c2, drms_md1, drms_md2))
+    df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
+                                    'correction_self_onset', 'correction_partner_onset',
+                                    'correction_self_ioi', 'correction_partner_ioi'])
     create_plots(df=df, output_dir=output_dir)
-    create_prediction_plots(pred_list=models, output_dir=output_dir)
+    #         # Create tempo slopes
+
+    #         # Append results to the list of summary statistics
+    #         f3 = lambda c, m: (c['trial'], c['block'], c['latency'], c['jitter'], c['instrument'],
+    #                            *m.params.iloc[1:].values, m.rsquared, tempo_slope)
+    #         res.append(f3(c1, keys_model))
+    #         res.append(f3(c2, drms_model))
+    #
+    #         # Append keys/drums predictions to list of models
+    #         models.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], keys_nn, drms_nn))
+    # df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'correction_self',
+    #                                 'correction_partner_onset', 'correction_partner_ioi', 'rsquared', 'tempo_slope'])
+    # create_plots(df=df, output_dir=output_dir)
+    # create_prediction_plots(pred_list=models, output_dir=output_dir)
