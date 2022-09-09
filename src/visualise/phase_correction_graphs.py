@@ -11,6 +11,13 @@ cmap = sns.color_palette('vlag_r', as_cmap=True)
 offset = 8
 
 
+def create_output_folder(out):
+    # Create a folder to store the plots
+    output_path = out + '\\figures\\phase_correction_graphs'
+    pathlib.Path(output_path).mkdir(parents=True, exist_ok=True)
+    return output_path
+
+
 def format_ax(ax: plt.Axes, duo_num: int = 0, set_margins: bool = False) -> None:
     """
     Formats a matplotlib axis by setting tick paramaters, axis label and title
@@ -108,7 +115,7 @@ def plot_regplot(df, output, xvar: str = 'correction_partner', yvar: str = 'temp
 def plot_pairgrid(df, output: str, xvar: str = 'correction_partner'):
     """
     Creates a figure showing pairs of coefficients obtained for each performer in a condition,
-    stratified by block and trial number
+    stratified by block and trial number, with shading according to tempo slope
     """
     # Create the abbreviation column, showing latency and jitter
     df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
@@ -119,7 +126,8 @@ def plot_pairgrid(df, output: str, xvar: str = 'correction_partner'):
     # Create the plot
     g = sns.catplot(
         data=df, x=xvar, y='abbrev', row='block', col='trial', hue='instrument', hue_order=['Keys', 'Drums'],
-        palette=sns.color_palette(["#1f77b4", '#ff7f0e']), kind='strip', height=4, sharex=True, sharey=True, aspect=0.6
+        palette=sns.color_palette(['#4daf4a', '#f781bf']), kind='strip', height=4, sharex=True, sharey=True, aspect=0.6,
+        s=7, jitter=False, dodge=False, marker='D',
     )
     # Format the axis by iterating through
     for num in range(0, 5):
@@ -135,15 +143,27 @@ def plot_pairgrid(df, output: str, xvar: str = 'correction_partner'):
             g.axes[x, num].yaxis.grid(True)
             # Add on a vertical line at x=0
             g.axes[x, num].axvline(alpha=0.4, linestyle='-', color='#000000')
+            # Add the span, shaded according to tempo slope
+            d = df[
+                (df['trial'] == num + 1) & (df['block'] == x + 1) & (df['instrument'] == 'Keys')
+                ].sort_values(['latency', 'jitter'])['tempo_slope']
             for n in range(0, 13):
-                coef = cmap(norm(df[(df['trial'] == num+1) & (df['block'] == x+1) & (df['instrument'] == 'Keys')].sort_values(['latency', 'jitter'])['tempo_slope'].iloc[n]))
-                g.axes[x, num].axhspan(n-0.5, n+0.5, alpha=0.5, facecolor=coef)
+                coef = cmap(norm(d.iloc[n]))
+                g.axes[x, num].axhspan(n-0.5, n+0.5, alpha=0.4, facecolor=coef)
     # Format the figure
     g.despine(left=True, bottom=True)
-    g.fig.supxlabel(format_label(xvar), x=0.53, y=0.04)
-    g.fig.subplots_adjust(bottom=0.10, top=0.94, wspace=0.15, left=0.08, right=0.98)
+    g.fig.supxlabel('Correction to Partner', x=0.53, y=0.04)
+    g.fig.supylabel('Condition', x=0.01)
+    # Add the colorbar
+    position = g.fig.add_axes([0.95, 0.3, 0.01, 0.4])
+    cb = g.fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), cax=position,)
+    cb.set_alpha(0.5)
+    position.text(0, 0.3, ' Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
+    # Add the legend
     g.legend.remove()
-    g.fig.get_axes()[0].legend(loc='lower center', ncol=2, bbox_to_anchor=(2.8, -1.36), title=None, frameon=False)
+    g.fig.get_axes()[0].legend(loc='lower center', ncol=2, bbox_to_anchor=(2.85, -1.36), title=None, frameon=False)
+    # Adjust the plot spacing and save
+    g.fig.subplots_adjust(bottom=0.10, top=0.94, wspace=0.15, left=0.1, right=0.95)
     g.savefig(f'{output}\\condition_vs_{xvar}_pointplot.png')
 
 
@@ -172,9 +192,7 @@ def create_plots(df: pd.DataFrame, output_dir: str):
     """
     Creates plots for phase correction models.
     """
-    # Create a folder to store the plots
-    output_path = output_dir + '\\figures\\phase_correction_graphs'
-    pathlib.Path(output_path).mkdir(parents=True, exist_ok=True)
+    output_path = create_output_folder(output_dir)
     # Plot pairgrid
     plot_pairgrid(df=df, output=output_path, xvar='correction_partner_onset')
     plot_pairgrid(df=df, output=output_path, xvar='correction_partner_ioi')
@@ -187,7 +205,6 @@ def create_plots(df: pd.DataFrame, output_dir: str):
 
 
 def create_prediction_plots(pred_list: list[tuple], output_dir: str):
-    pass
     test_li = [item for item in pred_list if item[0] == 4 and item[1] == 1 and item[2] == 45 and item[3] == 0]
     km = test_li[0][4]
     md = smf.ols('live_next_ioi~live_prev_ioi+live_delayed_onset+live_delayed_ioi', data=km).fit()
@@ -198,3 +215,37 @@ def create_prediction_plots(pred_list: list[tuple], output_dir: str):
              label='Predicted')
     plt.legend()
     plt.show()
+
+
+def format_polar_plot_data(df, num_bins: int = 10) -> pd.DataFrame:
+    # Calculate the amount of phase correction for each beat
+    corr = df.live_prev_onset - df.delayed_prev_onset
+    # Cut into bins
+    cut = pd.cut(corr, num_bins, include_lowest=False).value_counts().sort_index()
+    # Format the dataframe
+    cut.index = pd.IntervalIndex(cut.index.get_level_values(0)).mid
+    cut = pd.DataFrame(cut, columns=['val']).reset_index(drop=False).rename(columns={'index': 'idx'})
+    cut['idx'] = cut['idx'] * np.pi
+    return cut
+
+
+def create_polar_plots(nn_list, output_dir: str, instr: str = 'Keys'):
+    output_path = create_output_folder(output_dir)
+    i = 0
+    fig, ax = plt.subplots(nrows=5, ncols=13, subplot_kw=dict(projection="polar"), figsize=(25, 8), )
+    for (trial, block, latency, jitter, keys, drms) in sorted(nn_list, key=lambda e: (e[0], e[1], e[2], e[3], e[4])):
+        dat = format_polar_plot_data(keys if instr == 'Keys' else drms, num_bins=15)
+        a = ax[trial - 1, i]
+        a.bar(x=dat.idx, height=dat.val, width=0.05, label=f'Measure {block}')
+        if trial != 1:
+            a.set_xticklabels('')
+        a.set_yticks([0, max(a.get_yticks())], labels=['', str(int(max(a.get_yticks())))])
+        a.set_thetamin(-45)
+        a.set_thetamax(45)
+        a.set_theta_zero_location('N')
+        a.set_theta_direction(-1)
+        a.set_title(f'{latency}ms/{jitter}x' if trial == 1 else '')
+        i = i + 1 if i < 12 else 0
+    fig.subplots_adjust(bottom=0.05, top=0.95, wspace=0.05, left=0.01, right=0.99, hspace=0.03)
+    plt.legend(ncol=4)
+    fig.savefig(f'{output_path}\\{instr}_polarplot.png')

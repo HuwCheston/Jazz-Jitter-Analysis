@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors
 import seaborn as sns
+import pandas as pd
 from statistics import median
 from operator import itemgetter
 from itertools import groupby
@@ -11,15 +12,20 @@ cmap = sns.color_palette('vlag_r', as_cmap=True)
 offset = 8
 
 
+def return_data(raw_data) -> list[tuple]:
+    # For each condition, generate the rolling BPM average across the ensemble
+    b = zip_same_conditions_together(raw_data)
+    s = lambda c: (c['trial'], c['block'], c['condition'], c['latency'], c['jitter'])   # to subset the raw data
+    return [(*s(c1), average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm']))) for z in b for c1, c2 in z]
+
+
 def gen_tempo_slope_graph(raw_data, output_dir, regplot: bool = False):
     """
     Creates a graph with subplots showing the average tempo trajectory of every condition in a trial.
     Repeats of one condition are plotted as different coloured lines on the same subplot.
     """
     # For each condition, generate the rolling BPM average across the ensemble
-    b = zip_same_conditions_together(raw_data)
-    s = lambda c: (c['trial'], c['block'], c['condition'], c['latency'], c['jitter'])   # to subset the raw data
-    data = [(*s(c1), average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm']))) for z in b for c1, c2 in z]
+    data = return_data(raw_data)
     # Set colormap properties
     slopes = [reg_func(d[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0] for d in data]
     norm = matplotlib.colors.TwoSlopeNorm(vmin=min(slopes), vcenter=median(slopes), vmax=max(slopes))
@@ -73,13 +79,13 @@ def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n
     # Add the reference column as a horizontal line once for each subplot
     if con_data[1] == 2:
         condition_axis.axhline(y=120, color='r', linestyle='--', alpha=0.3, label='Metronome Tempo')
-    # Shade the quadrant of the plot according to the tempo slope coefficient
-    coef = reg_func(con_data[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0]
-    condition_axis.axvspan(xrange[0] if con_data[1] == 1 else xrange[1], xrange[1] if con_data[1] == 1 else xrange[2],
-                           alpha=0.5, facecolor=cmap(norm(coef)))
-    if num_iter == 0:
-        condition_axis.text(x=xrange[0]+2, y=142, s='Measure 1', rotation='horizontal', fontsize=6)
-        condition_axis.text(x=xrange[2]-43, y=142, s='Measure 2', rotation='horizontal', fontsize=6)
+    # # Shade the quadrant of the plot according to the tempo slope coefficient
+    # coef = reg_func(con_data[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0]
+    # condition_axis.axvspan(xrange[0] if con_data[1] == 1 else xrange[1], xrange[1] if con_data[1] == 1 else xrange[2],
+    #                        alpha=0.5, facecolor=cmap(norm(coef)))
+    # if num_iter == 0:
+    #     condition_axis.text(x=xrange[0]+2, y=142, s='Measure 1', rotation='horizontal', fontsize=6)
+    #     condition_axis.text(x=xrange[2]-43, y=142, s='Measure 2', rotation='horizontal', fontsize=6)
 
 
 def format_figure(fig: plt.Figure, data: list, xrange: tuple = (8, 50.5, 93), norm = None) -> plt.Figure:
@@ -98,10 +104,43 @@ def format_figure(fig: plt.Figure, data: list, xrange: tuple = (8, 50.5, 93), no
     # Add the legend
     handles, labels = plt.gca().get_legend_handles_labels()
     fig.legend(handles, labels, ncol=3, loc='lower center', bbox_to_anchor=(0.5, 0), frameon=False)
-    # Add the colorbar
-    position = fig.add_axes([0.95, 0.3, 0.01, 0.4])
-    cb = fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), cax=position,)
-    position.text(0, 0.3, 'Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
+    # # Add the colorbar
+    # position = fig.add_axes([0.95, 0.3, 0.01, 0.4])
+    # cb = fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), cax=position,)
+    # position.text(0, 0.3, 'Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
     # Reduce the space between plots a bit
-    plt.subplots_adjust(bottom=0.11, wspace=0.05, hspace=0.05, right=0.93)
+    plt.subplots_adjust(bottom=0.11, wspace=0.05, hspace=0.05, right=0.98)
     return fig
+
+
+def gen_tempo_slope_heatmap(raw_data, output_dir,):
+    data = return_data(raw_data)
+    # Set colormap properties
+    slopes = [(d[0], d[1], d[3], d[4], reg_func(d[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0]) for d in data]
+    df = pd.DataFrame(slopes, columns=['trial', 'block', 'latency', 'jitter', 'slope']).sort_values(
+        by=['trial', 'block', 'latency', 'jitter'])
+    df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
+    n_trials = max(df['trial'])
+    fig, ax = plt.subplots(nrows=n_trials, ncols=1, sharex='all', sharey='all', figsize=(15, 8))
+    norm = matplotlib.colors.TwoSlopeNorm(vmin=min(df['slope']), vcenter=median(df['slope']), vmax=max(df['slope']))
+    for idx, grp in df.groupby(by=['trial']):
+        piv = grp.pivot_table(index=['latency', 'jitter', 'abbrev'], columns='block', values='slope').reset_index(
+            drop=False).set_index('abbrev').drop(columns=['latency', 'jitter']).transpose()
+        sns.heatmap(piv, ax=ax[idx - 1], cmap=cmap, cbar=False, norm=norm, linewidth=1, linecolor='w')
+        ax[idx - 1].xaxis.set_ticks_position('top')
+        ax[idx - 1].yaxis.set_ticks_position('right')
+        ax[idx - 1].tick_params(axis='y', labelrotation=0)
+        ax[idx - 1].tick_params(axis='x', which='both', bottom=False, top=False, labelsize=12)
+        ax[idx - 1].set(xlabel='', ylabel=f'Duo {idx}')
+        if idx != 1:
+            ax[idx - 1].tick_params(axis='x', labeltop=False)
+    fig.suptitle('Performance Tempo Slopes')
+    fig.supylabel('Duo Number', x=0.01)
+    fig.supxlabel('Condition')
+    plt.tight_layout()
+    position = fig.add_axes([0.95, 0.2, 0.01, 0.6])
+    cb = fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), cax=position, )
+    position.text(0, 0.3, 'Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
+    plt.subplots_adjust(bottom=0.05, wspace=0.05, hspace=0.15, right=0.90)
+    plt.text(-3, -0.18, 'Measure Number', rotation=-90, fontsize=12)
+    fig.savefig(f'{output_dir}\\figures\\tempo_slopes_heatmap.png')

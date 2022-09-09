@@ -3,7 +3,7 @@ import pandas as pd
 import statsmodels.formula.api as smf
 from pymer4.models import Lmer
 from prepare_data import zip_same_conditions_together, generate_df, append_zoom_array, reg_func, average_bpms
-from src.visualise.phase_correction_graphs import create_plots, create_prediction_plots
+from src.visualise.phase_correction_graphs import create_plots, create_prediction_plots, create_polar_plots
 
 
 def delay_heard_onsets_by_latency(df: pd.DataFrame = object, ) -> pd.DataFrame:
@@ -99,7 +99,7 @@ def predict_from_model(md, df: pd.DataFrame) -> pd.DataFrame:
 
 
 def phase_correction_lmer(df: pd.DataFrame,
-                          mod: str = 'correction_partner~latency+jitter+instrument+(latency|block)+(jitter|block)'):
+                          mod: str = 'correction_partner~latency*jitter+instrument'):
     """
     For every trial, creates a linear mixed effects model in Pymer4. Default model:
     DV: phase correction to partner (continuous)
@@ -151,7 +151,7 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir):
     """
     zipped_data = zip_same_conditions_together(raw_data=raw_data)
     res = []
-    models = []
+    nn = []
     # Iterate through each conditions
     for z in zipped_data:
         # Iterate through keys and drums performances in a condition together
@@ -176,25 +176,15 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir):
                 average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm'])), ycol='bpm_avg', xcol='elapsed'
             ).params.iloc[1:].values[0]
 
-            f3 = lambda c, m1, m2: (c['trial'], c['block'], c['latency'], c['jitter'], c['instrument'], tempo_slope,
-                                    *m1.params.iloc[1:].values, *m2.params.iloc[1:].values, )
-            res.append(f3(c1, keys_md1, keys_md2))
-            res.append(f3(c2, drms_md1, drms_md2))
+            # Append the results
+            f3 = lambda c, m1, m2, d: (c['trial'], c['block'], c['latency'], c['jitter'], c['instrument'], tempo_slope,
+                                       *m1.params.iloc[1:].values, *m2.params.iloc[1:].values)
+            res.append(f3(c1, keys_md1, keys_md2, keys_nn))
+            res.append(f3(c2, drms_md1, drms_md2, drms_nn))
+            nn.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], keys_nn, drms_nn))
     df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
                                     'correction_self_onset', 'correction_partner_onset',
-                                    'correction_self_ioi', 'correction_partner_ioi'])
-    create_plots(df=df, output_dir=output_dir)
-    #         # Create tempo slopes
+                                    'correction_self_ioi', 'correction_partner_ioi',])
+    create_polar_plots(nn_list=nn, instr='Keys', output_dir=output_dir)
+    create_polar_plots(nn_list=nn, instr='Drums', output_dir=output_dir)
 
-    #         # Append results to the list of summary statistics
-    #         f3 = lambda c, m: (c['trial'], c['block'], c['latency'], c['jitter'], c['instrument'],
-    #                            *m.params.iloc[1:].values, m.rsquared, tempo_slope)
-    #         res.append(f3(c1, keys_model))
-    #         res.append(f3(c2, drms_model))
-    #
-    #         # Append keys/drums predictions to list of models
-    #         models.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], keys_nn, drms_nn))
-    # df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'correction_self',
-    #                                 'correction_partner_onset', 'correction_partner_ioi', 'rsquared', 'tempo_slope'])
-    # create_plots(df=df, output_dir=output_dir)
-    # create_prediction_plots(pred_list=models, output_dir=output_dir)
