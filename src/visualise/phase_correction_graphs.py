@@ -7,13 +7,20 @@ import seaborn as sns
 import statsmodels.formula.api as smf
 import pathlib
 
-cmap = sns.color_palette('vlag_r', as_cmap=True)
+slopes_cmap = sns.color_palette('vlag_r', as_cmap=True)
+data_cmap = ['#9933ff', '#00ff00']
+alpha = 0.4
 offset = 8
 
 
-def create_output_folder(out):
-    # Create a folder to store the plots
-    output_path = out + '\\figures\\phase_correction_graphs'
+def create_output_folder(out, subdir: str = None):
+    """
+    Create a folder to store the plots, with optional subdirectory
+    """
+    if subdir is None:
+        output_path = out + '\\figures\\phase_correction_graphs'
+    else:
+        output_path = out + '\\figures\\phase_correction_graphs' + f'\\{subdir}'
     pathlib.Path(output_path).mkdir(parents=True, exist_ok=True)
     return output_path
 
@@ -72,7 +79,7 @@ def plot_barplot(df, output, xvar: str = 'latency', yvar: str = 'correction_part
         sns.rugplot(data=grp, y=yvar, hue=hvar, hue_order=['Keys', 'Drums'], ax=ax[x], legend=False, height=0.05)
         # Create barplot
         sns.barplot(data=means, x=means[xvar], y=yvar, hue=hvar, ax=ax[x], hue_order=['Keys', 'Drums'],
-                    palette=sns.color_palette(["#1f77b4", '#ff7f0e']))
+                    palette=sns.color_palette(data_cmap))
         # Store handles and labels then remove legend
         hand, lab = ax[-1].get_legend_handles_labels()
         ax[x].legend([], [], frameon=False)
@@ -93,7 +100,7 @@ def plot_regplot(df, output, xvar: str = 'correction_partner', yvar: str = 'temp
     """
     # Create subplots
     fig, ax = plt.subplots(nrows=1, ncols=5, sharex='all', sharey='all', figsize=(15, 5))
-    cs = sns.color_palette(["#1f77b4", '#ff7f0e'])
+    cs = sns.color_palette(data_cmap)
     # Iterate through each trial individually
     grouper = df.groupby('trial')
     for idx, grp in grouper:
@@ -126,7 +133,7 @@ def plot_pairgrid(df, output: str, xvar: str = 'correction_partner'):
     # Create the plot
     g = sns.catplot(
         data=df, x=xvar, y='abbrev', row='block', col='trial', hue='instrument', hue_order=['Keys', 'Drums'],
-        palette=sns.color_palette(['#4daf4a', '#f781bf']), kind='strip', height=4, sharex=True, sharey=True, aspect=0.6,
+        palette=sns.color_palette(data_cmap), kind='strip', height=4, sharex=True, sharey=True, aspect=0.6,
         s=7, jitter=False, dodge=False, marker='D',
     )
     # Format the axis by iterating through
@@ -142,28 +149,27 @@ def plot_pairgrid(df, output: str, xvar: str = 'correction_partner'):
             g.axes[x, num].xaxis.grid(False)
             g.axes[x, num].yaxis.grid(True)
             # Add on a vertical line at x=0
-            g.axes[x, num].axvline(alpha=0.4, linestyle='-', color='#000000')
+            g.axes[x, num].axvline(alpha=alpha, linestyle='-', color='#000000')
             # Add the span, shaded according to tempo slope
             d = df[
                 (df['trial'] == num + 1) & (df['block'] == x + 1) & (df['instrument'] == 'Keys')
                 ].sort_values(['latency', 'jitter'])['tempo_slope']
             for n in range(0, 13):
-                coef = cmap(norm(d.iloc[n]))
-                g.axes[x, num].axhspan(n-0.5, n+0.5, alpha=0.4, facecolor=coef)
+                coef = slopes_cmap(norm(d.iloc[n]))
+                g.axes[x, num].axhspan(n-0.5, n+0.5, alpha=alpha, facecolor=coef)
     # Format the figure
     g.despine(left=True, bottom=True)
     g.fig.supxlabel('Correction to Partner', x=0.53, y=0.04)
     g.fig.supylabel('Condition', x=0.01)
     # Add the colorbar
     position = g.fig.add_axes([0.95, 0.3, 0.01, 0.4])
-    cb = g.fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), cax=position,)
-    cb.set_alpha(0.5)
+    g.fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=slopes_cmap), cax=position, )
     position.text(0, 0.3, ' Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
     # Add the legend
     g.legend.remove()
     g.fig.get_axes()[0].legend(loc='lower center', ncol=2, bbox_to_anchor=(2.85, -1.36), title=None, frameon=False)
     # Adjust the plot spacing and save
-    g.fig.subplots_adjust(bottom=0.10, top=0.94, wspace=0.15, left=0.1, right=0.95)
+    g.fig.subplots_adjust(bottom=0.10, top=0.94, wspace=0.15, left=0.1, right=0.93)
     g.savefig(f'{output}\\condition_vs_{xvar}_pointplot.png')
 
 
@@ -217,7 +223,11 @@ def create_prediction_plots(pred_list: list[tuple], output_dir: str):
     plt.show()
 
 
-def format_polar_plot_data(df, num_bins: int = 10) -> pd.DataFrame:
+def format_polar_plot_data(df: pd.DataFrame, num_bins: int = 10) -> pd.DataFrame:
+    """
+    Formats the data required for a polar plot by calculating phase of live musician relative to delayed, subsetting
+    result into given number of bins, getting the square-root density of these bins.
+    """
     # Calculate the amount of phase correction for each beat
     corr = df.live_prev_onset - df.delayed_prev_onset
     # Cut into bins
@@ -225,27 +235,78 @@ def format_polar_plot_data(df, num_bins: int = 10) -> pd.DataFrame:
     # Format the dataframe
     cut.index = pd.IntervalIndex(cut.index.get_level_values(0)).mid
     cut = pd.DataFrame(cut, columns=['val']).reset_index(drop=False).rename(columns={'index': 'idx'})
+    # Multiply the bin median by pi to get number of degrees
     cut['idx'] = cut['idx'] * np.pi
+    # Take the square root of the density for plotting
+    cut['val'] = np.sqrt(cut['val'])
     return cut
 
 
-def create_polar_plots(nn_list, output_dir: str, instr: str = 'Keys'):
-    output_path = create_output_folder(output_dir)
-    i = 0
+def format_polar_subplot(ax: plt.Axes, sl) -> None:
+    """
+    Formats a polar subplot by setting axis ticks and gridlines, rotation properties, and facecolor
+    """
+    # Set the y axis ticks and gridlines
+    ax.set_yticks([0, max(ax.get_yticks())], labels=['', str(int(max(ax.get_yticks())))])
+    ax.grid(False)
+    # Set the polar plot rotation properties, direction, etc
+    ax.set_thetamin(-45)
+    ax.set_thetamax(45)
+    ax.set_theta_zero_location('N')
+    ax.set_theta_direction(-1)
+    # Set the color according to the tempo slope
+    ax.patch.set_facecolor(sl)
+    ax.patch.set_alpha(alpha)
+
+
+def create_polar_plots(nn_list: list[tuple], output_dir: str, block_num: int = 1) -> None:
+    """
+    Creates circle plots showing relative phase (i.e. playing before or after reference) for both musicians for a trial.
+    """
+    # Create the folder to store the plots
+    output_path = create_output_folder(output_dir, subdir='polar_plots')
+    # Subset the data for only the block we are plotting
+    sorter = lambda e: (e[0], e[1], e[2], e[3], e[4])
+    to_plot = [t for t in sorted(nn_list, key=sorter) if t[1] == block_num]
+    # Create the subplots
     fig, ax = plt.subplots(nrows=5, ncols=13, subplot_kw=dict(projection="polar"), figsize=(25, 8), )
-    for (trial, block, latency, jitter, keys, drms) in sorted(nn_list, key=lambda e: (e[0], e[1], e[2], e[3], e[4])):
-        dat = format_polar_plot_data(keys if instr == 'Keys' else drms, num_bins=15)
+    i = 0
+    # Sort the palette for the shading
+    slopes = [t[-1] for t in sorted(nn_list, key=sorter)]
+    norm = matplotlib.colors.TwoSlopeNorm(vmin=min(slopes), vcenter=median(slopes), vmax=max(slopes))
+    # Iterate through the data
+    for (trial, block, latency, jitter, keys, drms, slope) in to_plot:
+        # Subset the subplots
         a = ax[trial - 1, i]
-        a.bar(x=dat.idx, height=dat.val, width=0.05, label=f'Measure {block}')
-        if trial != 1:
+        # Plot the keys and drums data
+        for ins, st in zip([keys, drms], ['Keys', 'Drums']):
+            dat = format_polar_plot_data(ins, num_bins=15)
+            a.bar(x=dat.idx, height=dat.val, width=0.05, label=st, color=data_cmap[0] if st == 'Keys' else data_cmap[1])
+        # Adjust formatting for all plots
+        format_polar_subplot(ax=a, sl=slopes_cmap(norm(slope)))
+        # Adjust formatting for certain plots only
+        if trial == 1:
+            a.text(0.2, 0.05, s='Phase (πms)', transform=a.transAxes)
+            a.set_title(f'{latency}ms/{jitter}x')
+        else:
             a.set_xticklabels('')
-        a.set_yticks([0, max(a.get_yticks())], labels=['', str(int(max(a.get_yticks())))])
-        a.set_thetamin(-45)
-        a.set_thetamax(45)
-        a.set_theta_zero_location('N')
-        a.set_theta_direction(-1)
-        a.set_title(f'{latency}ms/{jitter}x' if trial == 1 else '')
+        if i == 0:
+            a.set_ylabel(f'Duo {trial}')
+            a.text(0, 0.15, s='√Density', transform=a.transAxes, rotation=-225)
+        # Increase counter
         i = i + 1 if i < 12 else 0
-    fig.subplots_adjust(bottom=0.05, top=0.95, wspace=0.05, left=0.01, right=0.99, hspace=0.03)
-    plt.legend(ncol=4)
-    fig.savefig(f'{output_path}\\{instr}_polarplot.png')
+    # Add figure-wise titles and labels
+    fig.suptitle(f'Relative Phase Distribution: Measure {block_num}', )
+    fig.supylabel('Duo Number', x=0.01)
+    fig.supxlabel('Condition', y=0.04)
+    # Create and position colourbar
+    position = fig.add_axes([0.96, 0.2, 0.01, 0.6])
+    fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=slopes_cmap), cax=position, )
+    position.text(0, 0.3, 'Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
+    # Adjust positioning slightly
+    fig.subplots_adjust(bottom=0.06, top=0.90, wspace=0.05, left=0.025, right=0.96, hspace=0.03)
+    # Create and position legend
+    hand, lab = ax[-1, -1].get_legend_handles_labels()
+    plt.legend(hand, lab, ncol=2, loc='lower center', bbox_to_anchor=(-46, -0.33), title=None, frameon=False)
+    # Save figure
+    fig.savefig(f'{output_path}\\block{block_num}_polarplot.png')

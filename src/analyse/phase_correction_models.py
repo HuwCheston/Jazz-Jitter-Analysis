@@ -12,6 +12,7 @@ def delay_heard_onsets_by_latency(df: pd.DataFrame = object, ) -> pd.DataFrame:
     Replicates the performance as it would have been heard by each participant.
     Returns a dataframe with delayed onset and delayed IOI column appended.
     """
+    # TODO: need to add in the constant amount of delay induced by the testbed - 12ms?
     # Need to suppress this warning as it is a false positive
     pd.options.mode.chained_assignment = None
     # Fill na in latency column with next/previous valid observation
@@ -181,10 +182,11 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir):
                                        *m1.params.iloc[1:].values, *m2.params.iloc[1:].values)
             res.append(f3(c1, keys_md1, keys_md2, keys_nn))
             res.append(f3(c2, drms_md1, drms_md2, drms_nn))
-            nn.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], keys_nn, drms_nn))
+            nn.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], keys_nn, drms_nn, tempo_slope))
     df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
                                     'correction_self_onset', 'correction_partner_onset',
                                     'correction_self_ioi', 'correction_partner_ioi',])
-    create_polar_plots(nn_list=nn, instr='Keys', output_dir=output_dir)
-    create_polar_plots(nn_list=nn, instr='Drums', output_dir=output_dir)
+    create_plots(df=df, output_dir=output_dir)
+    create_polar_plots(nn_list=nn, block_num=1, output_dir=output_dir)
+    create_polar_plots(nn_list=nn, block_num=2, output_dir=output_dir)
 

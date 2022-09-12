@@ -23,8 +23,8 @@ def main(input_filepath, output_filepath):
     data = load_data(input_filepath)
 
     logger.info(f'generating tempo slope graphs...')
-    gen_tempo_slope_graph(raw_data=data, output_dir=output_filepath)
-    gen_tempo_slope_heatmap(raw_data=data, output_dir=output_filepath)
+    gen_tempo_slope_graph(raw_data=data, output_dir=output_filepath, block_num=1)
+    gen_tempo_slope_graph(raw_data=data, output_dir=output_filepath, block_num=2)
 
 
 if __name__ == '__main__':

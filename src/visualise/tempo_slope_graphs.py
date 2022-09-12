@@ -19,7 +19,7 @@ def return_data(raw_data) -> list[tuple]:
     return [(*s(c1), average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm']))) for z in b for c1, c2 in z]
 
 
-def gen_tempo_slope_graph(raw_data, output_dir, regplot: bool = False):
+def gen_tempo_slope_graph(raw_data, output_dir, regplot: bool = False, block_num: int = 1):
     """
     Creates a graph with subplots showing the average tempo trajectory of every condition in a trial.
     Repeats of one condition are plotted as different coloured lines on the same subplot.
@@ -42,15 +42,16 @@ def gen_tempo_slope_graph(raw_data, output_dir, regplot: bool = False):
     fig, ax = plt.subplots(nrows=n_trials, ncols=n_conditions, sharex='all', sharey='all', figsize=(15, 8))
     # Iterate through data from each trial
     for k, g in groupby(data, itemgetter(0)):
-        # Sort the data from each trial by block, latency, and jitter
+        # Sort the data from each trial by block, latency, and jitter and subset for required block number
         li = sorted(list(g), key=lambda e: (e[0], e[1], e[3], e[4]))
+        li = [t for t in li if t[1] == block_num]
         # Iterate through each condition and plot
         for num, i in enumerate(li):
             plot_avg_tempo_for_condition(num_iter=num, con_data=i, ax=ax, n_conditions=n_conditions, regplot=regplot, norm=norm, xrange=xrange)
     # Format the figure
-    fig = format_figure(fig=fig, data=data, xrange=xrange, norm=norm)
+    fig = format_figure(fig=fig, data=data, xrange=xrange, norm=norm, block_num=block_num)
     # Save the result to the output_filepath
-    fig.savefig(f'{output_dir}\\figures\\tempo_slopes_{"rolling_mean" if not regplot else "regression"}.png')
+    fig.savefig(f'{output_dir}\\figures\\tempo_slopes_measure{block_num}.png')
 
 
 def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n_conditions: int = 13, regplot: bool = False, xrange: tuple = (8, 50.5, 93), norm=None,):
@@ -65,7 +66,7 @@ def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n
     cs = sns.color_palette(["#1f77b4", '#ff7f0e'])
     # Plot the data on required subplot
     if not regplot:
-        condition_axis.plot(con_data[5]['elapsed'], con_data[5]['bpm_rolling'], label=f'Measure {con_data[1]}')
+        condition_axis.plot(con_data[5]['elapsed'], con_data[5]['bpm_rolling'], label=f'Performance Tempo', color='#000000')
     else:
         sns.regplot(data=con_data[5], x='elapsed', y='bpm_rolling', scatter=False,
                     ax=condition_axis, ci=None, color=cs[con_data[1] - 1])
@@ -76,19 +77,14 @@ def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n
         condition_axis.set_title(f'{con_data[3]}ms/{con_data[4]}x')
     if num_iter == 0:
         condition_axis.set_ylabel(f'Duo {con_data[0]}', rotation=90)
-    # Add the reference column as a horizontal line once for each subplot
-    if con_data[1] == 2:
-        condition_axis.axhline(y=120, color='r', linestyle='--', alpha=0.3, label='Metronome Tempo')
-    # # Shade the quadrant of the plot according to the tempo slope coefficient
-    # coef = reg_func(con_data[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0]
-    # condition_axis.axvspan(xrange[0] if con_data[1] == 1 else xrange[1], xrange[1] if con_data[1] == 1 else xrange[2],
-    #                        alpha=0.5, facecolor=cmap(norm(coef)))
-    # if num_iter == 0:
-    #     condition_axis.text(x=xrange[0]+2, y=142, s='Measure 1', rotation='horizontal', fontsize=6)
-    #     condition_axis.text(x=xrange[2]-43, y=142, s='Measure 2', rotation='horizontal', fontsize=6)
+    # Add the reference column as a horizontal line
+    condition_axis.axhline(y=120, color='r', linestyle='--', alpha=0.3, label='Metronome Tempo')
+    # Shade the plot according to the tempo slope coefficient
+    coef = reg_func(con_data[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0]
+    condition_axis.axvspan(xrange[0], xrange[2], alpha=0.4, facecolor=cmap(norm(coef)))
 
 
-def format_figure(fig: plt.Figure, data: list, xrange: tuple = (8, 50.5, 93), norm = None) -> plt.Figure:
+def format_figure(fig: plt.Figure, data: list, xrange: tuple = (8, 50.5, 93), norm=None, block_num:int = 1) -> plt.Figure:
     """
     Formats the overall figure, setting axis limits, adding labels/titles, configuring legend
     """
@@ -98,18 +94,18 @@ def format_figure(fig: plt.Figure, data: list, xrange: tuple = (8, 50.5, 93), no
     # Set x and y labels, title
     fig.supxlabel('Performance Duration (s)', y=0.05)
     fig.supylabel('Average tempo (BPM, four-beat rolling window)', x=0.01)
-    fig.suptitle('Performance Tempo Slopes')
+    fig.suptitle(f'Performance Tempo: Measure {block_num}')
     # Call tight_layout only once we've finished formatting but before we, add the legend
     plt.tight_layout()
     # Add the legend
     handles, labels = plt.gca().get_legend_handles_labels()
     fig.legend(handles, labels, ncol=3, loc='lower center', bbox_to_anchor=(0.5, 0), frameon=False)
-    # # Add the colorbar
-    # position = fig.add_axes([0.95, 0.3, 0.01, 0.4])
-    # cb = fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), cax=position,)
-    # position.text(0, 0.3, 'Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
+    # Add the colorbar
+    position = fig.add_axes([0.95, 0.3, 0.01, 0.4])
+    cb = fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), cax=position,)
+    position.text(0, 0.3, 'Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
     # Reduce the space between plots a bit
-    plt.subplots_adjust(bottom=0.11, wspace=0.05, hspace=0.05, right=0.98)
+    plt.subplots_adjust(bottom=0.11, wspace=0.05, hspace=0.05, right=0.93)
     return fig
 
 
@@ -137,10 +133,9 @@ def gen_tempo_slope_heatmap(raw_data, output_dir,):
     fig.suptitle('Performance Tempo Slopes')
     fig.supylabel('Duo Number', x=0.01)
     fig.supxlabel('Condition')
-    plt.tight_layout()
     position = fig.add_axes([0.95, 0.2, 0.01, 0.6])
     cb = fig.colorbar(matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap), cax=position, )
     position.text(0, 0.3, 'Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
-    plt.subplots_adjust(bottom=0.05, wspace=0.05, hspace=0.15, right=0.90)
+    plt.subplots_adjust(bottom=0.05, wspace=0.05, hspace=0.15, right=0.95)
     plt.text(-3, -0.18, 'Measure Number', rotation=-90, fontsize=12)
     fig.savefig(f'{output_dir}\\figures\\tempo_slopes_heatmap.png')
