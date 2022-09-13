@@ -3,7 +3,7 @@ import pandas as pd
 import statsmodels.formula.api as smf
 from pymer4.models import Lmer
 from prepare_data import zip_same_conditions_together, generate_df, append_zoom_array, reg_func, average_bpms
-from src.visualise.phase_correction_graphs import create_plots, create_prediction_plots, create_polar_plots
+from src.visualise.phase_correction_graphs import make_pairgrid, create_prediction_plots, make_polar
 
 
 def delay_heard_onsets_by_latency(df: pd.DataFrame = object, ) -> pd.DataFrame:
@@ -184,9 +184,9 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir):
             res.append(f3(c2, drms_md1, drms_md2, drms_nn))
             nn.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], keys_nn, drms_nn, tempo_slope))
     df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
-                                    'correction_self_onset', 'correction_partner_onset',
-                                    'correction_self_ioi', 'correction_partner_ioi',])
-    create_plots(df=df, output_dir=output_dir)
-    create_polar_plots(nn_list=nn, block_num=1, output_dir=output_dir)
-    create_polar_plots(nn_list=nn, block_num=2, output_dir=output_dir)
+                                    'correction_self_onset', 'correction_partner_onset', 'correction_self_ioi',
+                                    'correction_partner_ioi'])
+    make_pairgrid(df=df, xvar='correction_partner_ioi', output=output_dir)
+    make_pairgrid(df=df, xvar='correction_partner_onset', output=output_dir)
+    make_polar(nn_list=nn, output_dir=output_dir)
 
