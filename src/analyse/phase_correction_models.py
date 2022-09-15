@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
-from pymer4.models import Lmer
 from prepare_data import zip_same_conditions_together, generate_df, append_zoom_array, reg_func, average_bpms
-from src.visualise.phase_correction_graphs import make_pairgrid, create_prediction_plots, make_polar
+from src.visualise.phase_correction_graphs import make_pairgrid, make_single_condition_phase_correction_plot, make_polar
 
 
 def delay_heard_onsets_by_latency(df: pd.DataFrame = object, ) -> pd.DataFrame:
@@ -96,54 +95,10 @@ def predict_from_model(md, df: pd.DataFrame) -> pd.DataFrame:
     pred = pd.Series(np.insert(np.cumsum(md.predict()) + df['live_prev_onset'].loc[0], 0, df['live_prev_onset'].loc[0]))
     df['predicted_onset'] = pred
     df['predicted_ioi'] = pred.diff()
-    return df[['live_prev_onset', 'predicted_onset', 'live_prev_ioi', 'predicted_ioi']]
-
-
-def phase_correction_lmer(df: pd.DataFrame,
-                          mod: str = 'correction_partner~latency*jitter+instrument'):
-    """
-    For every trial, creates a linear mixed effects model in Pymer4. Default model:
-    DV: phase correction to partner (continuous)
-    Fixed IVs: latency, jitter, instrument (categorical)
-    Random IVs: Random slope + intercept for block
-    """
-    for idx, grp in df.groupby('trial'):
-        md = Lmer(mod, data=grp).fit(factors={
-            "latency": ["0", "23", "45", "90", "180"],
-            "jitter": ["0.0", "0.5", "1.0", ],
-            "instrument": ['Keys', 'Drums']
-        })
-        print(md)
-
-
-def compare_linear_mixed_model(df: pd.DataFrame,
-                               linear_mod: str = 'correction_partner~C(latency)+C(jitter)+C(instrument)+C(block)',
-                               mixed_mod: str = 'correction_partner~latency+jitter+instrument+(1+latency+jitter+instrument|block)') -> pd.DataFrame:
-    """
-    Compare a linear and mixed effects regression model.
-    Returns a dataframe of AIC and log-likelihood values extracted from both models.
-    """
-    res = []
-    for idx, grp in df.groupby('trial'):
-        # Create the linear model in statsmodels and fit
-        md_l = smf.ols(linear_mod, data=grp)
-        fit_l = md_l.fit()
-        # Create the mixed effects model in Pymer4 and fit
-        md_m = Lmer(mixed_mod, data=grp)
-        fit_m = md_m.fit(factors={
-            "latency": ["0", "23", "45", "90", "180"],
-            "jitter": ["0.0", "0.5", "1.0", ],
-            "instrument": ['Keys', 'Drums']
-        }, summary=False, no_warnings=True)
-        # Extract summary statistics for both models
-        res.append({
-            'trial': idx,
-            'linear_aic': fit_l.aic,
-            'linear_ll': fit_l.llf,
-            'mixed_aic': md_m.AIC,
-            'mixed_ll': md_m.logLike
-        })
-    return pd.DataFrame(res, index='trial')
+    df['predicted_bpm'] = 60 / df['predicted_ioi']
+    df['live_bpm'] = 60 / df['live_prev_ioi']
+    df['elapsed'] = np.floor(df['live_prev_onset'])
+    return df
 
 
 def pc_live_ioi_delayed_ioi(raw_data, output_dir):
@@ -161,32 +116,28 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir):
             f1 = lambda c: delay_heard_onsets_by_latency(append_zoom_array(generate_df(c['midi_bpm']), c['zoom_array']))
             keys = f1(c1)
             drms = f1(c2)
-
             # For each performer, carry out the nearest neighbor algorithm
             f2 = lambda la, da, li, di: format_df_for_model(nearest_neighbor(la, da, li, di))
             keys_nn = f2(keys['onset'].to_numpy(), drms['onset_delayed'].to_numpy(), c1['instrument'], c2['instrument'])
             drms_nn = f2(drms['onset'].to_numpy(), keys['onset_delayed'].to_numpy(), c2['instrument'], c1['instrument'])
-
             # For each performer, create the phase correction model
-            keys_md1 = construct_phase_correction_model(keys_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_onset')
-            drms_md1 = construct_phase_correction_model(drms_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_onset')
-            keys_md2 = construct_phase_correction_model(keys_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_ioi')
-            drms_md2 = construct_phase_correction_model(drms_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_ioi')
-
+            keys_md = construct_phase_correction_model(keys_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_onset')
+            drms_md = construct_phase_correction_model(drms_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_onset')
+            make_single_condition_phase_correction_plot(keys_df=predict_from_model(keys_md, keys_nn), keys_md=keys_md,
+                                                        drms_df=predict_from_model(drms_md, drms_nn), drms_md=drms_md,
+                                                        meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
+                                                        output=output_dir, keys_o=keys, drms_o=drms)
+            # Append the results
             tempo_slope = reg_func(
                 average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm'])), ycol='bpm_avg', xcol='elapsed'
             ).params.iloc[1:].values[0]
-
-            # Append the results
-            f3 = lambda c, m1, m2, d: (c['trial'], c['block'], c['latency'], c['jitter'], c['instrument'], tempo_slope,
-                                       *m1.params.iloc[1:].values, *m2.params.iloc[1:].values)
-            res.append(f3(c1, keys_md1, keys_md2, keys_nn))
-            res.append(f3(c2, drms_md1, drms_md2, drms_nn))
+            f3 = lambda c, m1: (c['trial'], c['block'], c['latency'], c['jitter'], c['instrument'], tempo_slope,
+                                *m1.params.iloc[1:].values,)
+            res.append(f3(c1, keys_md))
+            res.append(f3(c2, drms_md))
             nn.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], keys_nn, drms_nn, tempo_slope))
-    df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
-                                    'correction_self_onset', 'correction_partner_onset', 'correction_self_ioi',
-                                    'correction_partner_ioi'])
-    make_pairgrid(df=df, xvar='correction_partner_ioi', output=output_dir)
-    make_pairgrid(df=df, xvar='correction_partner_onset', output=output_dir)
-    make_polar(nn_list=nn, output_dir=output_dir)
 
+    df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
+                                    'correction_self_onset', 'correction_partner_onset'])
+    make_pairgrid(df=df, output=output_dir, xvar='correction_partner_onset')
+    make_polar(nn_list=nn, output_dir=output_dir)

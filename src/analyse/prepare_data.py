@@ -168,24 +168,31 @@ def zip_same_conditions_together(raw_data: list) -> list[zip]:
     return all_trials
 
 
-def average_bpms(df1: pd.DataFrame, df2: pd.DataFrame, window_size: int = 4) -> pd.DataFrame:
+def average_bpms(df1: pd.DataFrame, df2: pd.DataFrame, window_size: int = 4, elap: str = 'elapsed', bpm: str = 'bpm') -> pd.DataFrame:
     """
     Returns a list of averaged BPMs from two performance.
     Data is grouped by every second in a performance.
     """
     # Merge dataframes from both performers together
-    bigdf = df1.merge(df2, how='inner', on='elapsed')
+    bigdf = df1.merge(df2, how='inner', on=elap)
     # Set function
     fn = lambda g: g.drop_duplicates().dropna().tolist()
     # Average tempo of beat onsets created by both musicians within one second
     with warnings.catch_warnings():     # Catch errors when we don't have any values for one particular second
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        avg_tempo = [(idx, np.nanmean([*fn(grp['bpm_x']), *fn(grp['bpm_y'])])) for idx, grp in bigdf.groupby('elapsed')]
+        avg_tempo = [(idx, np.nanmean([*fn(grp[f'{bpm}_x']), *fn(grp[f'{bpm}_y'])])) for idx, grp in bigdf.groupby(elap)]
     # Create dataframe
-    processed_df = pd.DataFrame(avg_tempo, columns=['elapsed', 'bpm_avg'])
+    df = pd.DataFrame(avg_tempo, columns=['elapsed', 'bpm_avg'])
+    # Reindex in case any rows are missing!
+    df.elapsed = df.elapsed.astype(int)
+    new_index = pd.Index(
+        [num for num in range(df.elapsed.min(), df.elapsed.max()+1)],
+        name="elapsed"
+    )
+    df = df.set_index('elapsed').reindex(new_index).reset_index()
     # Roll average BPM column
-    processed_df['bpm_rolling'] = processed_df['bpm_avg'].rolling(window=window_size).mean()
-    return processed_df
+    df['bpm_rolling'] = df['bpm_avg'].rolling(window=window_size, min_periods=1).mean()
+    return df
 
 
 def ioi_nearest_neighbours_intersection(a1, a2) -> list:

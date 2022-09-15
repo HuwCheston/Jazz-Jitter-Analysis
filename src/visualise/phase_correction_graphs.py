@@ -3,11 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import seaborn as sns
-import statsmodels.formula.api as smf
+
 import src.visualise.visualise_utils as vutils
+from src.analyse.prepare_data import average_bpms
 
 
-def make_pairgrid(df, output: str, xvar: str = 'correction_partner'):
+def make_pairgrid(df, output: str, xvar: str = 'correction_partner_onset'):
     """
     Creates a figure showing pairs of coefficients obtained for each performer in a condition,
     stratified by block and trial number, with shading according to tempo slope
@@ -63,19 +64,6 @@ def _format_pairgrid_fig(g, norm):
     g.fig.get_axes()[0].legend(loc='lower center', ncol=2, bbox_to_anchor=(2.85, -1.36), title=None, frameon=False)
     # Adjust the plot spacing
     g.fig.subplots_adjust(bottom=0.10, top=0.94, wspace=0.15, left=0.1, right=0.93)
-
-
-def create_prediction_plots(pred_list: list[tuple], output_dir: str):
-    test_li = [item for item in pred_list if item[0] == 4 and item[1] == 1 and item[2] == 45 and item[3] == 0]
-    km = test_li[0][4]
-    md = smf.ols('live_next_ioi~live_prev_ioi+live_delayed_onset+live_delayed_ioi', data=km).fit()
-    f = lambda d: (60 / d.dropna()).rolling(8).mean()
-    plt.plot(f(km['live_prev_ioi']), label='Data')
-    plt.plot(f(pd.Series(
-        np.insert(np.cumsum(md.predict()) + km['live_prev_onset'].loc[0], 0, km['live_prev_onset'].loc[0])).diff()),
-             label='Predicted')
-    plt.legend()
-    plt.show()
 
 
 def make_polar(nn_list: list[tuple], output_dir: str,) -> None:
@@ -178,13 +166,15 @@ def _format_polar_data(df: pd.DataFrame, num_bins: int = 10) -> pd.DataFrame:
     return cut
 
 
-def _format_polar_ax(ax: plt.Axes, sl) -> None:
+def _format_polar_ax(ax: plt.Axes, sl, yt: list = None, xt: list = None) -> None:
     """
     Formats a polar subplot by setting axis ticks and gridlines, rotation properties, and facecolor
     """
+    # Used to test if we've provided xticks already
+    test_none = lambda t: [] if t is None else t
     # Set the y axis ticks and gridlines
-    ax.set_yticks([])
-    ax.set_xticks([])
+    ax.set_yticks(test_none(yt))
+    ax.set_xticks(test_none(xt))
     ax.grid(False)
     # Set the polar plot rotation properties, direction, etc
     ax.set_thetamin(-90)
@@ -212,3 +202,83 @@ def _format_polar_fig(fig: plt.Figure, hand, lab, norm):
     # Create and position legend
     plt.legend(hand, lab, ncol=2, loc='lower center', bbox_to_anchor=(-46, -0.34), title=None,
                frameon=False, fontsize='xx-large')
+
+
+def make_single_condition_phase_correction_plot(keys_df: pd.DataFrame, drms_df: pd.DataFrame,
+                                                keys_md, drms_md,
+                                                keys_o: pd.DataFrame, drms_o: pd.DataFrame,
+                                                output: str,
+                                                meta: tuple = ('nan', 'nan', 'nan', 'nan'),):
+    """
+    Generate a nice plot of a single performance, showing actual and predicted tempo slope, relative phase adjustments,
+    phase correction coefficients to partner and self for both performers
+    """
+    out = vutils.create_output_folder(output, parent='phase_correction_models', child=f'individual\\duo_{meta[0]}')
+    # Create the matplotlib objects - figure with gridspec, 5 subplots
+    fig = plt.figure(figsize=(8, 8))
+    ax = vutils.get_gridspec_array(fig=fig)
+    # Plot onto the different parts of the gridspec
+    _single_fig_slopes(ax, keys_df=keys_df, drms_df=drms_df, keys_o=keys_o, drms_o=drms_o)
+    _single_fig_polar(ax, drms_df, keys_df)
+    _single_fig_coefficients(ax, drms_md, keys_md)
+    # Format the figure and save
+    fig.suptitle(f'Duo {meta[0]} (measure {meta[1]}): latency {meta[2]}ms, jitter {meta[3]}x')
+    fig.savefig(f'{out}\\duo{meta[0]}_measure{meta[1]}_latency{meta[2]}_jitter{meta[3]}.png')
+    plt.close()
+
+
+def _single_fig_polar(ax: plt.Axes, drms_df: pd.DataFrame, keys_df: pd.DataFrame) -> None:
+    """
+    For a plot of a single performance, create two polar plots showing phase difference between performers
+    """
+    # Create the polar plots
+    ax[0, 1].sharex(ax[0, 0])
+    for num, (ins, st) in enumerate(zip([keys_df, drms_df], ['Keys', 'Drums'])):
+        dat = _format_polar_data(ins, num_bins=15)
+        ax[0, num].bar(x=dat.idx, height=dat.val, width=0.05, label=st,
+                       color=vutils.data_cmap_contrast[0] if st == 'Keys' else vutils.data_cmap_contrast[1])
+        _format_polar_ax(ax=ax[0, num], sl='#ffffff', xt=np.pi / 180 * np.linspace(-90, 90, 5, endpoint=True),
+                         yt=[0, max(ax[0, num].get_yticks())])
+        ax[0, num].set(ylabel='', xlabel='')
+        x0, y0, x1, y1 = ax[0, num].get_position().get_points().flatten().tolist()
+        ax[0, num].set_position([x0-0.1 if num == 0 else x0-0.2, y0-0.03, x1-0.05 if num == 0 else x1-0.2, y1-0.5])
+        ax[0, num].text(-0.1, 0.8, s=st, transform=ax[0, num].transAxes, ha='center',)
+        if num == 0:
+            ax[0, num].text(1.5, 0.05, s="Relative Phase (πms)",
+                            transform=ax[0, num].transAxes, ha='center',)
+            ax[0, num].set_title('Relative Phase to Partner', x=1.5)
+
+
+def _single_fig_coefficients(ax: plt. Axes, drms_md, keys_md) -> None:
+    corr = pd.concat([keys_md.params, drms_md.params], axis=1).rename(
+        columns={0: 'Keys', 1: 'Drums'}).transpose().rename(
+        columns={'live_prev_ioi': 'Self', 'live_delayed_onset': 'Partner'}).reset_index(drop=False)
+    ax[1, 1].sharex(ax[1, 0])
+    for num, st in zip(range(0, 2), ['Keys', 'Drums']):
+        drms = corr[corr['index'] == st].melt().loc[2:]
+        g = sns.stripplot(ax=ax[1, num], x='value', y='variable', data=drms, jitter=False, dodge=False, marker='D', s=7,
+                          color=vutils.data_cmap_contrast[0] if st == 'Keys' else vutils.data_cmap_contrast[1])
+        g.set_xlim((-1.5, 1.5))
+        g.yaxis.grid(True)
+        g.xaxis.grid(False)
+        g.axvline(alpha=vutils.ALPHA, linestyle='-', color='#000000')
+        sns.despine(ax=g, left=True, bottom=True)
+        g.text(0.05, 0.9, s=st, transform=g.transAxes, ha='center', )
+        g.set_ylabel('')
+        if num == 0:
+            g.axes.set_yticks(g.axes.get_yticks(), g.axes.get_yticklabels())
+            g.axes.set_yticklabels(labels=g.axes.get_yticklabels(), va='center')
+            g.set_title('Phase Correction', x=1)
+            g.set_xlabel('Coefficient', x=1)
+        else:
+            g.axes.set_yticklabels('')
+            g.set_xlabel('')
+
+
+def _single_fig_slopes(ax: plt.Axes, keys_df: pd.DataFrame, drms_df: pd.DataFrame, keys_o: pd.DataFrame, drms_o: pd.DataFrame):
+    # Plot the actual and predicted rolling tempo slope
+    func = lambda s: average_bpms(keys_df, drms_df, elap='elapsed', bpm=s)
+    for df, lab in zip((average_bpms(keys_o, drms_o), func('predicted_bpm')), ('Actual', 'Fitted')):
+        ax[2, 0].plot(df['elapsed'], df['bpm_rolling'], label=lab)
+    ax[2, 0].legend()
+    ax[2, 0].set(xlabel='Performance Duration (s)', ylabel='Average tempo (BPM)', ylim=(30, 160), title='Tempo Slope')
