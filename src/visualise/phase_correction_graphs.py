@@ -323,5 +323,5 @@ def make_single_condition_slope_animation(keys_df, drms_df, keys_o: pd.DataFrame
     # Create the animation and save to our directory
     anim = animation.FuncAnimation(fig, animate, init_func=init, frames=int(act.index.max()),
                                    interval=1000 / vutils.VIDEO_FPS, blit=True)
-    anim.save(f'{out}\\duo{meta[0]}_measure{meta[1]}_latency{meta[2]}_jitter{meta[3]}.png',
+    anim.save(f'{out}\\duo{meta[0]}_measure{meta[1]}_latency{meta[2]}_jitter{meta[3]}.mp4',
               writer='ffmpeg', fps=vutils.VIDEO_FPS)
