@@ -2,8 +2,6 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 import seaborn as sns
 import pandas as pd
-import numpy as np
-from statistics import median
 from operator import itemgetter
 from itertools import groupby
 from src.analyse.prepare_data import generate_df, average_bpms, zip_same_conditions_together, reg_func
@@ -26,11 +24,8 @@ def gen_tempo_slope_graph(raw_data, output_dir, block_num: int = None,):
     # For each condition, generate the rolling BPM average across the ensemble
     data = return_data(raw_data)
     # Set colormap properties
-    norm = vutils.create_normalised_cmap(slopes=[reg_func(d[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0] for d in data])
-    xrange = (
-        min([d[-1]['elapsed'].min() for d in data]) - vutils.OFFSET,
-        median([d[-1]['elapsed'].median() for d in data]) - vutils.OFFSET,
-        max([d[-1]['elapsed'].max() for d in data]) - vutils.OFFSET,
+    vutils.create_normalised_cmap(
+        slopes=[reg_func(d[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0] for d in data]
     )
     # Calculate number of discrete trials and conditions within dataset
     fn = lambda nu: max(data, key=itemgetter(nu))[nu]
@@ -46,14 +41,14 @@ def gen_tempo_slope_graph(raw_data, output_dir, block_num: int = None,):
             li = [t for t in li if t[1] == block_num]
         # Iterate through each condition and plot
         for num, i in enumerate(li):
-            plot_avg_tempo_for_condition(num_iter=num, con_data=i, ax=ax, n_conditions=n_conditions, norm=norm, xrange=xrange)
+            plot_avg_tempo_for_condition(num_iter=num, con_data=i, ax=ax, n_conditions=n_conditions,)
     # Format the figure
-    fig = format_figure(fig=fig, data=data, xrange=xrange, norm=norm, block_num=block_num)
+    fig = format_figure(fig=fig, data=data,)
     # Save the result to the output_filepath
     fig.savefig(f'{out}\\tempo_slopes.png')
 
 
-def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n_conditions: int = 13, xrange: tuple = (8, 50.5, 93), norm=None,):
+def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n_conditions: int = 13, ):
     """
     Plots the data for one condition on one subplot of the overall figure
     """
@@ -74,19 +69,15 @@ def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n
     # Add the reference column as a horizontal line
     if con_data[1] == 2:
         condition_axis.axhline(y=120, color='r', linestyle='--', alpha=0.3, label='Metronome Tempo')
-    # # Shade the plot according to the tempo slope coefficient
-    # coef = reg_func(con_data[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0]
-    # condition_axis.axvspan(xrange[0], xrange[2], alpha=0.4, facecolor=sloeps_cmap(norm(coef)))
 
 
-def format_figure(fig: plt.Figure, data: list, xrange: tuple = (8, 50.5, 93), norm=None, block_num: int = 1) -> plt.Figure:
+def format_figure(fig: plt.Figure, data: list,) -> plt.Figure:
     """
     Formats the overall figure, setting axis limits, adding labels/titles, configuring legend
     """
     # Set x and y axis limit for figure according to max/min values of data
-    plt.ylim(min([d[-1]['bpm_rolling'].min() for d in data]) - vutils.OFFSET,
-             max([d[-1]['bpm_rolling'].max() for d in data]) + vutils.OFFSET)
-    plt.xlim(xrange[0], xrange[2])
+    plt.xlim(vutils.get_xrange(data=data))
+    plt.ylim(vutils.get_yrange(data=data))
     # Set x and y labels, title
     fig.supxlabel('Performance Duration (s)', y=0.05)
     fig.supylabel('Average tempo (BPM, four-beat rolling window)', x=0.01)
@@ -104,7 +95,9 @@ def format_figure(fig: plt.Figure, data: list, xrange: tuple = (8, 50.5, 93), no
 def gen_tempo_slope_heatmap(raw_data, output_dir,):
     data = return_data(raw_data)
     # Set colormap properties
-    slopes = [(d[0], d[1], d[3], d[4], reg_func(d[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0]) for d in data]
+    slopes = [
+        (d[0], d[1], d[3], d[4], reg_func(d[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0]) for d in data
+    ]
     df = pd.DataFrame(slopes, columns=['trial', 'block', 'latency', 'jitter', 'slope']).sort_values(
         by=['trial', 'block', 'latency', 'jitter'])
     df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
@@ -126,7 +119,7 @@ def gen_tempo_slope_heatmap(raw_data, output_dir,):
     fig.supylabel('Duo Number', x=0.01)
     fig.supxlabel('Condition')
     position = fig.add_axes([0.95, 0.2, 0.01, 0.6])
-    cb = fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position, )
+    fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position)
     position.text(0, 0.3, 'Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
     plt.subplots_adjust(bottom=0.05, wspace=0.05, hspace=0.15, right=0.95)
     plt.text(-3, -0.18, 'Measure Number', rotation=-90, fontsize=12)
@@ -150,16 +143,23 @@ def tempo_slope_animation(raw_data: list, output_dir: str) -> None:
 
     out = vutils.create_output_folder(out=output_dir, parent='tempo_slopes_graphs', child='animations_individual')
     data = return_data(raw_data)
+    # Get xrange and yrange now so we don't have to repeatedly iterate through the raw data
+    xrange = vutils.get_xrange(data=data, max_off=0)
+    yrange = vutils.get_yrange(data=data)
     for c in data:
         # Create the dataframe by appending blank rows and interpolating
         df = vutils.append_count_in_rows_to_df(df_avg_slopes=c[5])
         df = vutils.interpolate_df_rows(df=df)
         # Create the matplotlib objects we need
         fig = plt.figure()
-        ax = plt.axes(xlim=(int(df['elapsed'].min()), int(df['elapsed'].max())), ylim=(30, 160),
-                      xlabel='Performance Duration (s)', ylabel='Average tempo (BPM)',
+        ax = plt.axes(xlim=xrange, ylim=yrange, xlabel='Performance duration (s)',
+                      ylabel='Average tempo (BPM, four-beat rolling window)',
                       title=f'Duo {c[0]} (measure {c[1]}): latency {c[3]}ms, jitter {c[4]}x')
-        line, = ax.plot([], [], lw=2)
+        line, = ax.plot([], [], lw=2, label='Performance Tempo')
+        # Set the axes parameters
+        ax.tick_params(axis='both', which='both', bottom=False, left=False,)
+        ax.axhline(y=120, color='r', linestyle='--', alpha=0.3, label='Metronome Tempo')
+        ax.legend()
         # Create the animation and save to our directory
         anim = animation.FuncAnimation(fig, animate, init_func=init, frames=int(df.index.max()),
                                        fargs=(df,), interval=1000/vutils.VIDEO_FPS, blit=True)

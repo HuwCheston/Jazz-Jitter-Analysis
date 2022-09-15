@@ -90,3 +90,17 @@ def interpolate_df_rows(df: pd.DataFrame) -> pd.DataFrame:
                            (df.shape[0] - 1) * (VIDEO_FPS - 1) + df.shape[0])
     # Reindex the input dataframe and interpolate according to it
     return df.reindex(new_indx).interpolate(method='index').reset_index(drop=False)
+
+
+def get_xrange(data, min_off: int = -OFFSET, max_off: int = -OFFSET) -> tuple:
+    return (
+        min([d[-1]['elapsed'].min() for d in data]) + min_off,
+        max([d[-1]['elapsed'].max() for d in data]) + max_off,
+    )
+
+
+def get_yrange(data, min_off: int = -OFFSET, max_off: int = -OFFSET) -> tuple:
+    return (
+        min([d[-1]['bpm_rolling'].min() for d in data]) + min_off,
+        max([d[-1]['bpm_rolling'].max() for d in data]) + max_off
+    )

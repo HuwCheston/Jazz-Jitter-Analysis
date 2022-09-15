@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import animation
 from matplotlib.lines import Line2D
 import seaborn as sns
 
@@ -277,8 +278,50 @@ def _single_fig_coefficients(ax: plt. Axes, drms_md, keys_md) -> None:
 
 def _single_fig_slopes(ax: plt.Axes, keys_df: pd.DataFrame, drms_df: pd.DataFrame, keys_o: pd.DataFrame, drms_o: pd.DataFrame):
     # Plot the actual and predicted rolling tempo slope
-    func = lambda s: average_bpms(keys_df, drms_df, elap='elapsed', bpm=s)
-    for df, lab in zip((average_bpms(keys_o, drms_o), func('predicted_bpm')), ('Actual', 'Fitted')):
+    z = zip((average_bpms(keys_o, drms_o), average_bpms(keys_df, drms_df, elap='elapsed', bpm='predicted_bpm')),
+            ('Actual', 'Fitted'))
+    for df, lab in z:
         ax[2, 0].plot(df['elapsed'], df['bpm_rolling'], label=lab)
     ax[2, 0].legend()
     ax[2, 0].set(xlabel='Performance Duration (s)', ylabel='Average tempo (BPM)', ylim=(30, 160), title='Tempo Slope')
+
+
+def make_single_condition_slope_animation(keys_df, drms_df, keys_o: pd.DataFrame, drms_o: pd.DataFrame,
+                                          output_dir, meta: tuple = ('nan', 'nan', 'nan', 'nan'),):
+    def init():
+        act_line.set_data([], [])
+        pred_line.set_data([], [])
+        return act_line, pred_line,
+
+    def animate(i: int,):
+        f = lambda d: d[d.index <= i]
+        a, p = f(act), f(pred)
+        act_line.set_data(a['elapsed'].to_numpy(), a['bpm_rolling'].to_numpy())
+        pred_line.set_data(p['elapsed'].to_numpy(), p['bpm_rolling'].to_numpy())
+        return act_line, pred_line,
+
+    out = vutils.create_output_folder(output_dir, parent='phase_correction_models',
+                                      child=f'individual_animations\\duo_{meta[0]}')
+
+    chain = lambda k, d, e, b: vutils.interpolate_df_rows(
+        vutils.append_count_in_rows_to_df(average_bpms(df1=k, df2=d, elap=e, bpm=b)))
+    act = chain(keys_o, drms_o, 'elapsed', 'bpm')
+    pred = chain(keys_df, drms_df, 'elapsed', 'predicted_bpm')
+
+    # Create the matplotlib objects we need
+    fig = plt.figure()
+    ax = plt.axes(xlabel='Performance duration (s)',
+                  ylabel='Average tempo (BPM, four-beat rolling window)',
+                  xlim=(0, 100), ylim=(30, 160),
+                  title=f'Duo {meta[0]} (measure {meta[1]}): latency {meta[2]}ms, jitter {meta[3]}x')
+    act_line, = ax.plot([], [], lw=2, label='Actual tempo')
+    pred_line, = ax.plot([], [], lw=2, label='Fitted tempo')
+    # Set the axes parameters
+    ax.tick_params(axis='both', which='both', bottom=False, left=False, )
+    ax.axhline(y=120, color='r', linestyle='--', alpha=0.3, label='Metronome tempo')
+    ax.legend()
+    # Create the animation and save to our directory
+    anim = animation.FuncAnimation(fig, animate, init_func=init, frames=int(act.index.max()),
+                                   interval=1000 / vutils.VIDEO_FPS, blit=True)
+    anim.save(f'{out}\\duo{meta[0]}_measure{meta[1]}_latency{meta[2]}_jitter{meta[3]}.png',
+              writer='ffmpeg', fps=vutils.VIDEO_FPS)
