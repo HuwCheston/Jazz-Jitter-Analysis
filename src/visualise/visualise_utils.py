@@ -11,14 +11,24 @@ from statistics import median
 ALPHA = 0.4
 OFFSET = 8
 VIDEO_FPS = 30
-
-# Function used to shade a cmap by given alpha value (can be used in colorbars etc)
-cmap_alpha = lambda pal: ListedColormap(np.c_[pal.colors, np.full(len(pal.colors), fill_value=ALPHA)])
+CBAR_BINS = np.linspace(-0.5, 0.3, 9, endpoint=True)
 
 # Define the colour palettes
+# Function used to shade a cmap by given alpha value (can be used in colorbars etc)
+cmap_alpha = lambda pal: ListedColormap(np.c_[pal.colors, np.full(len(pal.colors), fill_value=ALPHA)])
 slopes_cmap = cmap_alpha(color_palette('vlag_r', as_cmap=True))     # Used for plotting tempo slopes
 data_cmap_contrast = ['#9933ff', '#00ff00']     # Palette used for plotting data that contrasts against slopes_cmap
 data_cmap_orig = ['#1f77b4', '#ff7f0e']     # Original matplotlib colour palette used for manual plotting
+
+
+def plot_decorator(func):
+    """
+    Decorator called before and after plotting. Used to cleanly save and close matplotlib figure returned by a function.
+    """
+    def wrapper(*args, **kwargs):
+        fig = func(*args, **kwargs)
+        plt.close(fig)
+    return wrapper
 
 
 def create_output_folder(out: str, parent: str = 'default', child: str = None):

@@ -14,41 +14,41 @@ def make_pairgrid(df, output: str, xvar: str = 'correction_partner_onset'):
     Creates a figure showing pairs of coefficients obtained for each performer in a condition,
     stratified by block and trial number, with shading according to tempo slope
     """
-    output = vutils.create_output_folder(output, parent='phase_correction_models', child='pairgrid')
+    output = vutils.create_output_folder(output, parent='phase_correction_plots', child='grouped')
     # Create the abbreviation column, showing latency and jitter
     df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
     df = df.sort_values(by=['latency', 'jitter'])
     # Sort the palette for the shading
     norm = vutils.create_normalised_cmap(df['tempo_slope'])
     # Create the plot
-    g = sns.catplot(
+    pg = sns.catplot(
         data=df, x=xvar, y='abbrev', row='block', col='trial', hue='instrument', hue_order=['Keys', 'Drums'],
-        palette=sns.color_palette(vutils.data_cmap_contrast), kind='strip', height=4, sharex=True, sharey=True,
-        aspect=0.6, s=7, jitter=False, dodge=False, marker='D',
+        palette=vutils.data_cmap_contrast, kind='strip', height=4, sharex=True, sharey=True,
+        aspect=0.6, s=7, jitter=False, dodge=False,
     )
     # Format the axis by iterating through
     for num in range(0, 5):
         # When we want different formatting for each row
-        g.axes[0, num].set(title=f'Measure 1\nDuo {num + 1}' if num == 2 else f'\nDuo {num + 1}', ylabel='',
-                           xlim=(-1, 1), )
-        g.axes[0, num].tick_params(bottom=False)
-        g.axes[1, num].set(title='Measure 2' if num == 2 else '', ylabel='', xlabel='', xlim=(-1, 1))
+        pg.axes[0, num].set(title=f'Measure 1\nDuo {num+1}' if num == 2 else f'\nDuo {num+1}', ylabel='', xlim=(-1, 1))
+        pg.axes[0, num].tick_params(bottom=False)
+        pg.axes[1, num].set(title='Measure 2' if num == 2 else '', ylabel='', xlabel='', xlim=(-1, 1))
         # When we want the same formatting for both rows
         for x in range(0, 2):
             # Disable the grid
-            g.axes[x, num].xaxis.grid(False)
-            g.axes[x, num].yaxis.grid(True)
+            pg.axes[x, num].xaxis.grid(False)
+            pg.axes[x, num].yaxis.grid(True)
             # Add on a vertical line at x=0
-            g.axes[x, num].axvline(alpha=vutils.ALPHA, linestyle='-', color='#000000')
+            pg.axes[x, num].axvline(alpha=vutils.ALPHA, linestyle='-', color='#000000')
             # Add the span, shaded according to tempo slope
             d = df[
-                (df['trial'] == num + 1) & (df['block'] == x + 1) & (df['instrument'] == 'Keys')
+                    (df['trial'] == num + 1) & (df['block'] == x + 1) & (df['instrument'] == 'Keys')
                 ].sort_values(['latency', 'jitter'])['tempo_slope']
             for n in range(0, 13):
                 coef = vutils.slopes_cmap(norm(d.iloc[n]))
-                g.axes[x, num].axhspan(n - 0.5, n + 0.5, facecolor=coef)
-    _format_pairgrid_fig(g, norm)
-    g.savefig(f'{output}\\condition_vs_{xvar}_pointplot.png')
+                pg.axes[x, num].axhspan(n - 0.5, n + 0.5, facecolor=coef)
+    _format_pairgrid_fig(pg, norm)
+    pg.savefig(f'{output}\\pairgrid_condition_vs_{xvar}.png')
+    return pg
 
 
 def _format_pairgrid_fig(g, norm):
@@ -58,7 +58,7 @@ def _format_pairgrid_fig(g, norm):
     g.fig.supylabel('Condition', x=0.01)
     # Add the colorbar
     position = g.fig.add_axes([0.95, 0.3, 0.01, 0.4])
-    g.fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position, )
+    g.fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position, ticks=vutils.CBAR_BINS)
     position.text(0, 0.3, ' Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
     # Add the legend
     g.legend.remove()
@@ -67,12 +67,47 @@ def _format_pairgrid_fig(g, norm):
     g.fig.subplots_adjust(bottom=0.10, top=0.94, wspace=0.15, left=0.1, right=0.93)
 
 
+@vutils.plot_decorator
+def make_correction_boxplot_by_variable(df: pd.DataFrame, output_dir: str,
+                                        exclude_control: bool = True, xvar: str = 'jitter') -> None:
+    """
+    Creates a figure showing correction to partner coefficients obtained for each performer in a duo, stratified by a
+    given variable (defaults to jitter scale). By default, the control condition is not included in this plot,
+    but this can be overridden by setting exclude_control to False.
+    """
+    output = vutils.create_output_folder(output_dir, parent='phase_correction_plots', child='grouped')
+    # Format the data to exclude the control condition
+    if exclude_control:
+        df = df[df['latency'] != 0]
+    # Create the plot
+    bp = sns.catplot(
+        data=df, x=xvar, y='correction_partner_onset', col='trial', hue='instrument', kind='box', sharex=True,
+        sharey=True, palette=vutils.data_cmap_contrast, height=4, aspect=0.6,
+    )
+    # Adjust axes-level parameters
+    bp.set(ylim=(-1.0, 1.0), xlabel='', ylabel='', )
+    bp.set_titles("Duo {col_name}")
+    for ax in bp.axes.flat:
+        ax.axhline(alpha=vutils.ALPHA, linestyle='-', color='#000000')
+        ax.yaxis.set_ticks(np.linspace(-1, 1, 5, endpoint=True))
+    # Adjust figure-level parameters
+    bp.figure.supxlabel(xvar.title(), y=0.06)
+    bp.figure.supylabel('Correction to Partner', x=0.007)
+    sns.move_legend(bp, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01))
+    # Adjust plot spacing
+    bp.figure.subplots_adjust(bottom=0.17, top=0.92, left=0.055, right=0.97)
+    # Save the plot
+    bp.savefig(f'{output}\\boxplot_correction_vs_{xvar}.png')
+    return bp.figure
+
+
+@vutils.plot_decorator
 def make_polar(nn_list: list[tuple], output_dir: str,) -> None:
     """
     Creates circle plots showing relative phase (i.e. playing before or after reference) for both musicians for a trial.
     """
     # Create the folder to store the plots
-    output_path = vutils.create_output_folder(output_dir, parent='phase_correction_models', child='polar_plots')
+    output_path = vutils.create_output_folder(output_dir, parent='phase_correction_plots', child='grouped')
     # Subset the data for only the block we are plotting
     sorter = lambda e: (e[0], e[1], e[2], e[3], e[4])
     to_plot = [t for t in sorted(nn_list, key=sorter)]
@@ -123,7 +158,8 @@ def make_polar(nn_list: list[tuple], output_dir: str,) -> None:
     # Add horizontal and vertical lines separating subplots
     _add_horizontal_lines_polar(fig)
     # Save figure
-    fig.savefig(f'{output_path}\\polarplot.png')
+    fig.savefig(f'{output_path}\\polarplot_relative_phase.png')
+    return fig
 
 
 def _add_vertical_lines_polar(fig: plt.Figure, start: float = 0.093, step: float = 0.2134,
@@ -195,9 +231,9 @@ def _format_polar_fig(fig: plt.Figure, hand, lab, norm):
     fig.supxlabel("Relative Phase to Partner's Onsets (πms)", y=0.03, fontsize='xx-large')
     # Create and position colourbar
     position = fig.add_axes([0.95, 0.2, 0.01, 0.6])
-    fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position,)
+    fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position, ticks=vutils.CBAR_BINS)
     position.tick_params(labelsize=17.7)
-    position.text(0, 0.3, 'Slope\n(BPM/s)\n', fontsize='xx-large')  # Super hacky way to add a title...
+    position.text(0, 0.3, 'Slope\n(BPM/s)\n\n', fontsize='xx-large')  # Super hacky way to add a title...
     # Adjust positioning slightly
     fig.subplots_adjust(bottom=0.03, top=0.96, wspace=0.3, left=0.03, right=0.94, hspace=-0.1)
     # Create and position legend
@@ -205,6 +241,7 @@ def _format_polar_fig(fig: plt.Figure, hand, lab, norm):
                frameon=False, fontsize='xx-large')
 
 
+@vutils.plot_decorator
 def make_single_condition_phase_correction_plot(keys_df: pd.DataFrame, drms_df: pd.DataFrame,
                                                 keys_md, drms_md,
                                                 keys_o: pd.DataFrame, drms_o: pd.DataFrame,
@@ -214,7 +251,7 @@ def make_single_condition_phase_correction_plot(keys_df: pd.DataFrame, drms_df: 
     Generate a nice plot of a single performance, showing actual and predicted tempo slope, relative phase adjustments,
     phase correction coefficients to partner and self for both performers
     """
-    out = vutils.create_output_folder(output, parent='phase_correction_models', child=f'individual\\duo_{meta[0]}')
+    out = vutils.create_output_folder(output, parent='phase_correction_plots', child=f'individual')
     # Create the matplotlib objects - figure with gridspec, 5 subplots
     fig = plt.figure(figsize=(8, 8))
     ax = vutils.get_gridspec_array(fig=fig)
@@ -225,7 +262,7 @@ def make_single_condition_phase_correction_plot(keys_df: pd.DataFrame, drms_df: 
     # Format the figure and save
     fig.suptitle(f'Duo {meta[0]} (measure {meta[1]}): latency {meta[2]}ms, jitter {meta[3]}x')
     fig.savefig(f'{out}\\duo{meta[0]}_measure{meta[1]}_latency{meta[2]}_jitter{meta[3]}.png')
-    plt.close()
+    return fig
 
 
 def _single_fig_polar(ax: plt.Axes, drms_df: pd.DataFrame, keys_df: pd.DataFrame) -> None:
@@ -276,7 +313,8 @@ def _single_fig_coefficients(ax: plt. Axes, drms_md, keys_md) -> None:
             g.set_xlabel('')
 
 
-def _single_fig_slopes(ax: plt.Axes, keys_df: pd.DataFrame, drms_df: pd.DataFrame, keys_o: pd.DataFrame, drms_o: pd.DataFrame):
+def _single_fig_slopes(ax: plt.Axes, keys_df: pd.DataFrame, drms_df: pd.DataFrame,
+                       keys_o: pd.DataFrame, drms_o: pd.DataFrame):
     # Plot the actual and predicted rolling tempo slope
     z = zip((average_bpms(keys_o, drms_o), average_bpms(keys_df, drms_df, elap='elapsed', bpm='predicted_bpm')),
             ('Actual', 'Fitted'))
@@ -300,8 +338,7 @@ def make_single_condition_slope_animation(keys_df, drms_df, keys_o: pd.DataFrame
         pred_line.set_data(p['elapsed'].to_numpy(), p['bpm_rolling'].to_numpy())
         return act_line, pred_line,
 
-    out = vutils.create_output_folder(output_dir, parent='phase_correction_models',
-                                      child=f'individual_animations\\duo_{meta[0]}')
+    out = vutils.create_output_folder(output_dir, parent='phase_correction_anims', child=f'tempo_slopes')
 
     chain = lambda k, d, e, b: vutils.interpolate_df_rows(
         vutils.append_count_in_rows_to_df(average_bpms(df1=k, df2=d, elap=e, bpm=b)))

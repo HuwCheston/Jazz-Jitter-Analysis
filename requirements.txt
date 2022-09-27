@@ -15,7 +15,7 @@ matplotlib
 pretty_midi
 librosa
 scipy
-seaborn
+seaborn==0.11.2
 statsmodels
 openpyxl
 lxml

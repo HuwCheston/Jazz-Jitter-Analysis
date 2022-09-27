@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 from prepare_data import zip_same_conditions_together, generate_df, append_zoom_array, reg_func, average_bpms
-from src.visualise.phase_correction_graphs import make_pairgrid, make_single_condition_phase_correction_plot, make_polar, make_single_condition_slope_animation
+from src.visualise.phase_correction_graphs import make_pairgrid, make_single_condition_phase_correction_plot, make_polar, make_single_condition_slope_animation, make_correction_boxplot_by_variable
 
 
 def delay_heard_onsets_by_latency(df: pd.DataFrame = object, ) -> pd.DataFrame:
@@ -101,7 +101,7 @@ def predict_from_model(md, df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def pc_live_ioi_delayed_ioi(raw_data, output_dir):
+def pc_live_ioi_delayed_ioi(raw_data, output_dir, make_anim: bool = False):
     """
     Creates a phase correction model for all performances.
     """
@@ -123,16 +123,16 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir):
             # For each performer, create the phase correction model
             keys_md = construct_phase_correction_model(keys_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_onset')
             drms_md = construct_phase_correction_model(drms_nn, mod='live_next_ioi~live_prev_ioi+live_delayed_onset')
-            # make_single_condition_phase_correction_plot(keys_df=predict_from_model(keys_md, keys_nn), keys_md=keys_md,
-            #                                             drms_df=predict_from_model(drms_md, drms_nn), drms_md=drms_md,
-            #                                             meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
-            #                                             output=output_dir, keys_o=keys, drms_o=drms)
-
-            make_single_condition_slope_animation(keys_df=predict_from_model(keys_md, keys_nn),
-                                                  drms_df=predict_from_model(drms_md, drms_nn),
-                                                  keys_o=keys, drms_o=drms, output_dir=output_dir,
-                                                  meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']))
-
+            # Generate output from single condition
+            make_single_condition_phase_correction_plot(keys_df=predict_from_model(keys_md, keys_nn), keys_md=keys_md,
+                                                        drms_df=predict_from_model(drms_md, drms_nn), drms_md=drms_md,
+                                                        meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
+                                                        output=output_dir, keys_o=keys, drms_o=drms)
+            if make_anim:
+                make_single_condition_slope_animation(keys_df=predict_from_model(keys_md, keys_nn),
+                                                      drms_df=predict_from_model(drms_md, drms_nn),
+                                                      keys_o=keys, drms_o=drms, output_dir=output_dir,
+                                                      meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']))
             # Append the results
             tempo_slope = reg_func(
                 average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm'])), ycol='bpm_avg', xcol='elapsed'
@@ -142,8 +142,9 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir):
             res.append(f3(c1, keys_md))
             res.append(f3(c2, drms_md))
             nn.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], keys_nn, drms_nn, tempo_slope))
-
+    # Generate outputs from all conditions
     df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
                                     'correction_self_onset', 'correction_partner_onset'])
     make_pairgrid(df=df, output=output_dir, xvar='correction_partner_onset')
     make_polar(nn_list=nn, output_dir=output_dir)
+    make_correction_boxplot_by_variable(df=df, output_dir=output_dir)
