@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 from src.analyse.prepare_data import load_data
-from tempo_slope_graphs import gen_tempo_slope_graph, gen_tempo_slope_heatmap, tempo_slope_animation
+from tempo_slope_graphs import gen_tempo_slope_graph, gen_tempo_slope_heatmap
 
 
 @click.command()
@@ -23,8 +23,7 @@ def main(input_filepath, output_filepath):
     data = load_data(input_filepath)
 
     logger.info(f'generating tempo slope graphs...')
-    gen_tempo_slope_graph(raw_data=data, output_dir=output_filepath)
-    tempo_slope_animation(raw_data=data, output_dir=output_filepath)
+    gen_tempo_slope_graph(raw_data=data, output_dir=output_filepath + '\\figures\\tempo_slopes_plots\\grouped')
 
 if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

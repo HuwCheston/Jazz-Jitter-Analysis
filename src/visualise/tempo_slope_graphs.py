@@ -4,6 +4,7 @@ import seaborn as sns
 import pandas as pd
 from operator import itemgetter
 from itertools import groupby
+
 from src.analyse.prepare_data import generate_df, average_bpms, zip_same_conditions_together, reg_func
 import src.visualise.visualise_utils as vutils
 
@@ -15,12 +16,12 @@ def return_data(raw_data) -> list[tuple]:
     return [(*s(c1), average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm']))) for z in b for c1, c2 in z]
 
 
-def gen_tempo_slope_graph(raw_data, output_dir, block_num: int = None,):
+@vutils.plot_decorator
+def gen_tempo_slope_graph(raw_data, output_dir, block_num: int = None,) -> tuple[plt.Figure, str]:
     """
     Creates a graph with subplots showing the average tempo trajectory of every condition in a trial.
     Repeats of one condition are plotted as different coloured lines on the same subplot.
     """
-    out = vutils.create_output_folder(out=output_dir, parent='tempo_slopes_graphs', child='all_conditions')
     # For each condition, generate the rolling BPM average across the ensemble
     data = return_data(raw_data)
     # Set colormap properties
@@ -45,7 +46,8 @@ def gen_tempo_slope_graph(raw_data, output_dir, block_num: int = None,):
     # Format the figure
     fig = format_figure(fig=fig, data=data,)
     # Save the result to the output_filepath
-    fig.savefig(f'{out}\\tempo_slopes.png')
+    fname = '\\tempo_slopes.png'
+    return fig, fname
 
 
 def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n_conditions: int = 13, ):
@@ -59,7 +61,7 @@ def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n
     con_data[5]['elapsed'] -= 8
     # Plot the data on required subplot
     condition_axis.plot(con_data[5]['elapsed'], con_data[5]['bpm_rolling'],
-                        label=f'Measure {con_data[1]}', color=vutils.data_cmap_orig[con_data[1]-1])
+                        label=f'Measure {con_data[1]}', color=vutils.LINE_CMAP[con_data[1] - 1])
     condition_axis.tick_params(axis='both', which='both', bottom=False, left=False,)
     # If this condition is either in the first row or column, add the required label
     if x == 0:
@@ -107,7 +109,7 @@ def gen_tempo_slope_heatmap(raw_data, output_dir,):
     for idx, grp in df.groupby(by=['trial']):
         piv = grp.pivot_table(index=['latency', 'jitter', 'abbrev'], columns='block', values='slope').reset_index(
             drop=False).set_index('abbrev').drop(columns=['latency', 'jitter']).transpose()
-        sns.heatmap(piv, ax=ax[idx - 1], cmap=vutils.slopes_cmap, cbar=False, norm=norm, linewidth=1, linecolor='w')
+        sns.heatmap(piv, ax=ax[idx - 1], cmap=vutils.SLOPES_CMAP, cbar=False, norm=norm, linewidth=1, linecolor='w')
         ax[idx - 1].xaxis.set_ticks_position('top')
         ax[idx - 1].yaxis.set_ticks_position('right')
         ax[idx - 1].tick_params(axis='y', labelrotation=0)
@@ -124,44 +126,3 @@ def gen_tempo_slope_heatmap(raw_data, output_dir,):
     plt.subplots_adjust(bottom=0.05, wspace=0.05, hspace=0.15, right=0.95)
     plt.text(-3, -0.18, 'Measure Number', rotation=-90, fontsize=12)
     fig.savefig(f'{output_dir}\\figures\\tempo_slopes_heatmap.png')
-
-
-def tempo_slope_animation(raw_data: list, output_dir: str) -> None:
-    """
-    Creates an animation of a performance tempo slope that should(!) be synchronised to the AV_Manip videos.
-    Default FPS is 30 seconds, with data interpolated to plotting look nice and smooth. This can be changed in vutils.
-    WARNING: this will take a really long time to complete!!!
-    """
-    def init():
-        line.set_data([], [])
-        return line,
-
-    def animate(i: int, dat: pd.DataFrame):
-        t = dat[dat.index <= i]
-        line.set_data(t['elapsed'].to_numpy(), t['bpm_rolling'].to_numpy())
-        return line,
-
-    out = vutils.create_output_folder(out=output_dir, parent='tempo_slopes_graphs', child='animations_individual')
-    data = return_data(raw_data)
-    # Get xrange and yrange now so we don't have to repeatedly iterate through the raw data
-    xrange = vutils.get_xrange(data=data, max_off=0)
-    yrange = vutils.get_yrange(data=data)
-    for c in data:
-        # Create the dataframe by appending blank rows and interpolating
-        df = vutils.append_count_in_rows_to_df(df_avg_slopes=c[5])
-        df = vutils.interpolate_df_rows(df=df)
-        # Create the matplotlib objects we need
-        fig = plt.figure()
-        ax = plt.axes(xlim=xrange, ylim=yrange, xlabel='Performance duration (s)',
-                      ylabel='Average tempo (BPM, four-beat rolling window)',
-                      title=f'Duo {c[0]} (measure {c[1]}): latency {c[3]}ms, jitter {c[4]}x')
-        line, = ax.plot([], [], lw=2, label='Performance Tempo')
-        # Set the axes parameters
-        ax.tick_params(axis='both', which='both', bottom=False, left=False,)
-        ax.axhline(y=120, color='r', linestyle='--', alpha=0.3, label='Metronome Tempo')
-        ax.legend()
-        # Create the animation and save to our directory
-        anim = animation.FuncAnimation(fig, animate, init_func=init, frames=int(df.index.max()),
-                                       fargs=(df,), interval=1000/vutils.VIDEO_FPS, blit=True)
-        anim.save(f'{out}\\duo{c[0]}_measure{c[1]}_latency{c[3]}_jitter{str(c[4]).replace(".", "")}.mp4',
-                  writer='ffmpeg', fps=vutils.VIDEO_FPS)

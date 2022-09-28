@@ -2,48 +2,57 @@ from pathlib import Path
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm, ListedColormap
 from matplotlib.cm import ScalarMappable
-import numpy as np
-import pandas as pd
 from seaborn import color_palette
 from statistics import median
+import numpy as np
+import pandas as pd
+import functools
+
 
 # Define constants
 ALPHA = 0.4
+BLACK = '#ffffff'
 OFFSET = 8
 VIDEO_FPS = 30
 CBAR_BINS = np.linspace(-0.5, 0.3, 9, endpoint=True)
 
 # Define the colour palettes
 # Function used to shade a cmap by given alpha value (can be used in colorbars etc)
-cmap_alpha = lambda pal: ListedColormap(np.c_[pal.colors, np.full(len(pal.colors), fill_value=ALPHA)])
-slopes_cmap = cmap_alpha(color_palette('vlag_r', as_cmap=True))     # Used for plotting tempo slopes
-data_cmap_contrast = ['#9933ff', '#00ff00']     # Palette used for plotting data that contrasts against slopes_cmap
-data_cmap_orig = ['#1f77b4', '#ff7f0e']     # Original matplotlib colour palette used for manual plotting
+alpha_func = lambda pal: ListedColormap(np.c_[pal.colors, np.full(len(pal.colors), fill_value=ALPHA)])
+SLOPES_CMAP = alpha_func(color_palette('vlag_r', as_cmap=True))     # Used for plotting tempo slopes
+INSTR_CMAP = ['#9933ff', '#00ff00']     # Palette used for plotting data that contrasts against slopes_cmap
+LINE_CMAP = ['#1f77b4', '#ff7f0e']     # Original matplotlib colour palette used for manual plotting
 
 
-def plot_decorator(func):
+def plot_decorator(plotter: callable):
     """
-    Decorator called before and after plotting. Used to cleanly save and close matplotlib figure returned by a function.
+    Decorator applied to any plotting function.
+    Used to create a folder, save plot into this, then close it cleanly and exit.
     """
+    @functools.wraps(plotter)
     def wrapper(*args, **kwargs):
-        fig = func(*args, **kwargs)
+        # Create the output directory to store the plot
+        output = kwargs.get('output_dir', None)
+        # Create the plot and return the figure
+        fig, fname = plotter(*args, **kwargs)
+        # Save the figure in the form output directory + fname
+        if output is not None:
+            d = create_output_folder(output)
+            fig.savefig(d + fname)
+        # Close the plot to prevent it remaining in memory
         plt.close(fig)
     return wrapper
 
 
-def create_output_folder(out: str, parent: str = 'default', child: str = None):
+def create_output_folder(out):
     """
     Create a folder to store the plots, with optional subdirectory. Out should be a full system path.
     Optional keyword arguments:
     Parent:     first subdirectory, usually what the plot depicts i.e. tempo_slopes
     Child:      second subdirectory, usually the type of plot i.e. point plot, polar plot...
     """
-    if child is None:
-        output_path = out + f'\\figures\\{parent}'
-    else:
-        output_path = out + f'\\figures\\{parent}\\{child}'
-    Path(output_path).mkdir(parents=True, exist_ok=True)
-    return output_path
+    Path(out).mkdir(parents=True, exist_ok=True)
+    return out
 
 
 def create_normalised_cmap(slopes: list) -> TwoSlopeNorm:
@@ -57,7 +66,7 @@ def create_scalar_cbar(norm: TwoSlopeNorm) -> ScalarMappable:
     """
     Creates a scalar colourbar object to be placed on a figure
     """
-    return ScalarMappable(norm=norm, cmap=slopes_cmap)
+    return ScalarMappable(norm=norm, cmap=SLOPES_CMAP)
 
 
 def get_gridspec_array(fig: plt.Figure = None, ncols: int = 2) -> np.array:
