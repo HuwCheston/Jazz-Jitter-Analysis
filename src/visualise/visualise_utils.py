@@ -35,7 +35,7 @@ def plot_decorator(plotter: callable):
         output = kwargs.get('output_dir', None)
         # Create the plot and return the figure
         fig, fname = plotter(*args, **kwargs)
-        # Save the figure in the form output directory + fname
+        # If we've provided an output directory, save the figure in the form output directory + fname
         if output is not None:
             d = create_output_folder(output)
             fig.savefig(d + fname)
@@ -47,9 +47,6 @@ def plot_decorator(plotter: callable):
 def create_output_folder(out):
     """
     Create a folder to store the plots, with optional subdirectory. Out should be a full system path.
-    Optional keyword arguments:
-    Parent:     first subdirectory, usually what the plot depicts i.e. tempo_slopes
-    Child:      second subdirectory, usually the type of plot i.e. point plot, polar plot...
     """
     Path(out).mkdir(parents=True, exist_ok=True)
     return out

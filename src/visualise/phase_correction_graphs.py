@@ -4,6 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.lines import Line2D
+from stargazer.stargazer import Stargazer
 
 import src.visualise.visualise_utils as vutils
 from src.analyse.prepare_data import average_bpms
@@ -46,15 +47,15 @@ def make_pairgrid(df: pd.DataFrame, output_dir: str, xvar: str = 'correction_par
             for n in range(0, 13):
                 coef = vutils.SLOPES_CMAP(norm(d.iloc[n]))
                 pg.axes[x, num].axhspan(n - 0.5, n + 0.5, facecolor=coef)
-    _format_pairgrid_fig(pg, norm)
+    _format_pairgrid_fig(pg, norm, xvar=xvar.replace('_', ' ').title())
     fname = f'\\pairgrid_condition_vs_{xvar}.png'
     return pg.fig, fname
 
 
-def _format_pairgrid_fig(g: sns.FacetGrid, norm) -> None:
+def _format_pairgrid_fig(g: sns.FacetGrid, norm, xvar: str = 'Correction') -> None:
     # Format the figure
     g.despine(left=True, bottom=True)
-    g.fig.supxlabel('Correction to Partner', x=0.53, y=0.04)
+    g.fig.supxlabel(xvar, x=0.53, y=0.04)
     g.fig.supylabel('Condition', x=0.01)
     # Add the colorbar
     position = g.fig.add_axes([0.95, 0.3, 0.01, 0.4])
@@ -68,19 +69,19 @@ def _format_pairgrid_fig(g: sns.FacetGrid, norm) -> None:
 
 
 @vutils.plot_decorator
-def make_correction_boxplot_by_variable(df: pd.DataFrame, output_dir: str, exclude_control: bool = True,
-                                        xvar: str = 'jitter') -> tuple[plt.Figure, str]:
+def make_correction_boxplot_by_variable(df: pd.DataFrame, output_dir: str, yvar: str = 'correction_partner_onset',
+                                        exclude_ctrl: bool = False, xvar: str = 'jitter') -> tuple[plt.Figure, str]:
     """
     Creates a figure showing correction to partner coefficients obtained for each performer in a duo, stratified by a
     given variable (defaults to jitter scale). By default, the control condition is not included in this plot,
     but this can be overridden by setting exclude_control to False.
     """
     # Format the data to exclude the control condition
-    if exclude_control:
+    if exclude_ctrl:
         df = df[df['latency'] != 0]
     # Create the plot
     bp = sns.catplot(
-        data=df, x=xvar, y='correction_partner_onset', col='trial', hue='instrument', kind='box', sharex=True,
+        data=df, x=xvar, y=yvar, col='trial', hue='instrument', kind='box', sharex=True,
         sharey=True, palette=vutils.INSTR_CMAP, height=4, aspect=0.6,
     )
     bp.refline(y=0, alpha=vutils.ALPHA, linestyle='-', color=vutils.BLACK)
@@ -91,12 +92,12 @@ def make_correction_boxplot_by_variable(df: pd.DataFrame, output_dir: str, exclu
         ax.yaxis.set_ticks(np.linspace(-1, 1, 5, endpoint=True))
     # Adjust figure-level parameters
     bp.figure.supxlabel(xvar.title(), y=0.06)
-    bp.figure.supylabel('Correction to Partner', x=0.007)
+    bp.figure.supylabel(yvar.replace('_', ' ').title(), x=0.007)
     sns.move_legend(bp, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01))
     # Adjust plot spacing
     bp.figure.subplots_adjust(bottom=0.17, top=0.92, left=0.055, right=0.97)
     # Save the plot
-    fname = f'\\boxplot_correction_vs_{xvar}.png'
+    fname = f'\\boxplot_{yvar}_vs_{xvar}.png'
     return bp.figure, fname
 
 
@@ -353,3 +354,54 @@ def make_single_condition_slope_animation(keys_df, drms_df, keys_o: pd.DataFrame
                                    interval=1000 / vutils.VIDEO_FPS, blit=True)
     anim.save(f'{output}\\duo{meta[0]}_measure{meta[1]}_latency{meta[2]}_jitter{meta[3]}.mp4',
               writer='ffmpeg', fps=vutils.VIDEO_FPS)
+
+
+def output_regression_table(mds: list, output_dir: str, verbose_footer: bool = False) -> None:
+    """
+    Create a nicely formatted regression table from a list of regression models ordered by trial, and output to html.
+    """
+    def get_cov_names(name: str) -> list[str]:
+        k = lambda x: float(x.partition('T.')[2].partition(']')[0])
+        # Try and sort the values by integers within the string
+        try:
+            return [o for o in sorted([i for i in out.cov_names if name in i], key=k)]
+        # If there are no integers in the string, return unsorted
+        except ValueError:
+            return [i for i in out.cov_names if name in i]
+
+    def format_cov_names(i: str, ext: str = '') -> str:
+        # If we've defined a non-default reference category the statsmodels output looks weird, so catch this
+        if 'Treatment' in i:
+            base = i.split('C(')[1].split(')')[0].title().split(',')[0] + ' ('
+            return base + i.split('[T.')[1].replace(']', ')')
+        else:
+            base = i.split('C(')[1].split(')')[0].title() + ' ('
+            return base + i.split('C(')[1].split(')')[1].title().replace('[T.', '').replace(']', '') + ext + ')'
+
+    # Create the stargazer object from our list of models
+    out = Stargazer(mds)
+    # Get the original covariate names
+    l_o, j_o, i_o, int_o = (get_cov_names(i) for i in ['latency', 'jitter', 'instrument', 'Intercept'])
+    orig = [item for sublist in [l_o, j_o, i_o, int_o] for item in sublist]
+    # Format the original covariate names so they look nice
+    lat_fm = [format_cov_names(s, 'ms') for s in l_o]
+    jit_fm = [format_cov_names(s, 'x') for s in j_o]
+    instr_fm = [format_cov_names(s) for s in i_o]
+    form = [item for sublist in [lat_fm, jit_fm, instr_fm, int_o] for item in sublist]
+    # Format the stargazer object
+    out.custom_columns([f'Duo {i}' for i in range(1, len(mds) + 1)], [1 for _ in range(1, len(mds) + 1)])
+    out.show_model_numbers(False)
+    out.rename_covariates(dict(zip(orig, form)))
+    out.covariate_order(orig)
+    t = out.dependent_variable
+    out.dependent_variable = ' ' + out.dependent_variable.replace('_', ' ').title()
+    # If we're removing some statistics from the bottom of our table
+    if not verbose_footer:
+        out.show_adj_r2 = False
+        out.show_residual_std_err = False
+        out.show_f_statistic = False
+    # Create the output folder
+    fold = vutils.create_output_folder(output_dir + '\\phase_correction')
+    # Render to html and write the result
+    with open(f"{fold}\\regress_{t}.html", "w") as f:
+        f.write(out.render_html())
