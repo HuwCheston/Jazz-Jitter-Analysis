@@ -5,7 +5,8 @@ from datetime import timedelta
 from prepare_data import zip_same_conditions_together, generate_df, append_zoom_array, reg_func, average_bpms
 from src.analyse.granger_causality import test_stationary
 from src.visualise.phase_correction_graphs import make_pairgrid, make_single_condition_phase_correction_plot, \
-    make_polar, make_single_condition_slope_animation, make_correction_boxplot_by_variable, output_regression_table
+    make_polar, make_single_condition_slope_animation, make_correction_boxplot_by_variable, output_regression_table, \
+    make_trial_hist
 
 
 PC_MOD = 'live_next_ioi~live_prev_ioi+live_delayed_onset'
@@ -155,7 +156,7 @@ def construct_correction_jitter_model(df: pd.DataFrame, max_lag: int = 4):
     return res.params.iloc[1:max_lag+2].values
 
 
-def create_model_list(df, ivar: list[str | tuple], dvar: str = 'correction_partner_onset', avg: bool = True) -> list:
+def create_model_list(df, avg_groupers: list, md='correction_partner_onset~C(latency)+C(jitter)+C(instrument)', ) -> list:
     """
     Subset a dataframe of per-condition results and return a list of statsmodels regression outputs for use in a table.
     By default, the regression will average results from the same condition across multiple measures. This can be
@@ -163,15 +164,12 @@ def create_model_list(df, ivar: list[str | tuple], dvar: str = 'correction_partn
     """
     # Create the list of models
     mds = []
-    ivs = [f'C({var})' if type(var) != tuple else f'C({var[0]}, Treatment(reference="{var[1]}"))' for var in ivar]
-    mod = f'{dvar}~' + '+'.join(ivs)
     # Group the dataframe by trial and iterate
     for idx, grp in df.groupby('trial'):
         # Average the results obtained for each condition across measures, if required
-        if avg:
-            grp = grp.groupby(by=['latency', 'jitter', 'instrument']).mean().reset_index(drop=False)
+        grp = grp.groupby(by=avg_groupers).mean().reset_index(drop=False)
         # Create the model and append to the list
-        mds.append(smf.ols(mod, data=grp).fit())
+        mds.append(smf.ols(md, data=grp).fit())
     return mds
 
 
@@ -184,6 +182,7 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir, make_anim: bool = False):
     res = []
     nn = []
     rolled = []
+    r2 = []
     # Iterate through each conditions
     for z in zipped_data:
         # Iterate through keys and drums performances in a condition together
@@ -199,6 +198,8 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir, make_anim: bool = False):
             # For each performer, create a static phase correction model (using all the data)
             keys_md = construct_static_phase_correction_model(keys_nn,)
             drms_md = construct_static_phase_correction_model(drms_nn,)
+            r2.append((keys_md.rsquared, c1['trial'], c1['instrument']))
+            r2.append((drms_md.rsquared, c2['trial'], c2['instrument']))
             # If we applied jitter to the performance, create a moving phase correction model
             # if c1['jitter'] != 0:
             #     keys_roll = construct_rolling_phase_correction_model(keys_nn, keys)
@@ -223,11 +224,12 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir, make_anim: bool = False):
             tempo_slope = reg_func(
                 average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm'])), ycol='bpm_avg', xcol='elapsed'
             ).params.iloc[1:].values[0]
-            f3 = lambda c, m1: (c['trial'], c['block'], c['latency'], c['jitter'], c['instrument'], tempo_slope,
-                                *m1.params.iloc[1:].values,)
-            res.append(f3(c1, keys_md))
-            res.append(f3(c2, drms_md))
+            f3 = lambda c, m1, m0: (c['trial'], c['block'], c['latency'], c['jitter'], c['instrument'], tempo_slope,
+                                    *m1.params.iloc[1:].values, m0.ioi.std())
+            res.append((f3(c1, keys_md, keys)))
+            res.append(f3(c2, drms_md, drms))
             nn.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], keys_nn, drms_nn, tempo_slope))
+
     # rolled_df = (
     #     pd.melt(
     #         pd.DataFrame(rolled, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 0, 1, 2, 3, 4]),
@@ -239,12 +241,32 @@ def pc_live_ioi_delayed_ioi(raw_data, output_dir, make_anim: bool = False):
     # Generate outputs from all conditions
     make_polar(nn_list=nn, output_dir=figures_output_dir + '\\grouped')
     df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
-                                    'correction_self_ioi', 'correction_partner_onset'])
+                                    'correction_self_ioi', 'correction_partner_onset', 'ioi_std'])
+
+    output_regression_table(
+        mds=create_model_list(df=df, md=f'tempo_slope~C(latency)+C(jitter)',
+                              avg_groupers=['latency', 'jitter']),
+        output_dir=output_dir, verbose_footer=False
+    )
+
+    output_regression_table(
+        mds=create_model_list(df=df, md=f'ioi_std~C(latency)+C(jitter)+C(instrument)',
+                              avg_groupers=['latency', 'jitter', 'instrument']),
+        output_dir=output_dir, verbose_footer=False
+    )
+    make_correction_boxplot_by_variable(df=df, output_dir=figures_output_dir + '\\grouped', yvar='ioi_std',
+                                        ylim=(df.ioi_std.min()-50, df.ioi_std.max()+50))
+    make_pairgrid(df=df, xvar='ioi_std', output_dir=figures_output_dir + '\\grouped',
+                  xlim=(df.ioi_std.min()-50, df.ioi_std.max()+50))
+
     # Create regression table outputs
-    for d in ['correction_partner_onset', 'correction_self_ioi']:
+    for d in ['correction_partner_onset', 'correction_self_ioi', ]:
         output_regression_table(
-            mds=create_model_list(df=df, ivar=['latency', 'jitter', ('instrument', "Keys")], dvar=d),
+            mds=create_model_list(df=df, md=f'{d}~C(latency)+C(jitter)+C(instrument)', avg_groupers=['latency', 'jitter', 'instrument']),
             output_dir=output_dir, verbose_footer=False
         )
         make_correction_boxplot_by_variable(df=df, output_dir=figures_output_dir + '\\grouped', yvar=d)
         make_pairgrid(df=df, xvar=d, output_dir=figures_output_dir + '\\grouped')
+
+    make_trial_hist(r=pd.DataFrame(r2, columns=['r2', 'trial', 'instrument']),
+                    output_dir=figures_output_dir + '\\grouped')

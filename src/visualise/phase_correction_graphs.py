@@ -11,7 +11,8 @@ from src.analyse.prepare_data import average_bpms
 
 
 @vutils.plot_decorator
-def make_pairgrid(df: pd.DataFrame, output_dir: str, xvar: str = 'correction_partner_onset',) -> tuple[plt.Figure, str]:
+def make_pairgrid(df: pd.DataFrame, output_dir: str,
+                  xvar: str = 'correction_partner_onset', xlim=(-1, 1)) -> tuple[plt.Figure, str]:
     """
     Creates a figure showing pairs of coefficients obtained for each performer in a condition,
     stratified by block and trial number, with shading according to tempo slope
@@ -32,9 +33,9 @@ def make_pairgrid(df: pd.DataFrame, output_dir: str, xvar: str = 'correction_par
     # Format the axis by iterating through
     for num in range(0, 5):
         # When we want different formatting for each row
-        pg.axes[0, num].set(title=f'Measure 1\nDuo {num+1}' if num == 2 else f'\nDuo {num+1}', ylabel='', xlim=(-1, 1))
+        pg.axes[0, num].set(title=f'Measure 1\nDuo {num+1}' if num == 2 else f'\nDuo {num+1}', ylabel='', xlim=xlim)
         pg.axes[0, num].tick_params(bottom=False)
-        pg.axes[1, num].set(title='Measure 2' if num == 2 else '', ylabel='', xlabel='', xlim=(-1, 1))
+        pg.axes[1, num].set(title='Measure 2' if num == 2 else '', ylabel='', xlabel='', xlim=xlim)
         # When we want the same formatting for both rows
         for x in range(0, 2):
             # Disable the grid
@@ -69,15 +70,15 @@ def _format_pairgrid_fig(g: sns.FacetGrid, norm, xvar: str = 'Correction') -> No
 
 
 @vutils.plot_decorator
-def make_correction_boxplot_by_variable(df: pd.DataFrame, output_dir: str, yvar: str = 'correction_partner_onset',
-                                        exclude_ctrl: bool = False, xvar: str = 'jitter') -> tuple[plt.Figure, str]:
+def make_correction_boxplot_by_variable(df: pd.DataFrame, output_dir: str, xvar: str = 'jitter', ylim=(-1, 1),
+                                        yvar: str = 'correction_partner_onset', subset=False) -> tuple[plt.Figure, str]:
     """
     Creates a figure showing correction to partner coefficients obtained for each performer in a duo, stratified by a
-    given variable (defaults to jitter scale). By default, the control condition is not included in this plot,
-    but this can be overridden by setting exclude_control to False.
+    given variable (defaults to jitter scale). By default, the control condition is included in this plot,
+    but this can be excluded by setting optional argument subset to True.
     """
     # Format the data to exclude the control condition
-    if exclude_ctrl:
+    if subset:
         df = df[df['latency'] != 0]
     # Create the plot
     bp = sns.catplot(
@@ -86,7 +87,7 @@ def make_correction_boxplot_by_variable(df: pd.DataFrame, output_dir: str, yvar:
     )
     bp.refline(y=0, alpha=vutils.ALPHA, linestyle='-', color=vutils.BLACK)
     # Adjust axes-level parameters
-    bp.set(ylim=(-1.0, 1.0), xlabel='', ylabel='', )
+    bp.set(ylim=ylim, xlabel='', ylabel='', )
     bp.set_titles("Duo {col_name}")
     for ax in bp.axes.flat:
         ax.yaxis.set_ticks(np.linspace(-1, 1, 5, endpoint=True))
@@ -209,7 +210,7 @@ def _format_polar_ax(ax: plt.Axes, sl, yt: list = None, xt: list = None) -> None
     ax.patch.set_facecolor(sl)
 
 
-def _format_polar_fig(fig: plt.Figure, hand, lab, norm):
+def _format_polar_fig(fig: plt.Figure, hand, lab, norm) -> None:
     """
     Format the overall polar plot figure, including setting titles, positioning colorbars, legends etc.
     """
@@ -371,9 +372,11 @@ def output_regression_table(mds: list, output_dir: str, verbose_footer: bool = F
 
     def format_cov_names(i: str, ext: str = '') -> str:
         # If we've defined a non-default reference category the statsmodels output looks weird, so catch this
+        if ':' in i:
+            lm = lambda s: s.split('C(')[1].split(')')[0].title() + ' (' + s.split('[T.')[1].split(']')[0] + ')'
+            return lm(i.split(':')[0]) + ': ' + lm(i.split(':')[1])
         if 'Treatment' in i:
-            base = i.split('C(')[1].split(')')[0].title().split(',')[0] + ' ('
-            return base + i.split('[T.')[1].replace(']', ')')
+            return i.split('C(')[1].split(')')[0].title().split(',')[0] + ' (' + i.split('[T.')[1].replace(']', ')')
         else:
             base = i.split('C(')[1].split(')')[0].title() + ' ('
             return base + i.split('C(')[1].split(')')[1].title().replace('[T.', '').replace(']', '') + ext + ')'
@@ -391,8 +394,8 @@ def output_regression_table(mds: list, output_dir: str, verbose_footer: bool = F
     # Format the stargazer object
     out.custom_columns([f'Duo {i}' for i in range(1, len(mds) + 1)], [1 for _ in range(1, len(mds) + 1)])
     out.show_model_numbers(False)
-    out.rename_covariates(dict(zip(orig, form)))
     out.covariate_order(orig)
+    out.rename_covariates(dict(zip(orig, form)))
     t = out.dependent_variable
     out.dependent_variable = ' ' + out.dependent_variable.replace('_', ' ').title()
     # If we're removing some statistics from the bottom of our table
@@ -405,3 +408,24 @@ def output_regression_table(mds: list, output_dir: str, verbose_footer: bool = F
     # Render to html and write the result
     with open(f"{fold}\\regress_{t}.html", "w") as f:
         f.write(out.render_html())
+
+
+@vutils.plot_decorator
+def make_trial_hist(r: pd.DataFrame, output_dir: str, xvar: str = 'r2', kind: str = 'hist') -> tuple[plt.Figure, str]:
+    """
+    Creates histograms of model parameters stratified by trial and instrument, x-axis variable defaults to R-squared
+    """
+    # Create the ditsplot
+    g = sns.displot(r, col='trial', kind=kind, x=xvar, hue="instrument", multiple="stack", palette=vutils.INSTR_CMAP,
+                    height=4, aspect=0.6, )
+    # Format figure-level properties
+    g.set(xlabel='', ylabel='')
+    g.set_titles("Duo {col_name}", size=12)
+    g.figure.supxlabel(xvar.title(), y=0.06)
+    g.figure.supylabel('Count', x=0.007)
+    # Move legend and adjust subplots
+    sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.03), fontsize=12)
+    g.figure.subplots_adjust(bottom=0.17, top=0.92, left=0.055, right=0.97)
+    # Return, with plot_decorator used for saving
+    fname = f'\\{xvar}_hist'
+    return g.figure, fname

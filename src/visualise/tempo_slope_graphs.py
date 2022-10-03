@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
-from matplotlib import animation
 import seaborn as sns
 import pandas as pd
+import numpy as np
 from operator import itemgetter
 from itertools import groupby
 
@@ -126,3 +126,27 @@ def gen_tempo_slope_heatmap(raw_data, output_dir,):
     plt.subplots_adjust(bottom=0.05, wspace=0.05, hspace=0.15, right=0.95)
     plt.text(-3, -0.18, 'Measure Number', rotation=-90, fontsize=12)
     fig.savefig(f'{output_dir}\\figures\\tempo_slopes_heatmap.png')
+
+
+def gen_tempo_stability_hist(raw_data, output_dir, block_num: int = None,):
+    # For each condition, generate the rolling BPM average across the ensemble
+    b = zip_same_conditions_together(raw_data)
+    s = lambda c: (c['trial'], c['block'], c['condition'], c['latency'], c['jitter'])   # to subset the raw data
+    data = [(*s(c1), generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm'])) for z in b for c1, c2 in z]
+    fn = lambda nu: max(data, key=itemgetter(nu))[nu]
+    n_trials = fn(0)
+    n_conditions = fn(2)
+    # Construct figure and axis object
+    fig, ax = plt.subplots(nrows=n_trials, ncols=n_conditions, sharex='all', sharey='all', figsize=(15, 8))
+
+    # Iterate through data from each trial
+    for k, g in groupby(data, itemgetter(0)):
+        # Sort the data from each trial by block, latency, and jitter and subset for required block number
+        li = sorted(list(g), key=lambda e: (e[0], e[1], e[3], e[4]))
+        for num, i in enumerate(li):
+            x = i[0] - 1
+            y = num if num < n_conditions else num - n_conditions  # Plot data from both blocks on one subplot
+            condition_axis = ax[x, y]
+            condition_axis.hist(i[5].rolling(window=4, min_periods=4)['ioi'].std().dropna())
+            condition_axis.hist(i[6].rolling(window=4, min_periods=4)['ioi'].std())
+    plt.show()

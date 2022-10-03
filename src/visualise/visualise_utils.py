@@ -11,7 +11,7 @@ import functools
 
 # Define constants
 ALPHA = 0.4
-BLACK = '#ffffff'
+BLACK = '#000000'
 OFFSET = 8
 VIDEO_FPS = 30
 CBAR_BINS = np.linspace(-0.5, 0.3, 9, endpoint=True)
