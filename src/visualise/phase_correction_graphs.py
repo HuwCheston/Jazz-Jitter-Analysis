@@ -11,12 +11,14 @@ from src.analyse.prepare_data import average_bpms
 
 
 @vutils.plot_decorator
-def make_pairgrid(df: pd.DataFrame, output_dir: str,
-                  xvar: str = 'correction_partner_onset', xlim=(-1, 1)) -> tuple[plt.Figure, str]:
+def make_pairgrid(
+        df: pd.DataFrame, output_dir: str, xvar: str = 'correction_partner_onset', xlim=(-1, 1)
+) -> tuple[plt.Figure, str]:
     """
     Creates a figure showing pairs of coefficients obtained for each performer in a condition,
     stratified by block and trial number, with shading according to tempo slope
     """
+
     # Create the abbreviation column, showing latency and jitter
     df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
     df = df.sort_values(by=['latency', 'jitter'])
@@ -53,7 +55,13 @@ def make_pairgrid(df: pd.DataFrame, output_dir: str,
     return pg.fig, fname
 
 
-def _format_pairgrid_fig(g: sns.FacetGrid, norm, xvar: str = 'Correction') -> None:
+def _format_pairgrid_fig(
+        g: sns.FacetGrid, norm, xvar: str = 'Correction'
+) -> None:
+    """
+    Formats figure-level attributes for a horizontal pairgrid of all conditions
+    """
+
     # Format the figure
     g.despine(left=True, bottom=True)
     g.fig.supxlabel(xvar, x=0.53, y=0.04)
@@ -70,13 +78,16 @@ def _format_pairgrid_fig(g: sns.FacetGrid, norm, xvar: str = 'Correction') -> No
 
 
 @vutils.plot_decorator
-def make_correction_boxplot_by_variable(df: pd.DataFrame, output_dir: str, xvar: str = 'jitter', ylim=(-1, 1),
-                                        yvar: str = 'correction_partner_onset', subset=False) -> tuple[plt.Figure, str]:
+def make_correction_boxplot_by_variable(
+        df: pd.DataFrame, output_dir: str, xvar: str = 'jitter', ylim=(-1, 1), yvar: str = 'correction_partner_onset',
+        subset=False
+) -> tuple[plt.Figure, str]:
     """
     Creates a figure showing correction to partner coefficients obtained for each performer in a duo, stratified by a
     given variable (defaults to jitter scale). By default, the control condition is included in this plot,
     but this can be excluded by setting optional argument subset to True.
     """
+
     # Format the data to exclude the control condition
     if subset:
         df = df[df['latency'] != 0]
@@ -103,10 +114,13 @@ def make_correction_boxplot_by_variable(df: pd.DataFrame, output_dir: str, xvar:
 
 
 @vutils.plot_decorator
-def make_polar(nn_list: list[tuple], output_dir: str) -> tuple[plt.Figure, str]:
+def make_polar(
+        nn_list: list[tuple], output_dir: str
+) -> tuple[plt.Figure, str]:
     """
     Creates circle plots showing relative phase (i.e. playing before or after reference) for both musicians for a trial.
     """
+
     # Subset the data for only the block we are plotting
     sorter = lambda e: (e[0], e[1], e[2], e[3], e[4])
     to_plot = [t for t in sorted(nn_list, key=sorter)]
@@ -161,22 +175,28 @@ def make_polar(nn_list: list[tuple], output_dir: str) -> tuple[plt.Figure, str]:
     return fig, fname
 
 
-def _add_horizontal_lines_polar(fig: plt.Figure, start: float = 0.78, step: float = -0.1825,
-                                x: np.array = np.array([0.025, 0.94]), num_lines: int = 4):
+def _add_horizontal_lines_polar(
+        fig: plt.Figure, start: float = 0.78, step: float = -0.1825, x: np.array = np.array([0.025, 0.94]),
+        num_lines: int = 4
+) -> None:
     """
     Adds horizontal lines seperating the subplots of a polar plot by duo number.
     """
+
     y = start
     for _ in range(0, num_lines):
         fig.add_artist(Line2D(x, [y, y], alpha=vutils.ALPHA, linestyle='-', color='#000000'))
         y += step
 
 
-def _format_polar_data(df: pd.DataFrame, num_bins: int = 10) -> pd.DataFrame:
+def _format_polar_data(
+        df: pd.DataFrame, num_bins: int = 10
+) -> pd.DataFrame:
     """
     Formats the data required for a polar plot by calculating phase of live musician relative to delayed, subsetting
     result into given number of bins, getting the square-root density of these bins.
     """
+
     # Calculate the amount of phase correction for each beat
     corr = df.live_prev_onset - df.delayed_prev_onset
     # Cut into bins
@@ -191,10 +211,13 @@ def _format_polar_data(df: pd.DataFrame, num_bins: int = 10) -> pd.DataFrame:
     return cut
 
 
-def _format_polar_ax(ax: plt.Axes, sl, yt: list = None, xt: list = None) -> None:
+def _format_polar_ax(
+        ax: plt.Axes, sl, yt: list = None, xt: list = None
+) -> None:
     """
     Formats a polar subplot by setting axis ticks and gridlines, rotation properties, and facecolor
     """
+
     # Used to test if we've provided xticks already
     test_none = lambda t: [] if t is None else t
     # Set the y axis ticks and gridlines
@@ -210,10 +233,13 @@ def _format_polar_ax(ax: plt.Axes, sl, yt: list = None, xt: list = None) -> None
     ax.patch.set_facecolor(sl)
 
 
-def _format_polar_fig(fig: plt.Figure, hand, lab, norm) -> None:
+def _format_polar_fig(
+        fig: plt.Figure, hand: list, lab: list, norm
+) -> None:
     """
     Format the overall polar plot figure, including setting titles, positioning colorbars, legends etc.
     """
+
     # Add figure-wise titles and labels
     fig.supylabel('√Density', x=0.01, fontsize='xx-large')
     fig.supxlabel("Relative Phase to Partner's Onsets (πms)", y=0.03, fontsize='xx-large')
@@ -230,15 +256,15 @@ def _format_polar_fig(fig: plt.Figure, hand, lab, norm) -> None:
 
 
 @vutils.plot_decorator
-def make_single_condition_phase_correction_plot(keys_df: pd.DataFrame, drms_df: pd.DataFrame,
-                                                keys_md, drms_md,
-                                                keys_o: pd.DataFrame, drms_o: pd.DataFrame,
-                                                output_dir: str,
-                                                meta: tuple = ('nan', 'nan', 'nan', 'nan'),) -> tuple[plt.Figure, str]:
+def make_single_condition_phase_correction_plot(
+        keys_df: pd.DataFrame, drms_df: pd.DataFrame,keys_md, drms_md, keys_o: pd.DataFrame, drms_o: pd.DataFrame,
+        output_dir: str, meta: tuple = ('nan', 'nan', 'nan', 'nan')
+) -> tuple[plt.Figure, str]:
     """
     Generate a nice plot of a single performance, showing actual and predicted tempo slope, relative phase adjustments,
     phase correction coefficients to partner and self for both performers
     """
+
     # Create the matplotlib objects - figure with gridspec, 5 subplots
     fig = plt.figure(figsize=(8, 8))
     ax = vutils.get_gridspec_array(fig=fig)
@@ -252,10 +278,13 @@ def make_single_condition_phase_correction_plot(keys_df: pd.DataFrame, drms_df: 
     return fig, fname
 
 
-def _single_fig_polar(ax: plt.Axes, drms_df: pd.DataFrame, keys_df: pd.DataFrame) -> None:
+def _single_fig_polar(
+        ax: plt.Axes, drms_df: pd.DataFrame, keys_df: pd.DataFrame
+) -> None:
     """
     For a plot of a single performance, create two polar plots showing phase difference between performers
     """
+
     # Create the polar plots
     ax[0, 1].sharex(ax[0, 0])
     for num, (ins, st) in enumerate(zip([keys_df, drms_df], ['Keys', 'Drums'])):
@@ -275,11 +304,18 @@ def _single_fig_polar(ax: plt.Axes, drms_df: pd.DataFrame, keys_df: pd.DataFrame
             ax[0, num].set_title('Relative Phase to Partner', x=1.5)
 
 
-def _single_fig_coefficients(ax: plt. Axes, drms_md, keys_md) -> None:
+def _single_fig_coefficients(
+        ax: plt. Axes, drms_md, keys_md
+) -> None:
+    """
+    For a single condition plot, generate the coefficient stripplots
+    """
+
     corr = pd.concat([keys_md.params, drms_md.params], axis=1).rename(
         columns={0: 'Keys', 1: 'Drums'}).transpose().rename(
         columns={'live_prev_ioi': 'Self', 'live_delayed_onset': 'Partner'}).reset_index(drop=False)
     ax[1, 1].sharex(ax[1, 0])
+    # Iterate through data
     for num, st in zip(range(0, 2), ['Keys', 'Drums']):
         drms = corr[corr['index'] == st].melt().loc[2:]
         g = sns.stripplot(ax=ax[1, num], x='value', y='variable', data=drms, jitter=False, dodge=False, marker='D', s=7,
@@ -301,8 +337,13 @@ def _single_fig_coefficients(ax: plt. Axes, drms_md, keys_md) -> None:
             g.set_xlabel('')
 
 
-def _single_fig_slopes(ax: plt.Axes, keys_df: pd.DataFrame, drms_df: pd.DataFrame,
-                       keys_o: pd.DataFrame, drms_o: pd.DataFrame):
+def _single_fig_slopes(
+        ax: plt.Axes, keys_df: pd.DataFrame, drms_df: pd.DataFrame, keys_o: pd.DataFrame, drms_o: pd.DataFrame
+) -> None:
+    """
+    For a single condition plot, generate the tempo slopes graphs.
+    """
+
     # Plot the actual and predicted rolling tempo slope
     z = zip((average_bpms(keys_o, drms_o), average_bpms(keys_df, drms_df, elap='elapsed', bpm='predicted_bpm')),
             ('Actual', 'Fitted'))
@@ -313,13 +354,16 @@ def _single_fig_slopes(ax: plt.Axes, keys_df: pd.DataFrame, drms_df: pd.DataFram
     ax[2, 0].set(xlabel='Performance Duration (s)', ylabel='Average tempo (BPM)', ylim=(30, 160), title='Tempo Slope')
 
 
-def make_single_condition_slope_animation(keys_df, drms_df, keys_o: pd.DataFrame, drms_o: pd.DataFrame,
-                                          output_dir, meta: tuple = ('nan', 'nan', 'nan', 'nan'),):
+def make_single_condition_slope_animation(
+        keys_df, drms_df, keys_o: pd.DataFrame, drms_o: pd.DataFrame, output_dir,
+        meta: tuple = ('nan', 'nan', 'nan', 'nan')
+) -> None:
     """
     Creates an animation of actual and predicted tempo slope that should(!) be synchronised to the AV_Manip videos.
     Default FPS is 30 seconds, with data interpolated so plotting look nice and smooth. This can be changed in vutils.
     WARNING: this will take a really long time to complete!!!
     """
+
     def init():
         act_line.set_data([], [])
         pred_line.set_data([], [])
@@ -357,10 +401,13 @@ def make_single_condition_slope_animation(keys_df, drms_df, keys_o: pd.DataFrame
               writer='ffmpeg', fps=vutils.VIDEO_FPS)
 
 
-def output_regression_table(mds: list, output_dir: str, verbose_footer: bool = False) -> None:
+def output_regression_table(
+        mds: list, output_dir: str, verbose_footer: bool = False
+) -> None:
     """
     Create a nicely formatted regression table from a list of regression models ordered by trial, and output to html.
     """
+
     def get_cov_names(name: str) -> list[str]:
         k = lambda x: float(x.partition('T.')[2].partition(']')[0])
         # Try and sort the values by integers within the string
@@ -411,10 +458,13 @@ def output_regression_table(mds: list, output_dir: str, verbose_footer: bool = F
 
 
 @vutils.plot_decorator
-def make_trial_hist(r: pd.DataFrame, output_dir: str, xvar: str = 'r2', kind: str = 'hist') -> tuple[plt.Figure, str]:
+def make_trial_hist(
+        r: pd.DataFrame, output_dir: str, xvar: str = 'r2', kind: str = 'hist'
+) -> tuple[plt.Figure, str]:
     """
     Creates histograms of model parameters stratified by trial and instrument, x-axis variable defaults to R-squared
     """
+
     # Create the ditsplot
     g = sns.displot(r, col='trial', kind=kind, x=xvar, hue="instrument", multiple="stack", palette=vutils.INSTR_CMAP,
                     height=4, aspect=0.6, )
@@ -428,4 +478,32 @@ def make_trial_hist(r: pd.DataFrame, output_dir: str, xvar: str = 'r2', kind: st
     g.figure.subplots_adjust(bottom=0.17, top=0.92, left=0.055, right=0.97)
     # Return, with plot_decorator used for saving
     fname = f'\\{xvar}_hist'
+    return g.figure, fname
+
+
+@vutils.plot_decorator
+def make_lagged_pointplot(
+        df: pd.DataFrame, output_dir: str
+) -> tuple[plt.Figure, str]:
+    """
+    Make a pointplot showing lagged timestamps on x-axis and regression coefficients on y. Columns grouped by trial,
+    rows grouped by jitter.
+    """
+
+    # Make the plot
+    g = sns.catplot(
+        data=df, col='trial', row='jitter', x="lag", y="coef", hue='instrument',
+        kind="point", height=4, aspect=.6, dodge=0.2, palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'],
+    )
+    # Format titles, labels
+    g.set_titles('Duo {col_name}, Jitter: {row_name}x', size=12)
+    g.set_axis_labels(x_var='', y_var='')
+    g.figure.supxlabel('Lag (s)', y=0.04, fontsize=12)
+    g.figure.supylabel('Coefficient', x=0.007, fontsize=12)
+    # Set figure properties
+    g.refline(y=0, alpha=vutils.ALPHA, linestyle='-', color=vutils.BLACK)
+    g.figure.subplots_adjust(bottom=0.1, top=0.95, left=0.09, right=0.97)
+    sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01), fontsize=12)
+    # Create filename and return to save
+    fname = '\\lagged_pointplot'
     return g.figure, fname

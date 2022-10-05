@@ -3,19 +3,22 @@ import click
 import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
-from prepare_data import generate_tempo_slopes, load_data
-from linear_regressions import lr_tempo_slope, lr_beat_variance
-from granger_causality import gc_event_density_vs_latency_var, gc_ioi_var_vs_latency_var, pearson_r_ioi_var_vs_latency_var
-from anovas import analyse_beat_variance, anova_ts_lat_jit
-from phase_correction_models import pc_live_ioi_delayed_ioi
+
+from src.analyse.prepare_data import load_data
+from src.analyse.phase_correction_models import pc_live_ioi_delayed_ioi
+from src.analyse.questionnaire_analysis import questionnaire_analysis
 
 @click.command()
 @click.argument('input_filepath', type=click.Path(exists=True))
 @click.argument('output_filepath', type=click.Path(exists=True))
-def main(input_filepath, output_filepath):
-    """ Runs data processing scripts to turn raw data from (../raw) into
-        cleaned data ready to be analyzed (saved in ../processed).
+def main(
+        input_filepath: str, output_filepath: str
+) -> None:
     """
+    Runs data processing scripts to turn raw data from (../raw) into
+    cleaned data ready to be analyzed (saved in ../processed).
+    """
+
     logger = logging.getLogger(__name__)
     logger.info(f'running analysis scripts on processed data in {input_filepath}')
 
@@ -23,27 +26,15 @@ def main(input_filepath, output_filepath):
     # Load the data in as list of lists of dictionaries (one list per trial, one dictionary per condition)
     logger.info(f'loading data...')
     data = load_data(input_filepath)
-    ts_raw = generate_tempo_slopes(raw_data=data)
     logger.info(f'loaded data from {len(data)} trials!')
 
-    # SYNCHRONISATION MODELS
+    # SYNCHRONISATION MODELS #
     logger.info(f'Creating phase correction models...')
     pc_live_ioi_delayed_ioi(raw_data=data, output_dir=output_filepath)
 
-    # LINEAR REGRESSIONS #
-    # logger.info(f'Conducting linear regressions...')
-    # lr_ts = lr_tempo_slope(tempo_slopes_data=ts_raw, output_dir=output_filepath)
-    # lr_bv = lr_beat_variance(raw_data=data, output_dir=output_filepath)
-
-    # GRANGER CAUSALITY
-    # logger.info(f'Estimating Granger causality...')
-    # gc_ed = gc_event_density_vs_latency_var(raw_data=data, output_dir=output_filepath)
-    # gc_bv = gc_ioi_var_vs_latency_var(raw_data=data, output_dir=output_filepath)
-
-    # ANOVAS
-    # logger.info(f'Conducting ANOVAS...')
-
-    # QUESTIONNAIRES
+    # QUESTIONNAIRES #
+    logger.info(f'Analysing questionnaires...')
+    questionnaire_analysis(raw_data=data, output_dir=output_filepath)
 
 
 if __name__ == '__main__':

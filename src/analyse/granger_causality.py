@@ -11,17 +11,17 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 
-def test_stationary(array: pd.Series) -> pd.Series:
-    """Tests if data is stationary, if not returns data with first difference calculated"""
-    # Carry out augmented Dickey-Fuller root test and get the p-value
-    p = adfuller(array.dropna(), autolag='AIC')[1]
-    # If the result is significant, the data is stationary, so we don't need to transform it
-    if p < 0.05:
-        return array
-    # If the result is not significant, the data is non-stationary, so  transform it by taking the first difference
-    elif p > 0.05:
-        # Increase the counter by one if it's performance data that isn't stationary
-        return array.diff()
+def test_stationary(
+        array: pd.Series
+) -> pd.Series:
+    """
+    Tests if data is stationary, if not returns data with first difference calculated
+    """
+    # Keep taking first difference while data is non-stationary
+    while adfuller(array.dropna(), autolag='AIC')[1] > 0.05:
+        array = array.diff()
+    # Return the array once data is stationary
+    return array
 
 
 def estimate_max_lag(df: pd.DataFrame, maxlag: int = 15) -> int:
