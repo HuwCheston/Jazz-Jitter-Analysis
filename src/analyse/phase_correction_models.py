@@ -3,13 +3,15 @@ import pandas as pd
 import statsmodels.formula.api as smf
 from datetime import timedelta
 from prepare_data import zip_same_conditions_together, generate_df, append_zoom_array, reg_func, average_bpms
-from src.analyse.granger_causality import test_stationary
+import warnings
+
 from src.visualise.phase_correction_graphs import make_pairgrid, make_single_condition_phase_correction_plot, \
-    make_polar, make_single_condition_slope_animation, make_correction_boxplot_by_variable, output_regression_table, \
-    make_trial_hist, make_lagged_pointplot
+    make_single_condition_slope_animation, make_correction_boxplot_by_variable, output_regression_table, \
+    make_lagged_pointplot
 
 
 PC_MOD = 'live_next_ioi~live_prev_ioi+live_delayed_onset'
+WINDOW_SIZE = 6
 
 
 def delay_heard_onsets_by_latency(
@@ -62,7 +64,7 @@ def nearest_neighbor(
 
 def filter_duplicates_from_grouped_df(
         grp, live, delayed
-):
+) -> pd.DataFrame.groupby:
     """
     Removes duplicate values. Dataframe should be grouped by events from delayed performer: if an event is duplicated,
     len(group) > 1. In these cases, the pairing with the closest distance is identified, with all others set to NaN.
@@ -106,11 +108,12 @@ def construct_static_phase_correction_model(
     and IOI difference between live and delayed musician.
     Returns a tuple containing coefficients for all predictors and rsquared value.
     """
+
     return smf.ols(mod, data=df).fit()
 
 
 def predict_from_model(
-        md, df: pd.DataFrame
+        md: smf.ols, df: pd.DataFrame
 ) -> pd.DataFrame:
     """
     From a linear regression model, return a dataframe of actual and predicted onset times and IOIs
@@ -136,12 +139,12 @@ def construct_rolling_phase_correction_model(
     # Create the rolling phase correction function
     def process(x):
         try:
+            warnings.filterwarnings("ignore")
             reg = smf.ols(mod, data=x).fit()
+            return reg.params['live_delayed_onset'], reg.aic, reg.rsquared_adj
         # Catch errors if we only have nans and return a NaN coefficient
         except (IndexError, ValueError) as _:
-            return np.nan
-        else:
-            return reg.params['live_delayed_onset']
+            return np.nan, np.nan, np.nan
 
     # Merge the original dataframe with the nearest neighbour model
     merge = pd.merge(nn, orig.rename(columns={'onset': 'live_prev_onset'}), on='live_prev_onset')
@@ -149,15 +152,16 @@ def construct_rolling_phase_correction_model(
     merge['td'] = pd.to_timedelta([timedelta(seconds=val) for val in merge.live_prev_onset.values])
     # Merge the dataframe of coefficients back onto the original and subset for required columns
     df = merge.join(
-        pd.DataFrame([process(x) for x in merge.rolling(window=win_size, on='td')], columns=['correction_partner'])
+        pd.DataFrame([process(x) for x in merge.rolling(window=win_size, on='td')],
+                     columns=['correction_partner', 'aic', 'r2'])
     )
     # Roll latency column to get standard deviation
     df['lat'] = df.rolling(window=win_size, on='td')['lat'].std()
     df['ioi'] = df.rolling(window=win_size, on='td')['live_prev_ioi'].std() * 100
     # Test correction to partner for stationarity (we know latency variation is always stationary so no need to test)
-    df['correction_partner'] = test_stationary(df['correction_partner'])
+    df['correction_partner'] = df['correction_partner']
     # TODO: subset this data using arg 'sub', to only include values for after window is full (e.g. from 16 seconds on?)
-    return df[['td', 'live_prev_onset', 'lat', 'correction_partner', 'ioi']]
+    return df[['td', 'live_prev_onset', 'lat', 'correction_partner', 'ioi', 'aic', 'r2']]
 
 
 def construct_correction_jitter_model(
@@ -200,103 +204,148 @@ def create_model_list(
     return mds
 
 
-def pc_live_ioi_delayed_ioi(raw_data, output_dir, make_anim: bool = False):
+def phase_correction_pre_processing(
+        c1: dict, c2: dict
+) -> tuple:
     """
-    Creates a phase correction model for all performances.
+    Carries out preprocessing necessary for creating a phase correction model
     """
+    # Create dataframe, append zoom array, and delay partner's onsets
+    f1 = lambda c: delay_heard_onsets_by_latency(append_zoom_array(generate_df(c['midi_bpm']), c['zoom_array']))
+    keys, drms = f1(c1), f1(c2)
+    # Carry out the nearest neighbor algorithm
+    f2 = lambda la, da, li, di: format_df_for_model(nearest_neighbor(la, da, li, di))
+    keys_nn = f2(keys['onset'].to_numpy(), drms['onset_delayed'].to_numpy(), c1['instrument'], c2['instrument'])
+    drms_nn = f2(drms['onset'].to_numpy(), keys['onset_delayed'].to_numpy(), c2['instrument'], c1['instrument'])
+    # Extract tempo slope
+    tempo_slope = reg_func(
+        average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm'])), ycol='bpm_avg', xcol='elapsed'
+    ).params.iloc[1:].values[0]
+    return keys, drms, keys_nn, drms_nn, tempo_slope
 
-    figures_output_dir = output_dir + '\\figures\\phase_correction_plots'
+
+def gen_static_phase_correction_models(
+    raw_data: list, output_dir: str, make_anim: bool = False, make_single_plot: bool = False,
+) -> list:
+    """
+    Generates a static phase correction model, using all of the data in a performance
+    """
+    figures_output_dir = output_dir + '\\figures\\static_phase_correction_plots'
     zipped_data = zip_same_conditions_together(raw_data=raw_data)
-    res = []
-    nn = []
-    rolled = []
-    r2 = []
+    static_mds = []
+
     # Iterate through each conditions
     for z in zipped_data:
         # Iterate through keys and drums performances in a condition together
         for c1, c2 in z:
-            # For each performer, create dataframe, append zoom array, and delay partner's onsets
-            f1 = lambda c: delay_heard_onsets_by_latency(append_zoom_array(generate_df(c['midi_bpm']), c['zoom_array']))
-            keys = f1(c1)
-            drms = f1(c2)
-            # For each performer, carry out the nearest neighbor algorithm
-            f2 = lambda la, da, li, di: format_df_for_model(nearest_neighbor(la, da, li, di))
-            keys_nn = f2(keys['onset'].to_numpy(), drms['onset_delayed'].to_numpy(), c1['instrument'], c2['instrument'])
-            drms_nn = f2(drms['onset'].to_numpy(), keys['onset_delayed'].to_numpy(), c2['instrument'], c1['instrument'])
+            # Pre-processing
+            keys, drms, keys_nn, drms_nn, tempo_slope = phase_correction_pre_processing(c1, c2)
 
-            # For each performer, create a static phase correction model (using all the data)
-            keys_md = construct_static_phase_correction_model(keys_nn,)
-            drms_md = construct_static_phase_correction_model(drms_nn,)
-            r2.append((keys_md.rsquared, c1['trial'], c1['instrument']))
-            r2.append((drms_md.rsquared, c2['trial'], c2['instrument']))
-
-            # If we applied jitter to the performance, create a moving phase correction model
-            # if c1['jitter'] != 0:
-            #     for v1, v2, v3 in [(keys_nn, keys, c1), (drms_nn, drms, c2)]:
-            #         correct = construct_correction_jitter_model(construct_rolling_phase_correction_model(v1, v2))
-            #         ioi = construct_correction_jitter_model(construct_rolling_phase_correction_model(v1, v2), var='ioi')
-            #         rolled.append((v3['trial'], v3['block'], v3['latency'], v3['jitter'], v3['instrument'],
-            #                        *correct,))
-
+            # Create models
+            keys_static = construct_static_phase_correction_model(keys_nn)
+            drms_static = construct_static_phase_correction_model(drms_nn)
+            static_mds.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], c1['instrument'], tempo_slope,
+                               *keys_static.params.iloc[1:].values))
+            static_mds.append((c2['trial'], c2['block'], c2['latency'], c2['jitter'], c2['instrument'], tempo_slope,
+                               *drms_static.params.iloc[1:].values))
             # Generate output from single condition
-            make_single_condition_phase_correction_plot(keys_df=predict_from_model(keys_md, keys_nn), keys_md=keys_md,
-                                                        drms_df=predict_from_model(drms_md, drms_nn), drms_md=drms_md,
-                                                        meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
-                                                        keys_o=keys, drms_o=drms,
-                                                        output_dir=figures_output_dir + '\\individual')
+            if make_single_plot:
+                make_single_condition_phase_correction_plot(
+                    keys_df=predict_from_model(keys_static, keys_nn), keys_md=keys_static,
+                    drms_df=predict_from_model(drms_static, drms_nn), drms_md=drms_static,
+                    meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']), keys_o=keys, drms_o=drms,
+                    output_dir=figures_output_dir + '\\individual'
+                )
+            # Generate animation if specified
             if make_anim:
-                make_single_condition_slope_animation(keys_df=predict_from_model(keys_md, keys_nn),
-                                                      drms_df=predict_from_model(drms_md, drms_nn),
+                make_single_condition_slope_animation(keys_df=predict_from_model(keys_static, keys_nn),
+                                                      drms_df=predict_from_model(drms_static, drms_nn),
                                                       keys_o=keys, drms_o=drms,
                                                       meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
                                                       output_dir=figures_output_dir + '\\animations\\tempo_slope')
-            # Append the results
-            tempo_slope = reg_func(
-                average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm'])), ycol='bpm_avg', xcol='elapsed'
-            ).params.iloc[1:].values[0]
-            f3 = lambda c, m1, m0: (c['trial'], c['block'], c['latency'], c['jitter'], c['instrument'], tempo_slope,
-                                    *m1.params.iloc[1:].values, m0.ioi.std())
-            res.append((f3(c1, keys_md, keys)))
-            res.append(f3(c2, drms_md, drms))
-            nn.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], keys_nn, drms_nn, tempo_slope))
-    # rolled_df = (
-    #     pd.melt(
-    #         pd.DataFrame(rolled, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 1, 2, 3, 4]),
-    #         id_vars=['trial', 'block', 'latency', 'jitter', 'instrument'], var_name='lag', value_name='coef',
-    #     ).sort_values(by=['trial', 'block', 'latency', 'jitter', 'instrument', 'lag'])
-    # )
-    # make_lagged_pointplot(rolled_df, output_dir=figures_output_dir + '\\grouped')
+    return static_mds
 
-    # Generate outputs from all conditions
-    make_polar(nn_list=nn, output_dir=figures_output_dir + '\\grouped')
-    df = pd.DataFrame(res, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
-                                    'correction_self_ioi', 'correction_partner_onset', 'ioi_std'])
 
+def gen_rolling_phase_correction_models(
+        raw_data: list, jitter_vs_correction: bool = False,
+) -> list[list]:
+    """
+    Generates a rolling phase correction model
+    """
+    zipped_data = zip_same_conditions_together(raw_data=raw_data)
+    rolling_mds = []
+
+    # Iterate through each conditions
+    for z in zipped_data:
+        # Iterate through keys and drums performances in a condition together
+        for c1, c2 in z:
+            keys, drms, keys_nn, drms_nn, tempo_slope = phase_correction_pre_processing(c1, c2)
+            # Create models
+            for v1, v2, v3 in [(keys_nn, keys, c1), (drms_nn, drms, c2)]:
+                correct = construct_rolling_phase_correction_model(v1, v2, win_size=timedelta(seconds=WINDOW_SIZE))
+                t = [v3['trial'], v3['block'], v3['latency'], v3['jitter'], v3['instrument'], tempo_slope,
+                     correct['correction_partner'].median()]
+                if jitter_vs_correction is True:
+                    if v3['jitter'] != 0:
+                        ioi = construct_correction_jitter_model(correct, var='ioi')
+                    else:
+                        ioi = [np.nan * 4]
+                    t.extend(*ioi)
+                rolling_mds.append(t)
+    return rolling_mds
+
+
+def gen_static_model_outputs(
+        static_mds: list[tuple], output_dir: str
+) -> None:
+    """
+    Generate output from rolling phase correction models
+    """
+
+    figures_output_dir = output_dir + '\\figures\\static_phase_correction_plots'
+    static_df = pd.DataFrame(static_mds, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
+                                                  'correction_self_ioi', 'correction_partner'])
     output_regression_table(
-        mds=create_model_list(df=df, md=f'tempo_slope~C(latency)+C(jitter)',
-                              avg_groupers=['latency', 'jitter']),
-        output_dir=output_dir, verbose_footer=False
-    )
-
-    output_regression_table(
-        mds=create_model_list(df=df, md=f'ioi_std~C(latency)+C(jitter)+C(instrument)',
-                              avg_groupers=['latency', 'jitter', 'instrument']),
-        output_dir=output_dir, verbose_footer=False
-    )
-    make_correction_boxplot_by_variable(df=df, output_dir=figures_output_dir + '\\grouped', yvar='ioi_std',
-                                        ylim=(df.ioi_std.min()-50, df.ioi_std.max()+50))
-    make_pairgrid(df=df, xvar='ioi_std', output_dir=figures_output_dir + '\\grouped',
-                  xlim=(df.ioi_std.min()-50, df.ioi_std.max()+50))
-
-    # Create regression table outputs
-    for d in ['correction_partner_onset', 'correction_self_ioi', ]:
-        output_regression_table(
-            mds=create_model_list(df=df, md=f'{d}~C(latency)+C(jitter)+C(instrument)',
+            mds=create_model_list(df=static_df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
                                   avg_groupers=['latency', 'jitter', 'instrument']),
-            output_dir=output_dir, verbose_footer=False
+            output_dir=figures_output_dir, verbose_footer=False
         )
-        make_correction_boxplot_by_variable(df=df, output_dir=figures_output_dir + '\\grouped', yvar=d)
-        make_pairgrid(df=df, xvar=d, output_dir=figures_output_dir + '\\grouped')
+    make_correction_boxplot_by_variable(df=static_df, output_dir=figures_output_dir + '\\grouped',
+                                        yvar='correction_partner')
+    make_pairgrid(df=static_df, xvar='correction_partner', output_dir=figures_output_dir + '\\grouped')
 
-    make_trial_hist(r=pd.DataFrame(r2, columns=['r2', 'trial', 'instrument']),
-                    output_dir=figures_output_dir + '\\grouped')
+
+def gen_rolling_model_outputs(
+        rolling_mds: list[list], output_dir: str
+) -> None:
+    """
+    Generate output from rolling phase correction models
+    """
+
+    figures_output_dir = output_dir + '\\figures\\rolling_phase_correction_plots'
+
+    roll_df = pd.DataFrame(
+        rolling_mds, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope', 'correction_partner']
+    )
+    output_regression_table(
+        mds=create_model_list(df=roll_df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
+                              avg_groupers=['latency', 'jitter', 'instrument']),
+        output_dir=figures_output_dir, verbose_footer=False
+    )
+    make_pairgrid(df=roll_df, xvar='correction_partner', output_dir=figures_output_dir + '\\grouped')
+    make_correction_boxplot_by_variable(df=roll_df,  yvar='correction_partner',
+                                        output_dir=figures_output_dir + '\\grouped',)
+
+
+def rolling_jitter_correction_outputs(
+        rolling_jitter_correction: list[tuple], output_dir: str
+) -> None:
+    figures_output_dir = output_dir + '\\figures\\rolling_phase_correction_plots'
+    rolled_df = (
+        pd.melt(
+            pd.DataFrame(rolling_jitter_correction, columns=['trial', 'block', 'latency', 'jitter', 'instrument',
+                                                             1, 2, 3, 4]),
+            id_vars=['trial', 'block', 'latency', 'jitter', 'instrument'], var_name='lag', value_name='coef',
+        ).sort_values(by=['trial', 'block', 'latency', 'jitter', 'instrument', 'lag'])
+    )
+    make_lagged_pointplot(rolled_df, output_dir=figures_output_dir + '\\grouped')

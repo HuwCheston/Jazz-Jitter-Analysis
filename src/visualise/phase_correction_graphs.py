@@ -12,7 +12,7 @@ from src.analyse.prepare_data import average_bpms
 
 @vutils.plot_decorator
 def make_pairgrid(
-        df: pd.DataFrame, output_dir: str, xvar: str = 'correction_partner_onset', xlim=(-1, 1)
+        df: pd.DataFrame, output_dir: str, xvar: str = 'correction_partner_onset', xlim=(-1.5, 1.5)
 ) -> tuple[plt.Figure, str]:
     """
     Creates a figure showing pairs of coefficients obtained for each performer in a condition,
@@ -257,7 +257,7 @@ def _format_polar_fig(
 
 @vutils.plot_decorator
 def make_single_condition_phase_correction_plot(
-        keys_df: pd.DataFrame, drms_df: pd.DataFrame,keys_md, drms_md, keys_o: pd.DataFrame, drms_o: pd.DataFrame,
+        keys_df: pd.DataFrame, drms_df: pd.DataFrame, keys_md, drms_md, keys_o: pd.DataFrame, drms_o: pd.DataFrame,
         output_dir: str, meta: tuple = ('nan', 'nan', 'nan', 'nan')
 ) -> tuple[plt.Figure, str]:
     """
@@ -451,7 +451,7 @@ def output_regression_table(
         out.show_residual_std_err = False
         out.show_f_statistic = False
     # Create the output folder
-    fold = vutils.create_output_folder(output_dir + '\\phase_correction')
+    fold = vutils.create_output_folder(output_dir)
     # Render to html and write the result
     with open(f"{fold}\\regress_{t}.html", "w") as f:
         f.write(out.render_html())
@@ -506,4 +506,23 @@ def make_lagged_pointplot(
     sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01), fontsize=12)
     # Create filename and return to save
     fname = '\\lagged_pointplot'
+    return g.figure, fname
+
+
+@vutils.plot_decorator
+def make_rolling_window_r2_boxplot(
+        df: pd.DataFrame, output_dir: str
+) -> tuple[plt.Figure, str]:
+    """
+    Creates a boxplot of average R2 values per rolling window size
+    """
+
+    test = df.replace([np.inf, -np.inf], np.nan).dropna().groupby(['trial', 'win_size']).mean()[
+        ['aic', 'r2']].reset_index(drop=False)
+    g = (
+        sns.boxplot(data=test, hue='trial', x='win_size', y='r2', color=vutils.INSTR_CMAP[0])
+           .set(xlabel='Window Size (s)', ylabel='Adjusted R2')
+    )
+    plt.tight_layout()
+    fname = "r2_vs_windowsize_phase_correction.png"
     return g.figure, fname

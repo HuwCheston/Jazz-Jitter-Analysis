@@ -5,7 +5,8 @@ from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
 from src.analyse.prepare_data import load_data
-from src.analyse.phase_correction_models import pc_live_ioi_delayed_ioi
+from src.analyse.phase_correction_models import gen_static_phase_correction_models, gen_rolling_phase_correction_models, gen_static_model_outputs, gen_rolling_model_outputs
+
 from src.analyse.questionnaire_analysis import questionnaire_analysis
 
 @click.command()
@@ -29,8 +30,13 @@ def main(
     logger.info(f'loaded data from {len(data)} trials!')
 
     # SYNCHRONISATION MODELS #
-    logger.info(f'Creating phase correction models...')
-    pc_live_ioi_delayed_ioi(raw_data=data, output_dir=output_filepath)
+    logger.info(f'Creating static phase correction models...')
+    static_mds = gen_static_phase_correction_models(raw_data=data, output_dir=output_filepath)
+    gen_static_model_outputs(static_mds, output_dir=output_filepath)
+
+    logger.info(f'Creating rolling phase correction models...')
+    rolling_mds = gen_rolling_phase_correction_models(raw_data=data)
+    gen_rolling_model_outputs(rolling_mds, output_dir=output_filepath)
 
     # QUESTIONNAIRES #
     logger.info(f'Analysing questionnaires...')
