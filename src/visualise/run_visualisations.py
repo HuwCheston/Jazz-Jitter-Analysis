@@ -3,8 +3,9 @@ import click
 import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
-from src.analyse.prepare_data import load_data
-from tempo_slope_graphs import gen_tempo_slope_graph, gen_tempo_stability_hist
+
+from src.analyse.analysis_utils import load_data
+from src.visualise.tempo_slope_graphs import gen_tempo_slope_graph, gen_tempo_stability_hist
 
 
 @click.command()

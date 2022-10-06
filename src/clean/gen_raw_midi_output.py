@@ -1,5 +1,7 @@
 import os
-from gen_pm_output import return_formatted_dic_from_filename, return_list_of_trials, return_pm_output, clean_pm_output
+
+from src.clean.gen_pm_output import return_formatted_dic_from_filename, return_list_of_trials, \
+    return_pm_output, clean_pm_output
 
 
 def return_list_of_raw_midi_files(input_dir):

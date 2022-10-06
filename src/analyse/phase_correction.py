@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 from datetime import timedelta
-from prepare_data import zip_same_conditions_together, generate_df, append_zoom_array, reg_func, average_bpms
 import warnings
 
+import src.analyse.analysis_utils as autils
 from src.visualise.phase_correction_graphs import make_pairgrid, make_single_condition_phase_correction_plot, \
     make_single_condition_slope_animation, make_correction_boxplot_by_variable, output_regression_table, \
     make_lagged_pointplot
@@ -210,16 +210,21 @@ def phase_correction_pre_processing(
     """
     Carries out preprocessing necessary for creating a phase correction model
     """
+
     # Create dataframe, append zoom array, and delay partner's onsets
-    f1 = lambda c: delay_heard_onsets_by_latency(append_zoom_array(generate_df(c['midi_bpm']), c['zoom_array']))
+    f1 = lambda c: delay_heard_onsets_by_latency(
+        autils.append_zoom_array(autils.generate_df(c['midi_bpm']), c['zoom_array'])
+    )
     keys, drms = f1(c1), f1(c2)
     # Carry out the nearest neighbor algorithm
     f2 = lambda la, da, li, di: format_df_for_model(nearest_neighbor(la, da, li, di))
     keys_nn = f2(keys['onset'].to_numpy(), drms['onset_delayed'].to_numpy(), c1['instrument'], c2['instrument'])
     drms_nn = f2(drms['onset'].to_numpy(), keys['onset_delayed'].to_numpy(), c2['instrument'], c1['instrument'])
     # Extract tempo slope
-    tempo_slope = reg_func(
-        average_bpms(generate_df(c1['midi_bpm']), generate_df(c2['midi_bpm'])), ycol='bpm_avg', xcol='elapsed'
+    tempo_slope = autils.reg_func(
+        autils.average_bpms(
+            autils.generate_df(c1['midi_bpm']), autils.generate_df(c2['midi_bpm'])
+        ), ycol='bpm_avg', xcol='elapsed'
     ).params.iloc[1:].values[0]
     return keys, drms, keys_nn, drms_nn, tempo_slope
 
@@ -230,8 +235,9 @@ def gen_static_phase_correction_models(
     """
     Generates a static phase correction model, using all of the data in a performance
     """
+
     figures_output_dir = output_dir + '\\figures\\static_phase_correction_plots'
-    zipped_data = zip_same_conditions_together(raw_data=raw_data)
+    zipped_data = autils.zip_same_conditions_together(raw_data=raw_data)
     static_mds = []
 
     # Iterate through each conditions
@@ -272,7 +278,8 @@ def gen_rolling_phase_correction_models(
     """
     Generates a rolling phase correction model
     """
-    zipped_data = zip_same_conditions_together(raw_data=raw_data)
+
+    zipped_data = autils.zip_same_conditions_together(raw_data=raw_data)
     rolling_mds = []
 
     # Iterate through each conditions
@@ -341,6 +348,7 @@ def rolling_jitter_correction_outputs(
         rolling_jitter_correction: list[tuple], output_dir: str
 ) -> None:
     figures_output_dir = output_dir + '\\figures\\rolling_phase_correction_plots'
+    # TODO: integrate this into above function
     rolled_df = (
         pd.melt(
             pd.DataFrame(rolling_jitter_correction, columns=['trial', 'block', 'latency', 'jitter', 'instrument',

@@ -4,10 +4,11 @@ import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
-from src.analyse.prepare_data import load_data
-from src.analyse.phase_correction_models import gen_static_phase_correction_models, gen_rolling_phase_correction_models, gen_static_model_outputs, gen_rolling_model_outputs
+import src.analyse.analysis_utils as autils
+from src.analyse.phase_correction import gen_static_phase_correction_models, \
+    gen_rolling_phase_correction_models, gen_static_model_outputs, gen_rolling_model_outputs
+from src.analyse.questionnaire import questionnaire_analysis
 
-from src.analyse.questionnaire_analysis import questionnaire_analysis
 
 @click.command()
 @click.argument('input_filepath', type=click.Path(exists=True))
@@ -26,7 +27,7 @@ def main(
     # LOAD DATA AND PREPARE #
     # Load the data in as list of lists of dictionaries (one list per trial, one dictionary per condition)
     logger.info(f'loading data...')
-    data = load_data(input_filepath)
+    data = autils.load_data(input_filepath)
     logger.info(f'loaded data from {len(data)} trials!')
 
     # SYNCHRONISATION MODELS #

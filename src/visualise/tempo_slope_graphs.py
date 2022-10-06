@@ -5,7 +5,7 @@ import numpy as np
 from operator import itemgetter
 from itertools import groupby
 
-from src.analyse.prepare_data import generate_df, average_bpms, zip_same_conditions_together, reg_func
+from src.analyse.analysis_utils import generate_df, average_bpms, zip_same_conditions_together, reg_func
 import src.visualise.visualise_utils as vutils
 
 

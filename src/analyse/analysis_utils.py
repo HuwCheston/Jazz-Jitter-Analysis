@@ -3,22 +3,37 @@ import pickle
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
+from statsmodels.tsa.stattools import adfuller
 import itertools
 import collections
 import warnings
 
 
-def load_data(input_filepath: str) -> list:
+def test_stationary(
+        array: pd.Series
+) -> pd.Series:
+    """
+    Tests if data is stationary, if not returns data with first difference calculated
+    """
+    # Keep taking first difference while data is non-stationary
+    while adfuller(array.dropna(), autolag='AIC')[1] > 0.05:
+        array = array.diff()
+    # Return the array once data is stationary
+    return array
+
+
+def load_data(
+        input_filepath: str
+) -> list:
     """
     Loads all pickled data from the processed data folder
     """
     return [pickle.load(open(f'{input_filepath}\\{f}', "rb")) for f in os.listdir(input_filepath) if f.endswith('.p')]
 
 
-def generate_df(data: np.array,
-                iqr_range: tuple = (0.05, 0.95),
-                threshold: float = 0,
-                keep_pitch_vel: bool = False) -> pd.DataFrame:
+def generate_df(
+        data: np.array, iqr_range: tuple = (0.05, 0.95), threshold: float = 0, keep_pitch_vel: bool = False
+) -> pd.DataFrame:
     """
     Create dataframe from MIDI performance data, either cleaned (just crotchet beats) or raw.
     Optional keyword arguments:
@@ -46,9 +61,9 @@ def generate_df(data: np.array,
     return df.reset_index(drop=True)
 
 
-def iqr_filter(col: str,
-               df: pd.DataFrame,
-               iqr_range: tuple = (0.05, 0.95)) -> pd.Series:
+def iqr_filter(
+        col: str, df: pd.DataFrame, iqr_range: tuple = (0.05, 0.95)
+) -> pd.Series:
     """
     Filter duration values below a certain quartile to remove extraneous midi notes not cleaned in Reaper
     """
@@ -60,7 +75,9 @@ def iqr_filter(col: str,
     return fil[col]
 
 
-def reg_func(df: pd.DataFrame, xcol: str, ycol: str) -> sm.regression.linear_model.RegressionResults:
+def reg_func(
+        df: pd.DataFrame, xcol: str, ycol: str
+) -> sm.regression.linear_model.RegressionResults:
     """
     Calculates linear regression between two given columns, returns results table
     """
@@ -77,14 +94,18 @@ def reg_func(df: pd.DataFrame, xcol: str, ycol: str) -> sm.regression.linear_mod
     return results
 
 
-def return_coeff_from_sm_output(results: sm.regression.linear_model.RegressionResults) -> int:
+def return_coeff_from_sm_output(
+        results: sm.regression.linear_model.RegressionResults
+) -> int:
     """
     Formats the table returned by statsmodel to return only the regression coefficient as an integer
     """
     return pd.read_html(results.summary().tables[1].as_html(), header=0, index_col=0)[0].iloc[1, 0]
 
 
-def return_average_coeffs(coeffs: list) -> list[tuple]:
+def return_average_coeffs(
+        coeffs: list
+) -> list[tuple]:
     """
     Returns list of tuples containing average coefficient for keys/drums performance in a single trial
     Tuples take the form of those in generate_tempo_slopes, i.e. (trial, block, latency, jitter, avg. slope coefficient)
@@ -95,7 +116,9 @@ def return_average_coeffs(coeffs: list) -> list[tuple]:
     return [(*idx, float(sum(d[-1] for d in li)) / 2) for idx, li in itertools.groupby(coeffs, key=func)]
 
 
-def extract_event_density(bpm: pd.DataFrame, raw: pd.DataFrame) -> pd.DataFrame:
+def extract_event_density(
+        bpm: pd.DataFrame, raw: pd.DataFrame
+) -> pd.DataFrame:
     """
     Appends a column to performance dataframe showing number of actual notes per extracted crotchet
     """
@@ -110,7 +133,9 @@ def extract_event_density(bpm: pd.DataFrame, raw: pd.DataFrame) -> pd.DataFrame:
     return bpm
 
 
-def append_zoom_array(perf_df: pd.DataFrame, zoom_arr: np.array) -> pd.DataFrame:
+def append_zoom_array(
+        perf_df: pd.DataFrame, zoom_arr: np.array
+) -> pd.DataFrame:
     """
     Appends a column to a dataframe showing the approx amount of latency by AV-Manip for each event in a performance
     """
@@ -128,7 +153,9 @@ def append_zoom_array(perf_df: pd.DataFrame, zoom_arr: np.array) -> pd.DataFrame
     return perf_df
 
 
-def generate_tempo_slopes(raw_data: list) -> list[tuple]:
+def generate_tempo_slopes(
+        raw_data: list
+) -> list[tuple]:
     """
     Returns average tempo slope coefficients for all performances as list of tuples in the form
     (trial, block, latency, jitter, avg. slope coefficient)
@@ -143,12 +170,15 @@ def generate_tempo_slopes(raw_data: list) -> list[tuple]:
             # Calculate the regression of elapsed time vs ioi
             res = reg_func(df, xcol='elapsed', ycol='ioi')
             # Construct the tuple and append to list
-            cs.append((con['trial'], con['block'], con['condition'], con['latency'], con['jitter'], con['instrument'], return_coeff_from_sm_output(res)))
+            cs.append((con['trial'], con['block'], con['condition'], con['latency'], con['jitter'], con['instrument'],
+                       return_coeff_from_sm_output(res)))
     # Average coefficients for both performers in a single condition and return as list of tuples
     return return_average_coeffs(cs)
 
 
-def zip_same_conditions_together(raw_data: list) -> list[zip]:
+def zip_same_conditions_together(
+        raw_data: list
+) -> list[zip]:
     """
     Iterates through raw data and zips keys/drums data from the same performance together
     Returns a list of zip objects, each element of which is a tuple containing
@@ -168,7 +198,9 @@ def zip_same_conditions_together(raw_data: list) -> list[zip]:
     return all_trials
 
 
-def average_bpms(df1: pd.DataFrame, df2: pd.DataFrame, window_size: int = 4, elap: str = 'elapsed', bpm: str = 'bpm') -> pd.DataFrame:
+def average_bpms(
+        df1: pd.DataFrame, df2: pd.DataFrame, window_size: int = 4, elap: str = 'elapsed', bpm: str = 'bpm'
+) -> pd.DataFrame:
     """
     Returns a list of averaged BPMs from two performance.
     Data is grouped by every second in a performance.
@@ -180,7 +212,8 @@ def average_bpms(df1: pd.DataFrame, df2: pd.DataFrame, window_size: int = 4, ela
     # Average tempo of beat onsets created by both musicians within one second
     with warnings.catch_warnings():     # Catch errors when we don't have any values for one particular second
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        avg_tempo = [(idx, np.nanmean([*fn(grp[f'{bpm}_x']), *fn(grp[f'{bpm}_y'])])) for idx, grp in bigdf.groupby(elap)]
+        avg_tempo = [(idx, np.nanmean([*fn(grp[f'{bpm}_x']), *fn(grp[f'{bpm}_y'])]))
+                     for idx, grp in bigdf.groupby(elap)]
     # Create dataframe
     df = pd.DataFrame(avg_tempo, columns=['elapsed', 'bpm_avg'])
     # Reindex in case any rows are missing!
@@ -195,7 +228,9 @@ def average_bpms(df1: pd.DataFrame, df2: pd.DataFrame, window_size: int = 4, ela
     return df
 
 
-def ioi_nearest_neighbours_intersection(a1, a2) -> list:
+def ioi_nearest_neighbours_intersection(
+        a1, a2
+) -> list:
     # Subset pianist/drummer arrays to same length
     if a1.shape[0] < a2.shape[0]:
         a2 = a2[:a1.shape[0]]
@@ -216,7 +251,9 @@ def ioi_nearest_neighbours_intersection(a1, a2) -> list:
     return c
 
 
-def ioi_nearest_neighbours_one(a1, a2) -> list:
+def ioi_nearest_neighbours_one(
+        a1, a2
+) -> list:
     # Subset pianist/drummer arrays to same length
     if a1.shape[0] < a2.shape[0]:
         a2 = a2[:a1.shape[0]]

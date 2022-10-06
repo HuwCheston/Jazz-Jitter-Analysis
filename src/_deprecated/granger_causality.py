@@ -3,25 +3,14 @@ import pandas as pd
 import operator
 import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
-from statsmodels.tsa.stattools import grangercausalitytests, adfuller
+from statsmodels.tsa.stattools import grangercausalitytests
 from statsmodels.tsa.api import VAR
-from prepare_data import generate_df, append_zoom_array, extract_event_density, zip_same_conditions_together, ioi_nearest_neighbours_one
+
+from src.analyse.analysis_utils import generate_df, append_zoom_array, extract_event_density, \
+    zip_same_conditions_together, ioi_nearest_neighbours_one, test_stationary
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
-
-
-def test_stationary(
-        array: pd.Series
-) -> pd.Series:
-    """
-    Tests if data is stationary, if not returns data with first difference calculated
-    """
-    # Keep taking first difference while data is non-stationary
-    while adfuller(array.dropna(), autolag='AIC')[1] > 0.05:
-        array = array.diff()
-    # Return the array once data is stationary
-    return array
 
 
 def estimate_max_lag(df: pd.DataFrame, maxlag: int = 15) -> int:

@@ -3,8 +3,9 @@ import warnings
 import matplotlib.pyplot as plt
 from bioinfokit.analys import stat
 import scipy.stats as stats
-from prepare_data import generate_df
-from linear_regressions import combine_dfs_from_all_trials
+
+from src.analyse.analysis_utils import generate_df
+from src._deprecated.linear_regressions import combine_dfs_from_all_trials
 
 
 def return_levene_results(df: pd.DataFrame) -> tuple[float, float]:

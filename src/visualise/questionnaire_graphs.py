@@ -4,7 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 import src.visualise.visualise_utils as vutils
-from src.analyse.prepare_data import average_bpms
+import src.analyse.analysis_utils as autils
 
 
 @vutils.plot_decorator

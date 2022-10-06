@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 import statsmodels.api as sm
-from prepare_data import generate_df
+
+from src.analyse.analysis_utils import generate_df
 
 pd.set_option('display.max_columns', None)
 

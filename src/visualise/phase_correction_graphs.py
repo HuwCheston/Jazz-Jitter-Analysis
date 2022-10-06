@@ -7,7 +7,7 @@ from matplotlib.lines import Line2D
 from stargazer.stargazer import Stargazer
 
 import src.visualise.visualise_utils as vutils
-from src.analyse.prepare_data import average_bpms
+import src.analyse.analysis_utils as autils
 
 
 @vutils.plot_decorator
@@ -345,8 +345,10 @@ def _single_fig_slopes(
     """
 
     # Plot the actual and predicted rolling tempo slope
-    z = zip((average_bpms(keys_o, drms_o), average_bpms(keys_df, drms_df, elap='elapsed', bpm='predicted_bpm')),
-            ('Actual', 'Fitted'))
+    z = zip((
+        autils.average_bpms(keys_o, drms_o), autils.average_bpms(keys_df, drms_df, elap='elapsed', bpm='predicted_bpm')
+    ), ('Actual', 'Fitted')
+    )
     for df, lab in z:
         ax[2, 0].plot(df['elapsed'], df['bpm_rolling'], label=lab)
     ax[2, 0].axhline(y=120, color='r', linestyle='--', alpha=0.3, label='Metronome Tempo')
@@ -378,7 +380,7 @@ def make_single_condition_slope_animation(
 
     output = vutils.create_output_folder(output_dir)
     chain = lambda k, d, e, b: vutils.interpolate_df_rows(
-        vutils.append_count_in_rows_to_df(average_bpms(df1=k, df2=d, elap=e, bpm=b)))
+        vutils.append_count_in_rows_to_df(autils.average_bpms(df1=k, df2=d, elap=e, bpm=b)))
     act = chain(keys_o, drms_o, 'elapsed', 'bpm')
     pred = chain(keys_df, drms_df, 'elapsed', 'predicted_bpm')
 
