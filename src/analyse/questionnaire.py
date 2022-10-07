@@ -32,4 +32,4 @@ def questionnaire_analysis(
     )
     irr = pd.DataFrame([(i, s, *return_irr(g, var=s)) for s in vrs for i, g in df.groupby(by=['trial'])],
                        columns=['trial', 'variable', 'f', 'p'])
-    print(irr)
+

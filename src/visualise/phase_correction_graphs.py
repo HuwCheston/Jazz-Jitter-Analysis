@@ -4,7 +4,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.lines import Line2D
-from stargazer.stargazer import Stargazer
 
 import src.visualise.visualise_utils as vutils
 import src.analyse.analysis_utils as autils
@@ -12,7 +11,8 @@ import src.analyse.analysis_utils as autils
 
 @vutils.plot_decorator
 def make_pairgrid(
-        df: pd.DataFrame, output_dir: str, xvar: str = 'correction_partner_onset', xlim=(-1.5, 1.5)
+        df: pd.DataFrame, output_dir: str, xvar: str = 'correction_partner_onset', xlim=(-1.5, 1.5),
+        xlabel: str = None
 ) -> tuple[plt.Figure, str]:
     """
     Creates a figure showing pairs of coefficients obtained for each performer in a condition,
@@ -27,15 +27,28 @@ def make_pairgrid(
     # Create the plot
     pg = sns.catplot(
         data=df, x=xvar, y='abbrev', row='block', col='trial', hue='instrument', hue_order=['Keys', 'Drums'],
-        palette=vutils.INSTR_CMAP, kind='strip', height=4, sharex=True, sharey=True,
+        palette=vutils.INSTR_CMAP, kind='strip', height=4, sharex=True, sharey=True, marker='o',
         aspect=0.6, s=7, jitter=False, dodge=False,
     )
     # Add the reference line in here or it messes up the plot titles
     pg.refline(x=0, alpha=vutils.ALPHA, linestyle='-', color=vutils.BLACK)
     # Format the axis by iterating through
+    _format_pairgrid_ax(norm=norm, pg=pg, df=df, xlim=xlim)
+    _format_pairgrid_fig(pg, norm, xvar=xlabel if xlabel is not None else xvar.replace('_', ' ').title())
+    fname = f'\\pairgrid_condition_vs_{xvar}.png'
+    return pg.fig, fname
+
+
+def _format_pairgrid_ax(
+        norm, pg, df: pd.DataFrame, xlim: tuple[float | int, float | int]
+) -> None:
+    """
+    Formats each axies within a pairgrid
+    """
     for num in range(0, 5):
         # When we want different formatting for each row
-        pg.axes[0, num].set(title=f'Measure 1\nDuo {num+1}' if num == 2 else f'\nDuo {num+1}', ylabel='', xlim=xlim)
+        pg.axes[0, num].set(title=f'Measure 1\nDuo {num + 1}' if num == 2 else f'\nDuo {num + 1}', ylabel='',
+                            xlim=xlim)
         pg.axes[0, num].tick_params(bottom=False)
         pg.axes[1, num].set(title='Measure 2' if num == 2 else '', ylabel='', xlabel='', xlim=xlim)
         # When we want the same formatting for both rows
@@ -45,14 +58,11 @@ def make_pairgrid(
             pg.axes[x, num].yaxis.grid(True)
             # Add the span, shaded according to tempo slope
             d = df[
-                    (df['trial'] == num + 1) & (df['block'] == x + 1) & (df['instrument'] == 'Keys')
+                (df['trial'] == num + 1) & (df['block'] == x + 1) & (df['instrument'] == 'Keys')
                 ].sort_values(['latency', 'jitter'])['tempo_slope']
             for n in range(0, 13):
                 coef = vutils.SLOPES_CMAP(norm(d.iloc[n]))
                 pg.axes[x, num].axhspan(n - 0.5, n + 0.5, facecolor=coef)
-    _format_pairgrid_fig(pg, norm, xvar=xvar.replace('_', ' ').title())
-    fname = f'\\pairgrid_condition_vs_{xvar}.png'
-    return pg.fig, fname
 
 
 def _format_pairgrid_fig(
@@ -296,6 +306,7 @@ def _single_fig_polar(
         ax[0, num].set(ylabel='', xlabel='')
         x0, y0, x1, y1 = ax[0, num].get_position().get_points().flatten().tolist()
         ax[0, num].set_position([x0-0.1 if num == 0 else x0-0.2, y0-0.03, x1-0.05 if num == 0 else x1-0.2, y1-0.5])
+        ax[0, num].set_facecolor('#FFFFFF')
         ax[0, num].text(-0.1, 0.8, s=st, transform=ax[0, num].transAxes, ha='center',)
         if num == 0:
             ax[0, num].text(1.5, 0.05, s="√Density", transform=ax[0, num].transAxes, ha='center',)
@@ -403,62 +414,6 @@ def make_single_condition_slope_animation(
               writer='ffmpeg', fps=vutils.VIDEO_FPS)
 
 
-def output_regression_table(
-        mds: list, output_dir: str, verbose_footer: bool = False
-) -> None:
-    """
-    Create a nicely formatted regression table from a list of regression models ordered by trial, and output to html.
-    """
-
-    def get_cov_names(name: str) -> list[str]:
-        k = lambda x: float(x.partition('T.')[2].partition(']')[0])
-        # Try and sort the values by integers within the string
-        try:
-            return [o for o in sorted([i for i in out.cov_names if name in i], key=k)]
-        # If there are no integers in the string, return unsorted
-        except ValueError:
-            return [i for i in out.cov_names if name in i]
-
-    def format_cov_names(i: str, ext: str = '') -> str:
-        # If we've defined a non-default reference category the statsmodels output looks weird, so catch this
-        if ':' in i:
-            lm = lambda s: s.split('C(')[1].split(')')[0].title() + ' (' + s.split('[T.')[1].split(']')[0] + ')'
-            return lm(i.split(':')[0]) + ': ' + lm(i.split(':')[1])
-        if 'Treatment' in i:
-            return i.split('C(')[1].split(')')[0].title().split(',')[0] + ' (' + i.split('[T.')[1].replace(']', ')')
-        else:
-            base = i.split('C(')[1].split(')')[0].title() + ' ('
-            return base + i.split('C(')[1].split(')')[1].title().replace('[T.', '').replace(']', '') + ext + ')'
-
-    # Create the stargazer object from our list of models
-    out = Stargazer(mds)
-    # Get the original covariate names
-    l_o, j_o, i_o, int_o = (get_cov_names(i) for i in ['latency', 'jitter', 'instrument', 'Intercept'])
-    orig = [item for sublist in [l_o, j_o, i_o, int_o] for item in sublist]
-    # Format the original covariate names so they look nice
-    lat_fm = [format_cov_names(s, 'ms') for s in l_o]
-    jit_fm = [format_cov_names(s, 'x') for s in j_o]
-    instr_fm = [format_cov_names(s) for s in i_o]
-    form = [item for sublist in [lat_fm, jit_fm, instr_fm, int_o] for item in sublist]
-    # Format the stargazer object
-    out.custom_columns([f'Duo {i}' for i in range(1, len(mds) + 1)], [1 for _ in range(1, len(mds) + 1)])
-    out.show_model_numbers(False)
-    out.covariate_order(orig)
-    out.rename_covariates(dict(zip(orig, form)))
-    t = out.dependent_variable
-    out.dependent_variable = ' ' + out.dependent_variable.replace('_', ' ').title()
-    # If we're removing some statistics from the bottom of our table
-    if not verbose_footer:
-        out.show_adj_r2 = False
-        out.show_residual_std_err = False
-        out.show_f_statistic = False
-    # Create the output folder
-    fold = vutils.create_output_folder(output_dir)
-    # Render to html and write the result
-    with open(f"{fold}\\regress_{t}.html", "w") as f:
-        f.write(out.render_html())
-
-
 @vutils.plot_decorator
 def make_trial_hist(
         r: pd.DataFrame, output_dir: str, xvar: str = 'r2', kind: str = 'hist'
@@ -528,3 +483,41 @@ def make_rolling_window_r2_boxplot(
     plt.tight_layout()
     fname = "r2_vs_windowsize_phase_correction.png"
     return g.figure, fname
+
+
+@vutils.plot_decorator
+def make_pairgrid_iqr(
+        df: pd.DataFrame, value_vars: list, value_name: str, output_dir: str, xvar: str = 'correction_partner',
+) -> tuple[plt.Figure, str]:
+    """
+    Creates a figure showing pairs of coefficients obtained for each performer in a condition,
+    stratified by block and trial number, with shading according to tempo slope
+    """
+    # Melt the dataframe
+    df = (
+            pd.melt(df, id_vars=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope'],
+                    value_vars=value_vars, value_name=value_name)
+              .sort_values(by=['trial', 'block', 'latency', 'jitter', 'instrument'])
+              .reset_index(drop=False)
+    )
+
+    # Create the abbreviation column, showing latency and jitter
+    df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
+    df = df.sort_values(by=['latency', 'jitter'])
+    # Create the plot
+    pg = sns.catplot(
+        data=df, x=xvar, y='abbrev', row='block', col='trial', hue='instrument',
+        hue_order=['Keys', 'Drums'], palette=vutils.INSTR_CMAP, kind='point', linestyles='', marker='.', s=7,
+        errorbar=lambda v: (min(v), max(v)), estimator=np.median, height=4, sharex=True, sharey=True, aspect=0.6,
+        dodge=0.2, plot_kws={'alpha': 1}
+    )
+    ts_df = df.drop_duplicates(subset='tempo_slope', keep='last')
+    norm = vutils.create_normalised_cmap(ts_df['tempo_slope'])
+    # Add the reference line in here or it messes up the plot titles
+    pg.refline(x=0, alpha=vutils.ALPHA, linestyle='-', color=vutils.BLACK)
+    # Format the axis by iterating through
+    _format_pairgrid_ax(norm, pg, ts_df, xlim=(-1.5, 1.5))
+    _format_pairgrid_fig(pg, norm, xvar=xvar.replace('_', ' ').title() + ' (Q1:Q3)')
+    pg.fig.subplots_adjust(bottom=0.10, top=0.94, wspace=0.15, hspace=0.09, left=0.1, right=0.93)
+    fname = f'\\pairgrid_condition_vs_{xvar}_iqr.png'
+    return pg.fig, fname

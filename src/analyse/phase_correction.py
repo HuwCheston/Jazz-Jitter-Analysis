@@ -2,16 +2,17 @@ import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 from datetime import timedelta
+from itertools import chain
 import warnings
 
 import src.analyse.analysis_utils as autils
+import src.visualise.visualise_utils as vutils
 from src.visualise.phase_correction_graphs import make_pairgrid, make_single_condition_phase_correction_plot, \
-    make_single_condition_slope_animation, make_correction_boxplot_by_variable, output_regression_table, \
-    make_lagged_pointplot
-
+    make_single_condition_slope_animation, make_correction_boxplot_by_variable, make_lagged_pointplot, make_pairgrid_iqr
 
 PC_MOD = 'live_next_ioi~live_prev_ioi+live_delayed_onset'
 WINDOW_SIZE = 6
+ROLLING_LAG = 4
 
 
 def delay_heard_onsets_by_latency(
@@ -141,7 +142,7 @@ def construct_rolling_phase_correction_model(
         try:
             warnings.filterwarnings("ignore")
             reg = smf.ols(mod, data=x).fit()
-            return reg.params['live_delayed_onset'], reg.aic, reg.rsquared_adj
+            return reg.params['live_delayed_onset'], reg.aic, reg.rsquared
         # Catch errors if we only have nans and return a NaN coefficient
         except (IndexError, ValueError) as _:
             return np.nan, np.nan, np.nan
@@ -165,7 +166,7 @@ def construct_rolling_phase_correction_model(
 
 
 def construct_correction_jitter_model(
-        df: pd.DataFrame, max_lag: int = 4, var: str = 'correction_partner'
+        df: pd.DataFrame, max_lag: int = ROLLING_LAG, var: str = 'correction_partner'
 ):
     """
     Construct a linear regression model for predicting variation in phase correction from variation in latency.
@@ -182,26 +183,6 @@ def construct_correction_jitter_model(
         [f'{col}' for col in train.columns if col[-3:-1] == '__'])
     res = smf.ols(md, train).fit()
     return res.params.iloc[1: max_lag + 1].values
-
-
-def create_model_list(
-        df, avg_groupers: list, md='correction_partner_onset~C(latency)+C(jitter)+C(instrument)'
-) -> list:
-    """
-    Subset a dataframe of per-condition results and return a list of statsmodels regression outputs for use in a table.
-    By default, the regression will average results from the same condition across multiple measures. This can be
-    overridden by setting the averaging argument to False.
-    """
-
-    # Create the list of models
-    mds = []
-    # Group the dataframe by trial and iterate
-    for idx, grp in df.groupby('trial'):
-        # Average the results obtained for each condition across measures, if required
-        grp = grp.groupby(by=avg_groupers).mean().reset_index(drop=False)
-        # Create the model and append to the list
-        mds.append(smf.ols(md, data=grp).fit())
-    return mds
 
 
 def phase_correction_pre_processing(
@@ -246,60 +227,31 @@ def gen_static_phase_correction_models(
         for c1, c2 in z:
             # Pre-processing
             keys, drms, keys_nn, drms_nn, tempo_slope = phase_correction_pre_processing(c1, c2)
-
-            # Create models
+            # Create models (can't be done in a loop, as we need to refer to them later)
             keys_static = construct_static_phase_correction_model(keys_nn)
             drms_static = construct_static_phase_correction_model(drms_nn)
             static_mds.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], c1['instrument'], tempo_slope,
-                               *keys_static.params.iloc[1:].values))
+                               *keys_static.params.iloc[1:].values,
+                               *chain.from_iterable(keys_static.conf_int(cols=None).iloc[-1:].values.tolist())))
             static_mds.append((c2['trial'], c2['block'], c2['latency'], c2['jitter'], c2['instrument'], tempo_slope,
-                               *drms_static.params.iloc[1:].values))
+                               *drms_static.params.iloc[1:].values,
+                               *chain.from_iterable(drms_static.conf_int(cols=None).iloc[-1:].values.tolist())))
             # Generate output from single condition
             if make_single_plot:
                 make_single_condition_phase_correction_plot(
-                    keys_df=predict_from_model(keys_static, keys_nn), keys_md=keys_static,
-                    drms_df=predict_from_model(drms_static, drms_nn), drms_md=drms_static,
-                    meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']), keys_o=keys, drms_o=drms,
-                    output_dir=figures_output_dir + '\\individual'
+                    keys_df=predict_from_model(keys_static, keys_nn), keys_md=keys_static, keys_o=keys,
+                    drms_df=predict_from_model(drms_static, drms_nn), drms_md=drms_static, drms_o=drms,
+                    meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
+                    output_dir=figures_output_dir + '\\individual_plots'
                 )
             # Generate animation if specified
             if make_anim:
-                make_single_condition_slope_animation(keys_df=predict_from_model(keys_static, keys_nn),
-                                                      drms_df=predict_from_model(drms_static, drms_nn),
-                                                      keys_o=keys, drms_o=drms,
-                                                      meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
-                                                      output_dir=figures_output_dir + '\\animations\\tempo_slope')
+                make_single_condition_slope_animation(
+                    keys_df=predict_from_model(keys_static, keys_nn), drms_df=predict_from_model(drms_static, drms_nn),
+                    keys_o=keys, drms_o=drms, meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
+                    output_dir=figures_output_dir + '\\animations\\tempo_slope'
+                )
     return static_mds
-
-
-def gen_rolling_phase_correction_models(
-        raw_data: list, jitter_vs_correction: bool = False,
-) -> list[list]:
-    """
-    Generates a rolling phase correction model
-    """
-
-    zipped_data = autils.zip_same_conditions_together(raw_data=raw_data)
-    rolling_mds = []
-
-    # Iterate through each conditions
-    for z in zipped_data:
-        # Iterate through keys and drums performances in a condition together
-        for c1, c2 in z:
-            keys, drms, keys_nn, drms_nn, tempo_slope = phase_correction_pre_processing(c1, c2)
-            # Create models
-            for v1, v2, v3 in [(keys_nn, keys, c1), (drms_nn, drms, c2)]:
-                correct = construct_rolling_phase_correction_model(v1, v2, win_size=timedelta(seconds=WINDOW_SIZE))
-                t = [v3['trial'], v3['block'], v3['latency'], v3['jitter'], v3['instrument'], tempo_slope,
-                     correct['correction_partner'].median()]
-                if jitter_vs_correction is True:
-                    if v3['jitter'] != 0:
-                        ioi = construct_correction_jitter_model(correct, var='ioi')
-                    else:
-                        ioi = [np.nan * 4]
-                    t.extend(*ioi)
-                rolling_mds.append(t)
-    return rolling_mds
 
 
 def gen_static_model_outputs(
@@ -311,15 +263,51 @@ def gen_static_model_outputs(
 
     figures_output_dir = output_dir + '\\figures\\static_phase_correction_plots'
     static_df = pd.DataFrame(static_mds, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
-                                                  'correction_self_ioi', 'correction_partner'])
-    output_regression_table(
-            mds=create_model_list(df=static_df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
-                                  avg_groupers=['latency', 'jitter', 'instrument']),
+                                                  'correction_self_ioi', 'correction_partner',
+                                                  'correction_partner_ub', 'correction_partner_lb'])
+    vutils.output_regression_table(
+            mds=autils.create_model_list(df=static_df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
+                                         avg_groupers=['latency', 'jitter', 'instrument']),
             output_dir=figures_output_dir, verbose_footer=False
         )
-    make_correction_boxplot_by_variable(df=static_df, output_dir=figures_output_dir + '\\grouped',
+    make_correction_boxplot_by_variable(df=static_df, output_dir=figures_output_dir,
                                         yvar='correction_partner')
-    make_pairgrid(df=static_df, xvar='correction_partner', output_dir=figures_output_dir + '\\grouped')
+    make_pairgrid(df=static_df, xvar='correction_partner', output_dir=figures_output_dir)
+    # Outputs using confidence intervals
+    make_pairgrid_iqr(df=static_df, value_vars=[col for col in static_df if 'correction_partner' in col],
+                      value_name='correction_to_partner', output_dir=figures_output_dir, xvar='correction_to_partner')
+
+
+def gen_rolling_phase_correction_models(
+        raw_data: list, jitter_vs_correction: bool = True,
+) -> list[list]:
+    """
+    Generates a rolling phase correction model
+    """
+    zipped_data = autils.zip_same_conditions_together(raw_data=raw_data)
+    rolling_mds = []
+    # Iterate through each condition
+    for z in zipped_data:
+        # Iterate through keys and drums performances in a condition together
+        for c1, c2 in z:
+            keys, drms, keys_nn, drms_nn, tempo_slope = phase_correction_pre_processing(c1, c2)
+            # Iterate through data for each performer separately
+            for nn, orig, meta in [(keys_nn, keys, c1), (drms_nn, drms, c2)]:
+                # Create models
+                correct = construct_rolling_phase_correction_model(nn, orig, win_size=timedelta(seconds=WINDOW_SIZE))
+                # Append metadata and correction upper/lower bounds, median
+                t = [meta['trial'], meta['block'], meta['latency'], meta['jitter'], meta['instrument'], tempo_slope,
+                     correct['correction_partner'].quantile(0.25), correct['correction_partner'].median(),
+                     correct['correction_partner'].quantile(0.75)]
+                # If we're extracting the effects of jitter on correction, and jitter was actually applied
+                if jitter_vs_correction is True and meta['jitter'] != 0:
+                    t.extend(construct_correction_jitter_model(correct, var='ioi', max_lag=ROLLING_LAG))
+                # Else, add NaNs to make it easier when creating the dataframe later
+                else:
+                    t.extend([np.nan * ROLLING_LAG])
+                # Append all the results to our list
+                rolling_mds.append(t)
+    return rolling_mds
 
 
 def gen_rolling_model_outputs(
@@ -330,30 +318,30 @@ def gen_rolling_model_outputs(
     """
 
     figures_output_dir = output_dir + '\\figures\\rolling_phase_correction_plots'
-
+    # Create the dataframe
     roll_df = pd.DataFrame(
-        rolling_mds, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope', 'correction_partner']
+        rolling_mds, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope', 'lb',
+                              'correction_partner', 'ub', *[f'lag_{s}' for s in range(1, ROLLING_LAG + 1)]]
     )
-    output_regression_table(
-        mds=create_model_list(df=roll_df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
-                              avg_groupers=['latency', 'jitter', 'instrument']),
+
+    def rolling_jitter_correction_df() -> pd.DataFrame:
+        return (
+            pd.melt(
+                roll_df, id_vars=['trial', 'block', 'latency', 'jitter', 'instrument'], var_name='lag',
+                value_vars=[col for col in roll_df.columns if 'lag_' in col], value_name='coef',
+            ).sort_values(by=['trial', 'block', 'latency', 'jitter', 'instrument', 'lag'])
+        )
+
+    # Outputs using median correction only
+    vutils.output_regression_table(
+        mds=autils.create_model_list(df=roll_df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
+                                     avg_groupers=['latency', 'jitter', 'instrument']),
         output_dir=figures_output_dir, verbose_footer=False
     )
-    make_pairgrid(df=roll_df, xvar='correction_partner', output_dir=figures_output_dir + '\\grouped')
-    make_correction_boxplot_by_variable(df=roll_df,  yvar='correction_partner',
-                                        output_dir=figures_output_dir + '\\grouped',)
-
-
-def rolling_jitter_correction_outputs(
-        rolling_jitter_correction: list[tuple], output_dir: str
-) -> None:
-    figures_output_dir = output_dir + '\\figures\\rolling_phase_correction_plots'
-    # TODO: integrate this into above function
-    rolled_df = (
-        pd.melt(
-            pd.DataFrame(rolling_jitter_correction, columns=['trial', 'block', 'latency', 'jitter', 'instrument',
-                                                             1, 2, 3, 4]),
-            id_vars=['trial', 'block', 'latency', 'jitter', 'instrument'], var_name='lag', value_name='coef',
-        ).sort_values(by=['trial', 'block', 'latency', 'jitter', 'instrument', 'lag'])
-    )
-    make_lagged_pointplot(rolled_df, output_dir=figures_output_dir + '\\grouped')
+    make_pairgrid(df=roll_df, output_dir=figures_output_dir, xvar='correction_partner')
+    make_correction_boxplot_by_variable(df=roll_df,  yvar='correction_partner', output_dir=figures_output_dir,)
+    # Outputs using correction upper/lower bounds
+    make_pairgrid_iqr(df=roll_df, value_vars=['lb', 'correction_partner', 'ub'], value_name='correction_partner',
+                      output_dir=figures_output_dir)
+    # Outputs using rolling jitter dataframe
+    make_lagged_pointplot(rolling_jitter_correction_df(), output_dir=output_dir)

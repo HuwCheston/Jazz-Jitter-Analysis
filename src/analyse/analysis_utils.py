@@ -3,10 +3,14 @@ import pickle
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
+from statsmodels.formula import api as smf
 from statsmodels.tsa.stattools import adfuller
 import itertools
 import collections
 import warnings
+
+WINDOW_SIZE = 6
+
 
 
 def test_stationary(
@@ -199,7 +203,7 @@ def zip_same_conditions_together(
 
 
 def average_bpms(
-        df1: pd.DataFrame, df2: pd.DataFrame, window_size: int = 4, elap: str = 'elapsed', bpm: str = 'bpm'
+        df1: pd.DataFrame, df2: pd.DataFrame, window_size: int = 8, elap: str = 'elapsed', bpm: str = 'bpm'
 ) -> pd.DataFrame:
     """
     Returns a list of averaged BPMs from two performance.
@@ -261,3 +265,23 @@ def ioi_nearest_neighbours_one(
         a1 = a1[:a2.shape[0]]
     # Create nearest neighbour array for keys -> drums and drums -> keys
     return [tuple(i) for i in np.vstack((a1, a2[np.argmin(np.abs(a1[:, None] - a2), axis=1)])).T.tolist()]
+
+
+def create_model_list(
+        df, avg_groupers: list, md='correction_partner_onset~C(latency)+C(jitter)+C(instrument)'
+) -> list:
+    """
+    Subset a dataframe of per-condition results and return a list of statsmodels regression outputs for use in a table.
+    By default, the regression will average results from the same condition across multiple measures. This can be
+    overridden by setting the averaging argument to False.
+    """
+
+    # Create the list of models
+    mds = []
+    # Group the dataframe by trial and iterate
+    for idx, grp in df.groupby('trial'):
+        # Average the results obtained for each condition across measures, if required
+        grp = grp.groupby(by=avg_groupers).mean().reset_index(drop=False)
+        # Create the model and append to the list
+        mds.append(smf.ols(md, data=grp).fit())
+    return mds
