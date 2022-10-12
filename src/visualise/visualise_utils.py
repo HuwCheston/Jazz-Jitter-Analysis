@@ -15,11 +15,12 @@ from stargazer.stargazer import Stargazer
 WIDTH = 6.2677165
 HEIGHT = 10.446194166666666666666666666667
 ASPECT = 0.6
+FONTSIZE = 18
 
 ALPHA = 0.4
 BLACK = '#000000'
-FONTSIZE = 18
 WHITE = '#FFFFFF'
+
 OFFSET = 8
 VIDEO_FPS = 30
 CBAR_BINS = np.linspace(-0.5, 0.3, 9, endpoint=True)
@@ -45,9 +46,9 @@ def plot_decorator(plotter: callable):
         fig, fname = plotter(*args, **kwargs)
         # If we've provided an output directory, save the figure in the form output directory + fname
         if output is not None:
-            d = create_output_folder(output)
-            fig.savefig(d + fname, facecolor=WHITE)
-        # Close the plot to prevent it remaining in memory
+            create_output_folder(output)
+            fig.savefig(fname, facecolor=WHITE)
+        # Close the plot to prevent it from remaining in memory
         plt.close(fig)
     return wrapper
 

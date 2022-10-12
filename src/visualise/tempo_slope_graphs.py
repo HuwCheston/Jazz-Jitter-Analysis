@@ -36,7 +36,7 @@ def gen_tempo_slope_graph(data, output_dir, block_num: int = None,) -> tuple[plt
     # Format the figure
     fig = _format_fig(fig=fig, data=data, )
     # Save the result to the output_filepath
-    fname = '\\tempo_slopes.png'
+    fname = f'{output_dir}\\tempo_slopes.png'
     return fig, fname
 
 
@@ -112,5 +112,5 @@ def gen_tempo_slope_heatmap(df, output_dir,):
     position.text(0, 0.3, 'Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
     plt.subplots_adjust(bottom=0.05, wspace=0.05, hspace=0.15, right=0.90, left=0.05, top=0.91)
     plt.text(-3, -0.18, 'Measure Number', rotation=-90, fontsize=12)
-    fname = '\\tempo_slopes_heatmap.png'
+    fname = f'{output_dir}\\tempo_slopes_heatmap.png'
     return fig, fname

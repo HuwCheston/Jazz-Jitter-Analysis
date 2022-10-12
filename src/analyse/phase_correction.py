@@ -9,7 +9,7 @@ import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
 from src.visualise.phase_correction_graphs import make_pairgrid, make_single_condition_phase_correction_plot, \
     make_single_condition_slope_animation, make_correction_boxplot_by_variable, make_lagged_pointplot, \
-    make_abs_correction_regplot, make_pairwise_asym_numberline
+    make_abs_correction_regplot, make_pairwise_asym_numberline, barplot_correction_by_instrument
 
 PC_MOD = 'my_next_ioi~my_prev_ioi+asynchrony'
 WINDOW_SIZE = 6
@@ -220,7 +220,7 @@ def phase_correction_pre_processing(
     return keys, drms, keys_nn, drms_nn, tempo_slope, pw_asym
 
 
-def gen_static_phase_correction_models(
+def gen_phase_correction_models(
         raw_data: list, output_dir: str, make_anim: bool = False, make_single_plot: bool = False,
         force_rebuild: bool = True
 ) -> list:
@@ -273,7 +273,7 @@ def gen_static_phase_correction_models(
     return static_mds
 
 
-def gen_static_model_outputs(
+def gen_phase_correction_model_outputs(
         static_mds: list[tuple], output_dir: str
 ) -> None:
     """
@@ -281,19 +281,19 @@ def gen_static_model_outputs(
     """
 
     figures_output_dir = output_dir + '\\figures\\static_phase_correction_plots'
-    static_df = pd.DataFrame(static_mds, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
-                                                  'pw_asym', 'rsquared', 'correction_self', 'correction_partner'])
+    md_df = pd.DataFrame(static_mds, columns=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope',
+                                              'pw_asym', 'rsquared', 'correction_self', 'correction_partner'])
     # Create regression table
     vutils.output_regression_table(
-            mds=autils.create_model_list(df=static_df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
+            mds=autils.create_model_list(df=md_df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
                                          avg_groupers=['latency', 'jitter', 'instrument']),
             output_dir=figures_output_dir, verbose_footer=False
         )
     # Create plots
-    make_correction_boxplot_by_variable(df=static_df, output_dir=figures_output_dir,
+    make_correction_boxplot_by_variable(df=md_df, output_dir=figures_output_dir,
                                         yvar='correction_partner', ylim=(-0.2, 1))
-    make_pairgrid(df=static_df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(-0.2, 1))
-    make_abs_correction_regplot(df=static_df, output_dir=figures_output_dir)
-    make_pairwise_asym_numberline(df=static_df, output_dir=figures_output_dir,
+    make_pairgrid(df=md_df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(-0.2, 1))
+    make_abs_correction_regplot(df=md_df, output_dir=figures_output_dir)
+    make_pairwise_asym_numberline(df=md_df, output_dir=figures_output_dir,
                                   corpus_filepath=f'{output_dir}\\pw_asymmetry_corpus.xlsx')
-    pass
+    barplot_correction_by_instrument(df=md_df, output_dir=figures_output_dir)

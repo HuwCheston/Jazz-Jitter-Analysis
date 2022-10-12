@@ -36,7 +36,7 @@ def make_pairgrid(
     # Format the axis by iterating through
     _format_pairgrid_ax(norm=norm, pg=pg, df=df, xlim=xlim)
     _format_pairgrid_fig(pg, norm, xvar=xlabel if xlabel is not None else xvar.replace('_', ' ').title())
-    fname = f'\\pairgrid_condition_vs_{xvar}.png'
+    fname = f'{output_dir}\\pairgrid_condition_vs_{xvar}.png'
     return pg.fig, fname
 
 
@@ -126,7 +126,7 @@ def make_correction_boxplot_by_variable(
     # Adjust plot spacing
     bp.figure.subplots_adjust(bottom=0.25, top=0.9, left=0.06, right=0.98)
     # Save the plot
-    fname = f'\\boxplot_{yvar}_vs_{xvar}.png'
+    fname = f'{output_dir}\\boxplot_{yvar}_vs_{xvar}.png'
     return bp.figure, fname
 
 
@@ -189,7 +189,7 @@ def make_polar(
     # Add horizontal lines separating subplots
     _add_horizontal_lines_polar(fig)
     # Save figure
-    fname = '\\polarplot_relative_phase.png'
+    fname = f'{output_dir}\\polarplot_relative_phase.png'
     return fig, fname
 
 
@@ -294,7 +294,7 @@ def make_single_condition_phase_correction_plot(
     _single_fig_coefficients(ax, drms_md, keys_md)
     # Format the figure and save
     fig.suptitle(f'Duo {meta[0]} (measure {meta[1]}): latency {meta[2]}ms, jitter {meta[3]}x')
-    fname = f'\\duo{meta[0]}_measure{meta[1]}_latency{meta[2]}_jitter{meta[3]}.png'
+    fname = f'{output_dir}\\duo{meta[0]}_measure{meta[1]}_latency{meta[2]}_jitter{meta[3]}.png'
     return fig, fname
 
 
@@ -448,7 +448,7 @@ def make_trial_hist(
                     fontsize=vutils.FONTSIZE)
     g.figure.subplots_adjust(bottom=0.17, top=0.92, left=0.055, right=0.97)
     # Return, with plot_decorator used for saving
-    fname = f'\\{xvar}_hist.png'
+    fname = f'{output_dir}\\{xvar}_hist.png'
     return g.figure, fname
 
 
@@ -477,7 +477,7 @@ def make_lagged_pointplot(
     sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01),
                     fontsize=vutils.FONTSIZE)
     # Create filename and return to save
-    fname = '\\lagged_pointplot.png'
+    fname = f'{output_dir}\\lagged_pointplot.png'
     return g.figure, fname
 
 
@@ -496,7 +496,7 @@ def make_rolling_window_r2_boxplot(
            .set(xlabel='Window Size (s)', ylabel='Adjusted R2')
     )
     plt.tight_layout()
-    fname = "r2_vs_windowsize_phase_correction.png"
+    fname = f'{output_dir}\\r2_vs_windowsize_phase_correction.png'
     return g.figure, fname
 
 
@@ -534,7 +534,7 @@ def make_pairgrid_iqr(
     # Format the axis by iterating through
     _format_pairgrid_ax(norm, pg, ts_df, xlim=(-1.5, 1.5))
     _format_pairgrid_fig(pg, norm, xvar=xvar.replace('_', ' ').title() + ' (Q1:Q3)')
-    fname = f'\\pairgrid_condition_vs_{xvar}_iqr.png'
+    fname = f'{output_dir}\\pairgrid_condition_vs_{xvar}_iqr.png'
     return pg.fig, fname
 
 
@@ -568,14 +568,14 @@ def make_abs_correction_regplot(
     ax.axhline(y=0, linestyle='-', alpha=vutils.ALPHA, color=vutils.BLACK)
     # Set axis labels
     fig.supylabel('Tempo slope (BPM/s)' if yvar == 'tempo_slope' else yvar, x=0.01)
-    fig.supxlabel('Absolute coupling difference across duo', y=0.09)
+    fig.supxlabel('Absolute difference in coupling', y=0.09)
     # Format axis positioning and move legend
     plt.tight_layout()
     sns.move_legend(ax, 'lower center', ncol=6, title=None, frameon=False, bbox_to_anchor=(0.45, -0.33),
                     markerscale=1.6)
     ax.figure.subplots_adjust(bottom=0.22, top=0.95, left=0.12, right=0.95)
     # Return with filename to be saved and closed in outer function
-    fname = f'\\abs_correction_vs_{yvar}.png'
+    fname = f'{output_dir}\\abs_correction_vs_{yvar}.png'
     return ax.figure, fname
 
 
@@ -615,6 +615,40 @@ def make_pairwise_asym_numberline(
     plt.subplots_adjust(top=0.34, bottom=0.25, left=0.05, right=0.93)
     plt.yticks([], [])
     plt.legend([], [], frameon=False)
-    fname = '\\pairwise_async_numberline.png'
-    plt.savefig(output_dir + fname)
+    fname = f'{output_dir}\\pairwise_async_numberline.png'
     return g.figure, fname
+
+
+@vutils.plot_decorator
+def barplot_correction_by_instrument(
+        df, output_dir, estimator=np.median
+) -> tuple[plt.Figure, str]:
+    # Create matplotlib objects
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
+    # Create the stripplot and barplot in seaborn
+    ax = sns.stripplot(
+        data=df, x='trial', y='correction_partner', hue='instrument', dodge=True, color=vutils.BLACK, s=4, marker='.',
+        jitter=1, ax=ax
+    )
+    ax = sns.barplot(
+        data=df, x='trial', y='correction_partner', hue='instrument', ax=ax, ci=25, palette=vutils.INSTR_CMAP,
+        hue_order=['Keys', 'Drums'], errcolor='#3953a3', errwidth=10, estimator=estimator
+    )
+    # Set ax formatting
+    ax.tick_params(width=3, )
+    ax.set(ylabel='', xlabel='')
+    plt.setp(ax.spines.values(), linewidth=2)
+    # Plot a horizontal line at x=0
+    ax.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK, linewidth=2)
+    # Set axis labels
+    fig.supylabel('Coupling constant', x=0.02, y=0.55)
+    fig.supxlabel('Duo', y=0.09)
+    # Format the legend to remove the handles/labels added automatically by sns.stripplot
+    handles, labels = ax.get_legend_handles_labels()
+    ax.get_legend().remove()
+    plt.legend(handles[2:], labels[2:], ncol=6, title=None, frameon=False, bbox_to_anchor=(0.7, -0.15),
+               markerscale=1.6)
+    # Adjust the figure a bit and return for saving in decorator
+    ax.figure.subplots_adjust(bottom=0.22, top=0.95, left=0.14, right=0.95)
+    fname = f'{output_dir}\\barplot_correction_by_instrument.png'
+    return fig, fname

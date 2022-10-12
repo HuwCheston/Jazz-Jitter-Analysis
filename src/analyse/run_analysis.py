@@ -58,8 +58,8 @@ def main(
 
     # STATIC SYNCHRONISATION MODELS #
     logger.info(f'Creating static phase correction models...')
-    static_mds = gen_static_phase_correction_models(raw_data=data, output_dir=output_filepath)
-    gen_static_model_outputs(static_mds, output_dir=output_filepath)
+    static_mds = gen_phase_correction_models(raw_data=data, output_dir=output_filepath)
+    gen_phase_correction_model_outputs(static_mds, output_dir=output_filepath)
 
     # QUESTIONNAIRES #
     logger.info(f'Analysing questionnaires...')
