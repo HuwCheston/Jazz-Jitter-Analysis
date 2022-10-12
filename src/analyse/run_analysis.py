@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 import click
 import logging
-from pickle import load
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
-import src.analyse.analysis_utils as autils
 from src.analyse.tempo_slope import *
 from src.analyse.tempo_stability import *
 from src.analyse.phase_correction import *
@@ -62,11 +60,6 @@ def main(
     logger.info(f'Creating static phase correction models...')
     static_mds = gen_static_phase_correction_models(raw_data=data, output_dir=output_filepath)
     gen_static_model_outputs(static_mds, output_dir=output_filepath)
-
-    # # ROLLING SYNCHRONISATION MODELS #
-    # logger.info(f'Creating rolling phase correction models...')
-    # rolling_mds = gen_rolling_phase_correction_models(raw_data=data, output_dir=output_filepath)
-    # gen_rolling_model_outputs(rolling_mds, output_dir=output_filepath)
 
     # QUESTIONNAIRES #
     logger.info(f'Analysing questionnaires...')

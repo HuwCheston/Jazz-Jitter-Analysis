@@ -74,7 +74,7 @@ def _format_fig(fig: plt.Figure, data: list, ) -> plt.Figure:
     plt.xlim(0, 93)
     plt.ylim(30, 160)
     # Set x and y labels, title
-    fig.supxlabel('Performance Duration (s)', y=0.06)
+    fig.supxlabel('Performance duration (s)', y=0.06)
     fig.supylabel('Average tempo (BPM, 8-seconds rolling)', x=0.01)
     # Call tight_layout only once we've finished formatting but before we, add the legend
     plt.tight_layout()

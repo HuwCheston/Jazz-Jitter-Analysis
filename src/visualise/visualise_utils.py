@@ -79,15 +79,15 @@ def get_gridspec_array(fig: plt.Figure = None, ncols: int = 2) -> np.array:
     Create an array of axes with unequal numbers of plots per row/column
     Returns an array that can be indexed in the same way as the array normally returned by plt.subplots()
     """
+    # Create the figure, if we haven't already provided one
     if fig is None:
         fig = plt.figure()
     # Create the gridspec
-    gs = fig.add_gridspec(3, ncols, height_ratios=[1, 2, 3],
-                          wspace=0.1, hspace=0.3, top=0.92, bottom=0.07)
+    gs = fig.add_gridspec(3, ncols, height_ratios=[1, 2, 3], wspace=0.1, hspace=0.4, top=0.92, bottom=0.09)
     # Create an array of axes with uneven numbers of plots per row
     return np.array(
-        [[*(fig.add_subplot(gs[1, num], projection='polar') for num in range(0, ncols))],   # For the phase diff polar
-         [*(fig.add_subplot(gs[0, num]) for num in range(0, ncols))],   # For the phase correction coefficients
+        [[*(fig.add_subplot(gs[1, num], projection='polar') for num in range(0, ncols))],  # For the phase diff polar
+         [*(fig.add_subplot(gs[0, num]) for num in range(0, ncols))],  # For the phase correction coefficients
          [fig.add_subplot(gs[2, :]), np.nan]]  # For the tempo slope
     )
 

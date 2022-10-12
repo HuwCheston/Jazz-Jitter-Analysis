@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from statistics import mean
 from matplotlib import animation
 from matplotlib.lines import Line2D
 
@@ -95,7 +96,7 @@ def _format_pairgrid_fig(
 @vutils.plot_decorator
 def make_correction_boxplot_by_variable(
         df: pd.DataFrame, output_dir: str, ylim: tuple = (-1, 1), xvar: str = 'jitter',
-        yvar: str = 'correction_partner_onset', subset=False, ylabel: str = None, height: float = 3.54
+        yvar: str = 'correction_partner_onset', subset=False, ylabel: str = None, height: float = 5
 ) -> tuple[plt.Figure, str]:
     """
     Creates a figure showing correction to partner coefficients obtained for each performer in a duo, stratified by a
@@ -109,7 +110,7 @@ def make_correction_boxplot_by_variable(
     bp = sns.catplot(
         data=df, x=xvar, y=yvar, col='trial', hue='instrument', kind='box', sharex=True,
         sharey=True, palette=vutils.INSTR_CMAP, boxprops=dict(linewidth=3, ),
-        whiskerprops=dict(linestyle='-', linewidth=3), flierprops={'markersize': 10}, height=height, aspect=0.96
+        whiskerprops=dict(linestyle='-', linewidth=3), flierprops={'markersize': 10}, height=height, aspect=0.68
     )
     bp.refline(y=0, alpha=1, linestyle='-', color=vutils.BLACK, linewidth=3)
     # Adjust axes-level parameters
@@ -118,12 +119,12 @@ def make_correction_boxplot_by_variable(
     # Adjust figure-level parameters
     bp.figure.supxlabel(xvar.title(), y=0.1,)
     bp.figure.supylabel(ylabel if ylabel is not None else yvar.replace('_', ' ').title(), x=0.007,)
-    sns.move_legend(bp, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.04),)
+    sns.move_legend(bp, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01),)
     for ax in bp.axes.flatten():
         ax.tick_params(width=3, )
         plt.setp(ax.spines.values(), linewidth=2)
     # Adjust plot spacing
-    bp.figure.subplots_adjust(bottom=0.27, top=0.9, left=0.06, right=0.98)
+    bp.figure.subplots_adjust(bottom=0.25, top=0.9, left=0.06, right=0.98)
     # Save the plot
     fname = f'\\boxplot_{yvar}_vs_{xvar}.png'
     return bp.figure, fname
@@ -215,12 +216,13 @@ def _format_polar_data(
     """
 
     # Calculate the amount of phase correction for each beat
-    corr = df.asynchrony
+    corr = df.asynchrony * -1
     # Cut into bins
-    cut = pd.cut(corr, num_bins, include_lowest=False).value_counts().sort_index()
+    cut = pd.cut(corr, 15, include_lowest=False).value_counts().sort_index()
     # Format the dataframe
     cut.index = pd.IntervalIndex(cut.index.get_level_values(0)).mid
-    cut = pd.DataFrame(cut, columns=['val']).reset_index(drop=False).rename(columns={'index': 'idx'})
+    cut = pd.DataFrame(cut, columns=['asynchrony']).reset_index(drop=False).rename(
+        columns={'asynchrony': 'val', 'index': 'idx'})
     # Multiply the bin median by pi to get number of degrees
     cut['idx'] = cut['idx'] * np.pi
     # Take the square root of the density for plotting
@@ -283,10 +285,11 @@ def make_single_condition_phase_correction_plot(
     """
 
     # Create the matplotlib objects - figure with gridspec, 5 subplots
-    fig = plt.figure(figsize=(8, 8))
+    fig = plt.figure(figsize=(9.4, 15))
     ax = vutils.get_gridspec_array(fig=fig)
+    rsquared = mean([keys_md.rsquared, drms_md.rsquared])
     # Plot onto the different parts of the gridspec
-    _single_fig_slopes(ax, keys_df=keys_df, drms_df=drms_df, keys_o=keys_o, drms_o=drms_o)
+    _single_fig_slopes(ax, keys_df=keys_df, drms_df=drms_df, keys_o=keys_o, drms_o=drms_o, rsquared=rsquared)
     _single_fig_polar(ax, drms_df, keys_df)
     _single_fig_coefficients(ax, drms_md, keys_md)
     # Format the figure and save
@@ -312,14 +315,15 @@ def _single_fig_polar(
                          yt=[0, max(ax[0, num].get_yticks())])
         ax[0, num].set(ylabel='', xlabel='')
         x0, y0, x1, y1 = ax[0, num].get_position().get_points().flatten().tolist()
-        ax[0, num].set_position([x0-0.1 if num == 0 else x0-0.2, y0-0.03, x1-0.05 if num == 0 else x1-0.2, y1-0.5])
+        ax[0, num].set_position(
+            [x0 - 0.05 if num == 0 else x0 - 0.15, y0 - 0.03, x1 - 0.1 if num == 0 else x1 - 0.2, y1 - 0.5])
         ax[0, num].set_facecolor('#FFFFFF')
-        ax[0, num].text(-0.1, 0.8, s=st, transform=ax[0, num].transAxes, ha='center',)
+        ax[0, num].text(0, 0.8, s=st, transform=ax[0, num].transAxes, ha='center', )
         if num == 0:
-            ax[0, num].text(1.5, 0.05, s="√Density", transform=ax[0, num].transAxes, ha='center',)
-            ax[0, num].text(-0.3, 0.5, s="Relative Phase (πms)",
-                            transform=ax[0, num].transAxes, va='center', rotation=90)
-            ax[0, num].set_title('Relative Phase to Partner', x=1.5)
+            ax[0, num].text(1.1, 0.05, s="√Density", transform=ax[0, num].transAxes, ha='center', )
+            ax[0, num].text(-0.2, 0.5, s="Relative Phase (πms)", transform=ax[0, num].transAxes, va='center',
+                            rotation=90)
+            ax[0, num].set_title('Relative Phase to Partner', x=1.1)
 
 
 def _single_fig_coefficients(
@@ -336,12 +340,12 @@ def _single_fig_coefficients(
     # Iterate through data
     for num, st in zip(range(0, 2), ['Keys', 'Drums']):
         drms = corr[corr['index'] == st].melt().loc[2:]
-        g = sns.stripplot(ax=ax[1, num], x='value', y='variable', data=drms, jitter=False, dodge=False, marker='D', s=7,
-                          color=vutils.INSTR_CMAP[0] if st == 'Keys' else vutils.INSTR_CMAP[1])
+        g = sns.stripplot(ax=ax[1, num], x='value', y='variable', data=drms, jitter=False, dodge=False, marker='o',
+                          s=12, color=vutils.INSTR_CMAP[0] if st == 'Keys' else vutils.INSTR_CMAP[1])
         g.set_xlim((-1.5, 1.5))
         g.yaxis.grid(True)
         g.xaxis.grid(False)
-        g.axvline(alpha=vutils.ALPHA, linestyle='-', color=vutils.BLACK)
+        g.axvline(x=0, alpha=1, linestyle='-', color=vutils.BLACK)
         sns.despine(ax=g, left=True, bottom=True)
         g.text(0.05, 0.9, s=st, transform=g.transAxes, ha='center', )
         g.set_ylabel('')
@@ -356,22 +360,24 @@ def _single_fig_coefficients(
 
 
 def _single_fig_slopes(
-        ax: plt.Axes, keys_df: pd.DataFrame, drms_df: pd.DataFrame, keys_o: pd.DataFrame, drms_o: pd.DataFrame
+        ax: plt.Axes, keys_df: pd.DataFrame, drms_df: pd.DataFrame, keys_o: pd.DataFrame, drms_o: pd.DataFrame,
+        rsquared: float = None
 ) -> None:
     """
     For a single condition plot, generate the tempo slopes graphs.
     """
 
     # Plot the actual and predicted rolling tempo slope
-    z = zip((
-        autils.average_bpms(keys_o, drms_o), autils.average_bpms(keys_df, drms_df, elap='elapsed', bpm='predicted_bpm')
-    ), ('Actual', 'Fitted')
-    )
+    i = autils.average_bpms(keys_o, drms_o), autils.average_bpms(keys_df, drms_df, elap='elapsed', bpm='predicted_bpm')
+    z = zip(i, ('Actual', 'Fitted'))
     for df, lab in z:
-        ax[2, 0].plot(df['elapsed'], df['bpm_rolling'], label=lab)
-    ax[2, 0].axhline(y=120, color='r', linestyle='--', alpha=0.3, label='Metronome Tempo')
-    ax[2, 0].legend()
-    ax[2, 0].set(xlabel='Performance Duration (s)', ylabel='Average tempo (BPM)', ylim=(30, 160), title='Tempo Slope')
+        ax[2, 0].plot(df['elapsed'], df['bpm_rolling'], label=lab, linewidth=2)
+    ax[2, 0].axhline(y=120, color=vutils.BLACK, linestyle='--', alpha=vutils.ALPHA, label='Metronome Tempo',
+                     linewidth=2)
+    ax[2, 0].text(8, 40, s=f'$r^2$ = {round(rsquared, 2)}', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    ax[2, 0].legend(ncol=3, loc='lower center', bbox_to_anchor=(0.48, -0.28), title=None, frameon=False, )
+    ax[2, 0].set(xlabel='Performance duration (s)', ylabel='Average tempo (BPM, 8-seconds rolling)', ylim=(30, 160),
+                 title='Tempo Slope')
 
 
 def make_single_condition_slope_animation(
