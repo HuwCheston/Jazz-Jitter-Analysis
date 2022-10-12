@@ -79,13 +79,14 @@ def gen_tempo_stability_df(
 
 
 def gen_tempo_stability_df_outputs(
-        tempo_stability_df: pd.DataFrame, output_dir: str, xvar: str = 'ioi_std'
+        tempo_stability_df: pd.DataFrame, output_dir: str, xvar: str = 'ioi_std',
+        xlabel='Median IOI standard deviation, 8-second window (ms)'
 ) -> None:
     """
     Generates outputs from a dataframe including a tempo stability column
     """
     make_pairgrid(tempo_stability_df, output_dir=output_dir, xvar=xvar,
-                  xlabel='Median IOI standard deviation, 8-second window (ms)',
+                  xlabel=xlabel,
                   xlim=(0, tempo_stability_df[xvar].max() + (tempo_stability_df[xvar].max() / 10)))
 
 

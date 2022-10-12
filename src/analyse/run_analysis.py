@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import click
 import logging
+from pickle import load
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
@@ -53,19 +54,19 @@ def main(
     gen_tempo_slope_mds_outputs(tempo_stability_mds, output_filepath + '\\figures\\tempo_stability_plots')
     # Regress NPVI stability and generate outputs
     gen_tempo_stability_df_outputs(tempo_stability_df, output_dir=output_filepath + '\\figures\\tempo_stability_plots',
-                                   xvar='ioi_npvi')
+                                   xvar='ioi_npvi', xlabel='IOI normalised pairwise variability index (nPVI)')
     npvi_mds = gen_tempo_stability_mds(tempo_stability_df, md='ioi_npvi~C(latency)+C(jitter)+C(instrument)')
-    gen_tempo_stability_mds_outputs(npvi_mds, output_filepath + '\\figures\\tempo_stability_plots')
+    gen_tempo_stability_mds_outputs(npvi_mds, output_filepath + '\\figures\\tempo_stability_plots',)
 
     # STATIC SYNCHRONISATION MODELS #
     logger.info(f'Creating static phase correction models...')
     static_mds = gen_static_phase_correction_models(raw_data=data, output_dir=output_filepath)
     gen_static_model_outputs(static_mds, output_dir=output_filepath)
 
-    # ROLLING SYNCHRONISATION MODELS #
-    logger.info(f'Creating rolling phase correction models...')
-    rolling_mds = gen_rolling_phase_correction_models(raw_data=data)
-    gen_rolling_model_outputs(rolling_mds, output_dir=output_filepath)
+    # # ROLLING SYNCHRONISATION MODELS #
+    # logger.info(f'Creating rolling phase correction models...')
+    # rolling_mds = gen_rolling_phase_correction_models(raw_data=data, output_dir=output_filepath)
+    # gen_rolling_model_outputs(rolling_mds, output_dir=output_filepath)
 
     # QUESTIONNAIRES #
     logger.info(f'Analysing questionnaires...')

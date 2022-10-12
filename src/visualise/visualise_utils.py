@@ -12,8 +12,13 @@ import functools
 # Define constants
 from stargazer.stargazer import Stargazer
 
+WIDTH = 6.2677165
+HEIGHT = 10.446194166666666666666666666667
+ASPECT = 0.6
+
 ALPHA = 0.4
 BLACK = '#000000'
+FONTSIZE = 18
 WHITE = '#FFFFFF'
 OFFSET = 8
 VIDEO_FPS = 30

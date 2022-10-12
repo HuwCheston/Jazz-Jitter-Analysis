@@ -18,7 +18,7 @@ def make_pairgrid(
     Creates a figure showing pairs of coefficients obtained for each performer in a condition,
     stratified by block and trial number, with shading according to tempo slope
     """
-
+    plt.rcParams.update({'font.size': vutils.FONTSIZE})
     # Create the abbreviation column, showing latency and jitter
     df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
     df = df.sort_values(by=['latency', 'jitter'])
@@ -27,11 +27,11 @@ def make_pairgrid(
     # Create the plot
     pg = sns.catplot(
         data=df, x=xvar, y='abbrev', row='block', col='trial', hue='instrument', hue_order=['Keys', 'Drums'],
-        palette=vutils.INSTR_CMAP, kind='strip', height=4, sharex=True, sharey=True, marker='o',
-        aspect=0.6, s=7, jitter=False, dodge=False,
+        palette=vutils.INSTR_CMAP, kind='strip', height=5.5, sharex=True, sharey=True, marker='o',
+        aspect=0.62, s=10, jitter=False, dodge=False,
     )
     # Add the reference line in here or it messes up the plot titles
-    pg.refline(x=0, alpha=vutils.ALPHA, linestyle='-', color=vutils.BLACK)
+    pg.refline(x=0, alpha=1, linestyle='-', color=vutils.BLACK)
     # Format the axis by iterating through
     _format_pairgrid_ax(norm=norm, pg=pg, df=df, xlim=xlim)
     _format_pairgrid_fig(pg, norm, xvar=xlabel if xlabel is not None else xvar.replace('_', ' ').title())
@@ -47,10 +47,13 @@ def _format_pairgrid_ax(
     """
     for num in range(0, 5):
         # When we want different formatting for each row
-        pg.axes[0, num].set(title=f'Measure 1\nDuo {num + 1}' if num == 2 else f'\nDuo {num + 1}', ylabel='',
-                            xlim=xlim)
+        pg.axes[0, num].set_title(f'Measure 1\nDuo {num + 1}' if num == 2 else f'\nDuo {num + 1}',
+                                  fontsize=vutils.FONTSIZE)
+        pg.axes[0, num].set(ylabel='', xlim=xlim, )
         pg.axes[0, num].tick_params(bottom=False)
-        pg.axes[1, num].set(title='Measure 2' if num == 2 else '', ylabel='', xlabel='', xlim=xlim)
+
+        pg.axes[1, num].set_title(f'Measure 2' if num == 2 else '', fontsize=vutils.FONTSIZE)
+        pg.axes[1, num].set(ylabel='', xlabel='', xlim=xlim)
         # When we want the same formatting for both rows
         for x in range(0, 2):
             # Disable the grid
@@ -66,58 +69,61 @@ def _format_pairgrid_ax(
 
 
 def _format_pairgrid_fig(
-        g: sns.FacetGrid, norm, xvar: str = 'Correction'
+        pg: sns.FacetGrid, norm, xvar: str = 'Correction'
 ) -> None:
     """
     Formats figure-level attributes for a horizontal pairgrid of all conditions
     """
 
     # Format the figure
-    g.despine(left=True, bottom=True)
-    g.fig.supxlabel(xvar, x=0.53, y=0.04)
-    g.fig.supylabel('Condition', x=0.01)
+    pg.despine(left=True, bottom=True)
+    pg.fig.supxlabel(xvar, x=0.53, y=0.05)
+    pg.fig.supylabel('Condition', x=0.01)
     # Add the colorbar
-    position = g.fig.add_axes([0.95, 0.3, 0.01, 0.4])
-    g.fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position, ticks=vutils.CBAR_BINS)
-    position.text(0, 0.3, ' Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
+    position = pg.fig.add_axes([0.94, 0.2, 0.01, 0.6])
+    pg.fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position, ticks=vutils.CBAR_BINS)
+    position.text(0., 0.3, ' Slope\n(BPM/s)\n\n', fontsize=vutils.FONTSIZE)  # Super hacky way to add a title...
     # Add the legend
-    g.legend.remove()
-    g.fig.get_axes()[0].legend(loc='lower center', ncol=2, bbox_to_anchor=(2.85, -1.36), title=None, frameon=False)
+    pg.legend.remove()
+    lg = pg.fig.get_axes()[0].legend(loc='lower center', ncol=2, bbox_to_anchor=(2.85, -1.45), title=None, frameon=False)
+    for handle in lg.legendHandles:
+        handle.set_sizes([100.0])
     # Adjust the plot spacing
-    g.fig.subplots_adjust(bottom=0.10, top=0.94, wspace=0.15, left=0.1, right=0.93)
+    pg.fig.subplots_adjust(bottom=0.12, top=0.93, wspace=0.15, left=0.11, right=0.93)
 
 
 @vutils.plot_decorator
 def make_correction_boxplot_by_variable(
-        df: pd.DataFrame, output_dir: str, xvar: str = 'jitter', ylim=(-1, 1), yvar: str = 'correction_partner_onset',
-        subset=False
+        df: pd.DataFrame, output_dir: str, ylim: tuple = (-1, 1), xvar: str = 'jitter',
+        yvar: str = 'correction_partner_onset', subset=False, ylabel: str = None, height: float = 3.54
 ) -> tuple[plt.Figure, str]:
     """
     Creates a figure showing correction to partner coefficients obtained for each performer in a duo, stratified by a
     given variable (defaults to jitter scale). By default, the control condition is included in this plot,
     but this can be excluded by setting optional argument subset to True.
     """
-
+    plt.rcParams.update({'font.size': vutils.FONTSIZE})
     # Format the data to exclude the control condition
     if subset:
         df = df[df['latency'] != 0]
-    # Create the plot
     bp = sns.catplot(
         data=df, x=xvar, y=yvar, col='trial', hue='instrument', kind='box', sharex=True,
-        sharey=True, palette=vutils.INSTR_CMAP, height=4, aspect=0.6,
+        sharey=True, palette=vutils.INSTR_CMAP, boxprops=dict(linewidth=3, ),
+        whiskerprops=dict(linestyle='-', linewidth=3), flierprops={'markersize': 10}, height=height, aspect=0.96
     )
-    bp.refline(y=0, alpha=vutils.ALPHA, linestyle='-', color=vutils.BLACK)
+    bp.refline(y=0, alpha=1, linestyle='-', color=vutils.BLACK, linewidth=3)
     # Adjust axes-level parameters
-    bp.set(ylim=ylim, xlabel='', ylabel='', )
-    bp.set_titles("Duo {col_name}")
-    for ax in bp.axes.flat:
-        ax.yaxis.set_ticks(np.linspace(-1, 1, 5, endpoint=True))
+    bp.set(ylim=ylim, xlabel='', ylabel='')
+    bp.set_titles("Duo {col_name}",)
     # Adjust figure-level parameters
-    bp.figure.supxlabel(xvar.title(), y=0.06)
-    bp.figure.supylabel(yvar.replace('_', ' ').title(), x=0.007)
-    sns.move_legend(bp, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01))
+    bp.figure.supxlabel(xvar.title(), y=0.1,)
+    bp.figure.supylabel(ylabel if ylabel is not None else yvar.replace('_', ' ').title(), x=0.007,)
+    sns.move_legend(bp, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.04),)
+    for ax in bp.axes.flatten():
+        ax.tick_params(width=3, )
+        plt.setp(ax.spines.values(), linewidth=2)
     # Adjust plot spacing
-    bp.figure.subplots_adjust(bottom=0.17, top=0.92, left=0.055, right=0.97)
+    bp.figure.subplots_adjust(bottom=0.27, top=0.9, left=0.06, right=0.98)
     # Save the plot
     fname = f'\\boxplot_{yvar}_vs_{xvar}.png'
     return bp.figure, fname
@@ -135,7 +141,8 @@ def make_polar(
     sorter = lambda e: (e[0], e[1], e[2], e[3], e[4])
     to_plot = [t for t in sorted(nn_list, key=sorter)]
     # Create the subplots
-    fig, ax = plt.subplots(nrows=10, ncols=13, subplot_kw=dict(projection="polar"), figsize=(22, 14), sharex='row', )
+    fig, ax = plt.subplots(nrows=10, ncols=13, subplot_kw=dict(projection="polar"),
+                           figsize=(vutils.WIDTH, vutils.HEIGHT), sharex='row', )
     # Create the indexers
     col_ind, row_ind = 0, 0
     # Sort the palette for the shading
@@ -208,7 +215,7 @@ def _format_polar_data(
     """
 
     # Calculate the amount of phase correction for each beat
-    corr = df.live_prev_onset - df.delayed_prev_onset
+    corr = df.asynchrony
     # Cut into bins
     cut = pd.cut(corr, num_bins, include_lowest=False).value_counts().sort_index()
     # Format the dataframe
@@ -324,7 +331,7 @@ def _single_fig_coefficients(
 
     corr = pd.concat([keys_md.params, drms_md.params], axis=1).rename(
         columns={0: 'Keys', 1: 'Drums'}).transpose().rename(
-        columns={'live_prev_ioi': 'Self', 'live_delayed_onset': 'Partner'}).reset_index(drop=False)
+        columns={'my_prev_ioi': 'Self', 'asynchrony': 'Partner'}).reset_index(drop=False)
     ax[1, 1].sharex(ax[1, 0])
     # Iterate through data
     for num, st in zip(range(0, 2), ['Keys', 'Drums']):
@@ -424,17 +431,18 @@ def make_trial_hist(
 
     # Create the ditsplot
     g = sns.displot(r, col='trial', kind=kind, x=xvar, hue="instrument", multiple="stack", palette=vutils.INSTR_CMAP,
-                    height=4, aspect=0.6, )
+                    height=vutils.HEIGHT, aspect=vutils.ASPECT, )
     # Format figure-level properties
     g.set(xlabel='', ylabel='')
-    g.set_titles("Duo {col_name}", size=12)
+    g.set_titles("Duo {col_name}", size=vutils.FONTSIZE)
     g.figure.supxlabel(xvar.title(), y=0.06)
     g.figure.supylabel('Count', x=0.007)
     # Move legend and adjust subplots
-    sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.03), fontsize=12)
+    sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.03),
+                    fontsize=vutils.FONTSIZE)
     g.figure.subplots_adjust(bottom=0.17, top=0.92, left=0.055, right=0.97)
     # Return, with plot_decorator used for saving
-    fname = f'\\{xvar}_hist'
+    fname = f'\\{xvar}_hist.png'
     return g.figure, fname
 
 
@@ -449,20 +457,21 @@ def make_lagged_pointplot(
 
     # Make the plot
     g = sns.catplot(
-        data=df, col='trial', row='jitter', x="lag", y="coef", hue='instrument',
-        kind="point", height=4, aspect=.6, dodge=0.2, palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'],
+        data=df, col='trial', row='jitter', x="lag", y="coef", hue='instrument', kind="point", height=vutils.HEIGHT,
+        aspect=vutils.ASPECT, dodge=0.2, palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'],
     )
     # Format titles, labels
-    g.set_titles('Duo {col_name}, Jitter: {row_name}x', size=12)
+    g.set_titles('Duo {col_name}, Jitter: {row_name}x', size=vutils.FONTSIZE)
     g.set_axis_labels(x_var='', y_var='')
-    g.figure.supxlabel('Lag (s)', y=0.04, fontsize=12)
-    g.figure.supylabel('Coefficient', x=0.007, fontsize=12)
+    g.figure.supxlabel('Lag (s)', y=0.04, fontsize=vutils.FONTSIZE)
+    g.figure.supylabel('Coefficient', x=0.007, fontsize=vutils.FONTSIZE)
     # Set figure properties
     g.refline(y=0, alpha=vutils.ALPHA, linestyle='-', color=vutils.BLACK)
     g.figure.subplots_adjust(bottom=0.1, top=0.95, left=0.09, right=0.97)
-    sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01), fontsize=12)
+    sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01),
+                    fontsize=vutils.FONTSIZE)
     # Create filename and return to save
-    fname = '\\lagged_pointplot'
+    fname = '\\lagged_pointplot.png'
     return g.figure, fname
 
 
@@ -505,19 +514,101 @@ def make_pairgrid_iqr(
     df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
     df = df.sort_values(by=['latency', 'jitter'])
     # Create the plot
+    plt.rcParams.update({'font.size': vutils.FONTSIZE})
     pg = sns.catplot(
         data=df, x=xvar, y='abbrev', row='block', col='trial', hue='instrument',
-        hue_order=['Keys', 'Drums'], palette=vutils.INSTR_CMAP, kind='point', linestyles='', marker='.', s=7,
-        errorbar=lambda v: (min(v), max(v)), estimator=np.median, height=4, sharex=True, sharey=True, aspect=0.6,
-        dodge=0.2, plot_kws={'alpha': 1}
+        hue_order=['Keys', 'Drums'], palette=vutils.INSTR_CMAP, kind='point', linestyles='', marker='.', s=10,
+        errorbar=lambda v: (min(v), max(v)), estimator=np.median, height=5.5, sharex=True, sharey=True,
+        aspect=0.62, dodge=0.2, plot_kws={'alpha': 1}
     )
     ts_df = df.drop_duplicates(subset='tempo_slope', keep='last')
     norm = vutils.create_normalised_cmap(ts_df['tempo_slope'])
     # Add the reference line in here or it messes up the plot titles
-    pg.refline(x=0, alpha=vutils.ALPHA, linestyle='-', color=vutils.BLACK)
+    pg.refline(x=0, alpha=1, linestyle='-', color=vutils.BLACK)
     # Format the axis by iterating through
     _format_pairgrid_ax(norm, pg, ts_df, xlim=(-1.5, 1.5))
     _format_pairgrid_fig(pg, norm, xvar=xvar.replace('_', ' ').title() + ' (Q1:Q3)')
-    pg.fig.subplots_adjust(bottom=0.10, top=0.94, wspace=0.15, hspace=0.09, left=0.1, right=0.93)
     fname = f'\\pairgrid_condition_vs_{xvar}_iqr.png'
     return pg.fig, fname
+
+
+@vutils.plot_decorator
+def make_abs_correction_regplot(
+        df: pd.DataFrame, output_dir: str, yvar: str = 'tempo_slope'
+) -> tuple[plt.Figure, str]:
+    """
+    Creates a regression & scatter plot for absolute correction difference between duo members versus another variable
+    (defaults to tempo slope, but can be changed by setting yvar argument)
+    """
+
+    # Define function used to calculate absolute coupling difference across duo
+    def get_abs_correction(grp: pd.DataFrame.groupby) -> pd.DataFrame.groupby:
+        grp['abs_correction'] = abs(grp.iloc[1].correction_partner - grp.iloc[0].correction_partner)
+        return grp.drop_duplicates(subset=['abs_correction', yvar])
+
+    # Format the dataframe
+    df = df.groupby(by=['trial', 'block', 'latency', 'jitter']).apply(get_abs_correction)
+    df['trial'] = df['trial'].replace({n: f'Duo {n}' for n in range(1, 6)})  # Makes formatting legend easier
+    # Create the ax for plotting
+    plt.rcParams.update({'font.size': vutils.FONTSIZE})
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
+    # Plot the scatterplot and single regression line
+    ax = sns.scatterplot(data=df, x='abs_correction', y=yvar, hue='trial', style='trial', s=150, ax=ax, palette='tab10')
+    ax = sns.regplot(data=df, x='abs_correction', y=yvar, scatter=None, truncate=True, ax=ax, color=vutils.BLACK)
+    ax.tick_params(width=3, )
+    ax.set(ylabel='', xlabel='')
+    plt.setp(ax.spines.values(), linewidth=2)
+    # Plot a horizontal line at x=0
+    ax.axhline(y=0, linestyle='-', alpha=vutils.ALPHA, color=vutils.BLACK)
+    # Set axis labels
+    fig.supylabel('Tempo slope (BPM/s)' if yvar == 'tempo_slope' else yvar, x=0.01)
+    fig.supxlabel('Absolute coupling difference across duo', y=0.09)
+    # Format axis positioning and move legend
+    plt.tight_layout()
+    sns.move_legend(ax, 'lower center', ncol=6, title=None, frameon=False, bbox_to_anchor=(0.45, -0.33),
+                    markerscale=1.6)
+    ax.figure.subplots_adjust(bottom=0.22, top=0.95, left=0.12, right=0.95)
+    # Return with filename to be saved and closed in outer function
+    fname = f'\\abs_correction_vs_{yvar}.png'
+    return ax.figure, fname
+
+
+def make_pairwise_asym_numberline(
+        df: pd.DataFrame, output_dir: str, corpus_filepath: str
+) -> tuple[plt.Figure, str]:
+    """
+    Creates a numberline showing difference in pairwise asynchrony between duos this experiment during the control
+    condition and a corpus of pairwise asynchrony values from other studies and genres
+    """
+
+    # Format the input dataframe
+    trial = df[df['latency'] == 0].drop_duplicates(subset='pw_asym').groupby(['trial']).mean()[
+        ['pw_asym']].reset_index(drop=False).rename(columns={'trial': 'style'})
+    trial['source'] = ''
+    trial['style'] = trial['style'].replace({n: f'Duo {n}, this study' for n in range(1, 6)})
+    # Read in the corpus dataframe and append to the input
+    corpus = pd.read_excel(io=corpus_filepath, sheet_name=0)
+    df = pd.concat([corpus.reset_index(drop=True), trial.reset_index(drop=True)]).round(0)
+    df['this_study'] = (df['source'] == '')
+    df['placeholder'] = ''
+    # Create the plot
+    plt.rcParams.update({'font.size': vutils.FONTSIZE})
+    fig, ax = plt.subplots(1, 1, figsize=(9.4 * 2, 4))
+    g = sns.stripplot(
+        data=df, x='pw_asym', y='placeholder', hue='this_study', jitter=False, dodge=False, s=12, ax=ax, orient='h'
+    )
+    g.axhline(y=0, alpha=1, linestyle='-', color=vutils.BLACK, linewidth=3)
+    # Add the annotations onto the plot
+    for k, v in df.iterrows():
+        g.annotate(text=v['style'] + '\n' + v['source'], xy=(v['pw_asym'], 0), xytext=(v['pw_asym'], -0.3),
+                   rotation=45)
+    # Format the plot
+    g.set(xlim=(15, 41), xticks=np.arange(15, 41, 5, ), xlabel='', ylabel='')
+    g.figure.supxlabel('Pairwise asynchrony (ms)', y=0.05)
+    sns.despine(left=True, bottom=True)
+    plt.subplots_adjust(top=0.34, bottom=0.25, left=0.05, right=0.93)
+    plt.yticks([], [])
+    plt.legend([], [], frameon=False)
+    fname = '\\pairwise_async_numberline.png'
+    plt.savefig(output_dir + fname)
+    return g.figure, fname

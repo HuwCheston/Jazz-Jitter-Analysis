@@ -17,12 +17,13 @@ def gen_tempo_slope_graph(data, output_dir, block_num: int = None,) -> tuple[plt
     vutils.create_normalised_cmap(
         slopes=[autils.reg_func(d[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0] for d in data]
     )
+    plt.rcParams.update({'font.size': vutils.FONTSIZE})
     # Calculate number of discrete trials and conditions within dataset
     fn = lambda nu: max(data, key=itemgetter(nu))[nu]
     n_trials = fn(0)
     n_conditions = fn(2)
     # Construct figure and axis object
-    fig, ax = plt.subplots(nrows=n_trials, ncols=n_conditions, sharex='all', sharey='all', figsize=(15, 8))
+    fig, ax = plt.subplots(nrows=n_trials, ncols=n_conditions, sharex='all', sharey='all', figsize=(6.2677165*3, 10))
     # Iterate through data from each trial
     for k, g in groupby(data, itemgetter(0)):
         # Sort the data from each trial by block, latency, and jitter and subset for required block number
@@ -31,15 +32,15 @@ def gen_tempo_slope_graph(data, output_dir, block_num: int = None,) -> tuple[plt
             li = [t for t in li if t[1] == block_num]
         # Iterate through each condition and plot
         for num, i in enumerate(li):
-            plot_avg_tempo_for_condition(num_iter=num, con_data=i, ax=ax, n_conditions=n_conditions,)
+            _format_ax(num_iter=num, con_data=i, ax=ax, n_conditions=n_conditions, )
     # Format the figure
-    fig = format_figure(fig=fig, data=data,)
+    fig = _format_fig(fig=fig, data=data, )
     # Save the result to the output_filepath
     fname = '\\tempo_slopes.png'
     return fig, fname
 
 
-def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n_conditions: int = 13, ):
+def _format_ax(num_iter: int, con_data: tuple, ax: plt.Axes, n_conditions: int = 13, ):
     """
     Plots the data for one condition on one subplot of the overall figure
     """
@@ -48,21 +49,24 @@ def plot_avg_tempo_for_condition(num_iter: int, con_data: tuple, ax: plt.Axes, n
     y = num_iter if num_iter < n_conditions else num_iter - n_conditions    # Plot data from both blocks on one subplot
     condition_axis = ax[x, y]
     con_data[5]['elapsed'] -= 8
+    plt.setp(condition_axis.spines.values(), linewidth=2)
     # Plot the data on required subplot
     condition_axis.plot(con_data[5]['elapsed'], con_data[5]['bpm_rolling'],
-                        label=f'Measure {con_data[1]}', color=vutils.LINE_CMAP[con_data[1] - 1])
+                        label=f'Repeated Measure {con_data[1]}', color=vutils.LINE_CMAP[con_data[1] - 1],
+                        linewidth=2)
     condition_axis.tick_params(axis='both', which='both', bottom=False, left=False,)
     # If this condition is either in the first row or column, add the required label
     if x == 0:
-        condition_axis.set_title(f'{con_data[3]}ms/{con_data[4]}x')
+        condition_axis.set_title(f'{con_data[3]}ms\n{con_data[4]}x')
     if num_iter == 0:
         condition_axis.set_ylabel(f'Duo {con_data[0]}', rotation=90)
     # Add the reference column as a horizontal line
     if con_data[1] == 2:
-        condition_axis.axhline(y=120, color=vutils.BLACK, linestyle='--', alpha=vutils.ALPHA, label='Metronome Tempo')
+        condition_axis.axhline(y=120, color=vutils.BLACK, linestyle='--', alpha=vutils.ALPHA, label='Metronome Tempo',
+                               linewidth=2)
 
 
-def format_figure(fig: plt.Figure, data: list,) -> plt.Figure:
+def _format_fig(fig: plt.Figure, data: list, ) -> plt.Figure:
     """
     Formats the overall figure, setting axis limits, adding labels/titles, configuring legend
     """
@@ -70,7 +74,7 @@ def format_figure(fig: plt.Figure, data: list,) -> plt.Figure:
     plt.xlim(0, 93)
     plt.ylim(30, 160)
     # Set x and y labels, title
-    fig.supxlabel('Performance Duration (s)', y=0.05)
+    fig.supxlabel('Performance Duration (s)', y=0.06)
     fig.supylabel('Average tempo (BPM, 8-seconds rolling)', x=0.01)
     # Call tight_layout only once we've finished formatting but before we, add the legend
     plt.tight_layout()
@@ -78,7 +82,7 @@ def format_figure(fig: plt.Figure, data: list,) -> plt.Figure:
     handles, labels = plt.gca().get_legend_handles_labels()
     fig.legend(handles, labels, ncol=3, loc='lower center', bbox_to_anchor=(0.5, 0), frameon=False)
     # Reduce the space between plots a bit
-    plt.subplots_adjust(bottom=0.11, wspace=0.05, hspace=0.05, right=0.98)
+    plt.subplots_adjust(bottom=0.13, wspace=0.05, hspace=0.05, right=0.98, left=0.08)
     return fig
 
 
