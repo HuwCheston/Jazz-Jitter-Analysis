@@ -34,7 +34,7 @@ def gen_tempo_slope_graph(data, output_dir, block_num: int = None,) -> tuple[plt
         for num, i in enumerate(li):
             _format_ax(num_iter=num, con_data=i, ax=ax, n_conditions=n_conditions, )
     # Format the figure
-    fig = _format_fig(fig=fig, data=data, )
+    fig = _format_fig(fig=fig,)
     # Save the result to the output_filepath
     fname = f'{output_dir}\\tempo_slopes.png'
     return fig, fname
@@ -66,7 +66,7 @@ def _format_ax(num_iter: int, con_data: tuple, ax: plt.Axes, n_conditions: int =
                                linewidth=2)
 
 
-def _format_fig(fig: plt.Figure, data: list, ) -> plt.Figure:
+def _format_fig(fig: plt.Figure, ) -> plt.Figure:
     """
     Formats the overall figure, setting axis limits, adding labels/titles, configuring legend
     """

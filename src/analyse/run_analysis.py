@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
+# TODO: fix imports here to use __all__ instead, so that we don't import packages like numpy, pandas etc
 from src.analyse.tempo_slope import *
 from src.analyse.tempo_stability import *
 from src.analyse.phase_correction import *
@@ -56,10 +57,10 @@ def main(
     npvi_mds = gen_tempo_stability_mds(tempo_stability_df, md='ioi_npvi~C(latency)+C(jitter)+C(instrument)')
     gen_tempo_stability_mds_outputs(npvi_mds, output_filepath + '\\figures\\tempo_stability_plots',)
 
-    # STATIC SYNCHRONISATION MODELS #
-    logger.info(f'Creating static phase correction models...')
-    static_mds = gen_phase_correction_models(raw_data=data, output_dir=output_filepath)
-    gen_phase_correction_model_outputs(static_mds, output_dir=output_filepath)
+    # SYNCHRONISATION MODELS #
+    logger.info(f'Creating phase correction models...')
+    phase_correction_mds = gen_phase_correction_models(raw_data=data, output_dir=output_filepath, logger=logger)
+    gen_phase_correction_model_outputs(phase_correction_mds, output_dir=output_filepath)
 
     # QUESTIONNAIRES #
     logger.info(f'Analysing questionnaires...')

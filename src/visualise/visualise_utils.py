@@ -26,10 +26,10 @@ VIDEO_FPS = 30
 CBAR_BINS = np.linspace(-0.5, 0.3, 9, endpoint=True)
 
 # Define the colour palettes
-# Function used to shade a cmap by given alpha value (can be used in colorbars etc)
+# Function used to shade a color map by given alpha value (can be used in color bars etc)
 alpha_func = lambda pal: ListedColormap(np.c_[pal.colors, np.full(len(pal.colors), fill_value=ALPHA)])
 SLOPES_CMAP = alpha_func(color_palette('vlag_r', as_cmap=True))     # Used for plotting tempo slopes
-INSTR_CMAP = ['#9933ff', '#00ff00']     # Palette used for plotting data that contrasts against slopes_cmap
+INSTR_CMAP = ['#9933ff', '#00ff00']     # Palette used for plotting data that contrasts against slopes color map
 LINE_CMAP = ['#1f77b4', '#ff7f0e']     # Original matplotlib colour palette used for manual plotting
 
 
@@ -44,7 +44,7 @@ def plot_decorator(plotter: callable):
         output = kwargs.get('output_dir', None)
         # Create the plot and return the figure
         fig, fname = plotter(*args, **kwargs)
-        # If we've provided an output directory, save the figure in the form output directory + fname
+        # If we've provided an output directory, create a folder and save the plot within it
         if output is not None:
             create_output_folder(output)
             fig.savefig(fname, facecolor=WHITE)
@@ -83,7 +83,7 @@ def get_gridspec_array(fig: plt.Figure = None, ncols: int = 2) -> np.array:
     # Create the figure, if we haven't already provided one
     if fig is None:
         fig = plt.figure()
-    # Create the gridspec
+    # Create the grid spec
     gs = fig.add_gridspec(3, ncols, height_ratios=[1, 2, 3], wspace=0.1, hspace=0.4, top=0.92, bottom=0.09)
     # Create an array of axes with uneven numbers of plots per row
     return np.array(
@@ -148,7 +148,7 @@ def output_regression_table(
             return [i for i in out.cov_names if name in i]
 
     def format_cov_names(i: str, ext: str = '') -> str:
-        # If we've defined a non-default reference category the statsmodels output looks weird, so catch this
+        # If we've defined a non-default reference category the stats models output looks weird, so catch this
         if ':' in i:
             lm = lambda s: s.split('C(')[1].split(')')[0].title() + ' (' + s.split('[T.')[1].split(']')[0] + ')'
             return lm(i.split(':')[0]) + ': ' + lm(i.split(':')[1])
@@ -160,10 +160,10 @@ def output_regression_table(
 
     # Create the stargazer object from our list of models
     out = Stargazer(mds)
-    # Get the original covariate names
+    # Get the original co-variate names
     l_o, j_o, i_o, int_o = (get_cov_names(i) for i in ['latency', 'jitter', 'instrument', 'Intercept'])
     orig = [item for sublist in [l_o, j_o, i_o, int_o] for item in sublist]
-    # Format the original covariate names so they look nice
+    # Format the original co-variate names so they look nice
     lat_fm = [format_cov_names(s, 'ms') for s in l_o]
     jit_fm = [format_cov_names(s, 'x') for s in j_o]
     instr_fm = [format_cov_names(s) for s in i_o]

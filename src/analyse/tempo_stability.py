@@ -3,7 +3,7 @@ from datetime import timedelta
 
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
-from src.visualise.phase_correction_graphs import make_pairgrid
+from src.visualise.phase_correction_graphs import pairgrid_correction_vs_condition
 
 
 def extract_rolling_ioi_std(
@@ -85,9 +85,9 @@ def gen_tempo_stability_df_outputs(
     """
     Generates outputs from a dataframe including a tempo stability column
     """
-    make_pairgrid(tempo_stability_df, output_dir=output_dir, xvar=xvar,
-                  xlabel=xlabel,
-                  xlim=(0, tempo_stability_df[xvar].max() + (tempo_stability_df[xvar].max() / 10)))
+    pairgrid_correction_vs_condition(tempo_stability_df, output_dir=output_dir, xvar=xvar,
+                                     xlabel=xlabel,
+                                     xlim=(0, tempo_stability_df[xvar].max() + (tempo_stability_df[xvar].max() / 10)))
 
 
 def gen_tempo_stability_mds(

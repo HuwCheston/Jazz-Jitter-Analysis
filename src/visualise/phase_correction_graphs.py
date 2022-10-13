@@ -11,7 +11,7 @@ import src.analyse.analysis_utils as autils
 
 
 @vutils.plot_decorator
-def make_pairgrid(
+def pairgrid_correction_vs_condition(
         df: pd.DataFrame, output_dir: str, xvar: str = 'correction_partner_onset', xlim=(-1.5, 1.5),
         xlabel: str = None
 ) -> tuple[plt.Figure, str]:
@@ -80,21 +80,21 @@ def _format_pairgrid_fig(
     pg.despine(left=True, bottom=True)
     pg.fig.supxlabel(xvar, x=0.53, y=0.05)
     pg.fig.supylabel('Condition', x=0.01)
-    # Add the colorbar
+    # Add the color bar
     position = pg.fig.add_axes([0.94, 0.2, 0.01, 0.6])
     pg.fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position, ticks=vutils.CBAR_BINS)
     position.text(0., 0.3, ' Slope\n(BPM/s)\n\n', fontsize=vutils.FONTSIZE)  # Super hacky way to add a title...
     # Add the legend
     pg.legend.remove()
-    lg = pg.fig.get_axes()[0].legend(loc='lower center', ncol=2, bbox_to_anchor=(2.85, -1.45), title=None, frameon=False)
-    for handle in lg.legendHandles:
+    i = pg.fig.get_axes()[0].legend(loc='lower center', ncol=2, bbox_to_anchor=(2.85, -1.45), title=None, frameon=False)
+    for handle in i.legendHandles:
         handle.set_sizes([100.0])
     # Adjust the plot spacing
     pg.fig.subplots_adjust(bottom=0.12, top=0.93, wspace=0.15, left=0.11, right=0.93)
 
 
 @vutils.plot_decorator
-def make_correction_boxplot_by_variable(
+def boxplot_correction_vs_condition(
         df: pd.DataFrame, output_dir: str, ylim: tuple = (-1, 1), xvar: str = 'jitter',
         yvar: str = 'correction_partner_onset', subset=False, ylabel: str = None, height: float = 5
 ) -> tuple[plt.Figure, str]:
@@ -131,7 +131,7 @@ def make_correction_boxplot_by_variable(
 
 
 @vutils.plot_decorator
-def make_polar(
+def polarplot_relative_phase(
         nn_list: list[tuple], output_dir: str
 ) -> tuple[plt.Figure, str]:
     """
@@ -218,7 +218,7 @@ def _format_polar_data(
     # Calculate the amount of phase correction for each beat
     corr = df.asynchrony * -1
     # Cut into bins
-    cut = pd.cut(corr, 15, include_lowest=False).value_counts().sort_index()
+    cut = pd.cut(corr, num_bins, include_lowest=False).value_counts().sort_index()
     # Format the dataframe
     cut.index = pd.IntervalIndex(cut.index.get_level_values(0)).mid
     cut = pd.DataFrame(cut, columns=['asynchrony']).reset_index(drop=False).rename(
@@ -237,7 +237,7 @@ def _format_polar_ax(
     Formats a polar subplot by setting axis ticks and gridlines, rotation properties, and facecolor
     """
 
-    # Used to test if we've provided xticks already
+    # Used to test if we've provided x ticks already
     test_none = lambda t: [] if t is None else t
     # Set the y axis ticks and gridlines
     ax.set_yticks(test_none(yt))
@@ -262,7 +262,7 @@ def _format_polar_fig(
     # Add figure-wise titles and labels
     fig.supylabel('√Density', x=0.01, fontsize='xx-large')
     fig.supxlabel("Relative Phase to Partner's Onsets (πms)", y=0.03, fontsize='xx-large')
-    # Create and position colourbar
+    # Create and position colour bar
     position = fig.add_axes([0.95, 0.2, 0.01, 0.6])
     fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position, ticks=vutils.CBAR_BINS)
     position.tick_params(labelsize=17.7)
@@ -275,7 +275,7 @@ def _format_polar_fig(
 
 
 @vutils.plot_decorator
-def make_single_condition_phase_correction_plot(
+def single_condition_multiple_plot(
         keys_df: pd.DataFrame, drms_df: pd.DataFrame, keys_md, drms_md, keys_o: pd.DataFrame, drms_o: pd.DataFrame,
         output_dir: str, meta: tuple = ('nan', 'nan', 'nan', 'nan')
 ) -> tuple[plt.Figure, str]:
@@ -284,11 +284,11 @@ def make_single_condition_phase_correction_plot(
     phase correction coefficients to partner and self for both performers
     """
 
-    # Create the matplotlib objects - figure with gridspec, 5 subplots
+    # Create the matplotlib objects - figure with grid spec, 5 subplots
     fig = plt.figure(figsize=(9.4, 15))
     ax = vutils.get_gridspec_array(fig=fig)
     rsquared = mean([keys_md.rsquared, drms_md.rsquared])
-    # Plot onto the different parts of the gridspec
+    # Plot onto the different parts of the grid spec
     _single_fig_slopes(ax, keys_df=keys_df, drms_df=drms_df, keys_o=keys_o, drms_o=drms_o, rsquared=rsquared)
     _single_fig_polar(ax, drms_df, keys_df)
     _single_fig_coefficients(ax, drms_md, keys_md)
@@ -380,7 +380,7 @@ def _single_fig_slopes(
                  title='Tempo Slope')
 
 
-def make_single_condition_slope_animation(
+def animation_tempo_slope_single_condition(
         keys_df, drms_df, keys_o: pd.DataFrame, drms_o: pd.DataFrame, output_dir,
         meta: tuple = ('nan', 'nan', 'nan', 'nan')
 ) -> None:
@@ -428,14 +428,14 @@ def make_single_condition_slope_animation(
 
 
 @vutils.plot_decorator
-def make_trial_hist(
+def histplot_r2(
         r: pd.DataFrame, output_dir: str, xvar: str = 'r2', kind: str = 'hist'
 ) -> tuple[plt.Figure, str]:
     """
     Creates histograms of model parameters stratified by trial and instrument, x-axis variable defaults to R-squared
     """
 
-    # Create the ditsplot
+    # Create the dis plot
     g = sns.displot(r, col='trial', kind=kind, x=xvar, hue="instrument", multiple="stack", palette=vutils.INSTR_CMAP,
                     height=vutils.HEIGHT, aspect=vutils.ASPECT, )
     # Format figure-level properties
@@ -448,12 +448,12 @@ def make_trial_hist(
                     fontsize=vutils.FONTSIZE)
     g.figure.subplots_adjust(bottom=0.17, top=0.92, left=0.055, right=0.97)
     # Return, with plot_decorator used for saving
-    fname = f'{output_dir}\\{xvar}_hist.png'
+    fname = f'{output_dir}\\histplot_{xvar}.png'
     return g.figure, fname
 
 
 @vutils.plot_decorator
-def make_lagged_pointplot(
+def pointplot_lagged_latency_vs_correction(
         df: pd.DataFrame, output_dir: str
 ) -> tuple[plt.Figure, str]:
     """
@@ -477,12 +477,12 @@ def make_lagged_pointplot(
     sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01),
                     fontsize=vutils.FONTSIZE)
     # Create filename and return to save
-    fname = f'{output_dir}\\lagged_pointplot.png'
+    fname = f'{output_dir}\\pointplot_lagged_latency_vs_correction.png'
     return g.figure, fname
 
 
 @vutils.plot_decorator
-def make_rolling_window_r2_boxplot(
+def boxplot_r2_vs_windowsize(
         df: pd.DataFrame, output_dir: str
 ) -> tuple[plt.Figure, str]:
     """
@@ -496,12 +496,12 @@ def make_rolling_window_r2_boxplot(
            .set(xlabel='Window Size (s)', ylabel='Adjusted R2')
     )
     plt.tight_layout()
-    fname = f'{output_dir}\\r2_vs_windowsize_phase_correction.png'
+    fname = f'{output_dir}\\boxplot_r2_vs_windowsize.png'
     return g.figure, fname
 
 
 @vutils.plot_decorator
-def make_pairgrid_iqr(
+def pairgrid_correction_vs_condition_iqr(
         df: pd.DataFrame, value_vars: list, value_name: str, output_dir: str, xvar: str = 'correction_partner',
 ) -> tuple[plt.Figure, str]:
     """
@@ -539,7 +539,7 @@ def make_pairgrid_iqr(
 
 
 @vutils.plot_decorator
-def make_abs_correction_regplot(
+def regplot_abs_correction_vs_tempo_slope(
         df: pd.DataFrame, output_dir: str, yvar: str = 'tempo_slope'
 ) -> tuple[plt.Figure, str]:
     """
@@ -558,7 +558,7 @@ def make_abs_correction_regplot(
     # Create the ax for plotting
     plt.rcParams.update({'font.size': vutils.FONTSIZE})
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
-    # Plot the scatterplot and single regression line
+    # Plot the scatter plot and single regression line
     ax = sns.scatterplot(data=df, x='abs_correction', y=yvar, hue='trial', style='trial', s=150, ax=ax, palette='tab10')
     ax = sns.regplot(data=df, x='abs_correction', y=yvar, scatter=None, truncate=True, ax=ax, color=vutils.BLACK)
     ax.tick_params(width=3, )
@@ -579,7 +579,7 @@ def make_abs_correction_regplot(
     return ax.figure, fname
 
 
-def make_pairwise_asym_numberline(
+def numberline_pw_async(
         df: pd.DataFrame, output_dir: str, corpus_filepath: str
 ) -> tuple[plt.Figure, str]:
     """
@@ -615,23 +615,28 @@ def make_pairwise_asym_numberline(
     plt.subplots_adjust(top=0.34, bottom=0.25, left=0.05, right=0.93)
     plt.yticks([], [])
     plt.legend([], [], frameon=False)
-    fname = f'{output_dir}\\pairwise_async_numberline.png'
+    fname = f'{output_dir}\\numberline_pairwise_asynchrony.png'
     return g.figure, fname
 
 
 @vutils.plot_decorator
-def barplot_correction_by_instrument(
-        df, output_dir, estimator=np.median
+def barplot_correction_vs_instrument(
+        df, output_dir, estimator=np.median, yvar: str = 'correction_partner'
 ) -> tuple[plt.Figure, str]:
+    """
+    Creates a plot showing the coupling coefficients per instrument and duo, designed to look similar to fig 2.(c)
+    in Jacoby et al. (2021). However, by default this plot will use the median as an estimator of central tendency,
+    rather than mean, due to outlying values. This can be changed by setting the estimator argument to a different
+    function that can be called by seaborn's barplot function.
+    """
     # Create matplotlib objects
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
-    # Create the stripplot and barplot in seaborn
+    # Create the strip plot and bar plot in seaborn
     ax = sns.stripplot(
-        data=df, x='trial', y='correction_partner', hue='instrument', dodge=True, color=vutils.BLACK, s=4, marker='.',
-        jitter=1, ax=ax
+        data=df, x='trial', y=yvar, hue='instrument', dodge=True, color=vutils.BLACK, s=4, marker='.', jitter=1, ax=ax
     )
     ax = sns.barplot(
-        data=df, x='trial', y='correction_partner', hue='instrument', ax=ax, ci=25, palette=vutils.INSTR_CMAP,
+        data=df, x='trial', y=yvar, hue='instrument', ax=ax, ci=25, palette=vutils.INSTR_CMAP,
         hue_order=['Keys', 'Drums'], errcolor='#3953a3', errwidth=10, estimator=estimator
     )
     # Set ax formatting
@@ -643,12 +648,12 @@ def barplot_correction_by_instrument(
     # Set axis labels
     fig.supylabel('Coupling constant', x=0.02, y=0.55)
     fig.supxlabel('Duo', y=0.09)
-    # Format the legend to remove the handles/labels added automatically by sns.stripplot
+    # Format the legend to remove the handles/labels added automatically by the strip plot
     handles, labels = ax.get_legend_handles_labels()
     ax.get_legend().remove()
     plt.legend(handles[2:], labels[2:], ncol=6, title=None, frameon=False, bbox_to_anchor=(0.7, -0.15),
                markerscale=1.6)
     # Adjust the figure a bit and return for saving in decorator
     ax.figure.subplots_adjust(bottom=0.22, top=0.95, left=0.14, right=0.95)
-    fname = f'{output_dir}\\barplot_correction_by_instrument.png'
+    fname = f'{output_dir}\\barplot_correction_vs_instrument.png'
     return fig, fname
