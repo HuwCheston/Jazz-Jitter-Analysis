@@ -42,6 +42,9 @@ def plot_decorator(plotter: callable):
     def wrapper(*args, **kwargs):
         # Create the output directory to store the plot
         output = kwargs.get('output_dir', None)
+        # If we're accessing this decorator from a class, need to get the output by accessing the class attributes
+        if output is None:
+            output = args[0].output_dir     # Will be None anyway if no output_dir ever passed to class
         # Create the plot and return the figure
         fig, fname = plotter(*args, **kwargs)
         # If we've provided an output directory, create a folder and save the plot within it

@@ -6,9 +6,7 @@ from dotenv import find_dotenv, load_dotenv
 
 # TODO: fix imports here to use __all__ instead, so that we don't import packages like numpy, pandas etc
 from src.analyse.tempo_slope import *
-from src.analyse.tempo_stability import *
 from src.analyse.phase_correction import *
-from src.analyse.questionnaire import *
 
 
 @click.command()
@@ -48,8 +46,7 @@ def main(
     gen_phase_correction_model_outputs(df, output_dir=output_filepath)
 
     logger.info(f'Creating questionnaire outputs...')
-    questionnaire_analysis(raw_data=data, output_dir=output_filepath)
-
+    gen_questionnaire_outputs(df, output_dir=output_filepath)
 
 
 if __name__ == '__main__':

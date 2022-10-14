@@ -11,7 +11,7 @@ from src.visualise.phase_correction_graphs import pairgrid_correction_vs_conditi
     animation_tempo_slope_single_condition, boxplot_correction_vs_condition, pointplot_lagged_latency_vs_correction, \
     regplot_abs_correction_vs_var, numberline_pw_async, barplot_correction_vs_instrument, regplot_rsquared_vs_var
 from src.visualise.tempo_stability_graphs import regplot_ioi_std_vs_tempo_slope
-from src.visualise.tempo_slope_graphs import gen_tempo_slope_heatmap
+from src.visualise.questionnaire_graphs import ScatterPlotQuestionnaire
 
 PC_MOD = 'my_next_ioi~my_prev_ioi+asynchrony'
 WINDOW_SIZE = 6
@@ -330,6 +330,8 @@ def gen_phase_correction_models(
     # Pickle the results so we don't need to create them again
     # TODO: should be saved in the root//models directory!
     pickle.dump(df, open(f"{output_dir}\\output_mds.p", "wb"))
+    if logger is not None:
+        logger.info(f'Saved models to {output_dir}\\output_mds.p')
     return df
 
 
@@ -402,3 +404,15 @@ def gen_tempo_stability_outputs(
     mds = autils.create_model_list(df=df, avg_groupers=['latency', 'jitter', 'instrument'],
                                    md="ioi_npvi~C(latency)+C(jitter)+C(instrument)")
     vutils.output_regression_table(mds=mds, output_dir=figures_output_dir)
+
+
+def gen_questionnaire_outputs(
+        df: pd.DataFrame, output_dir: str
+) -> None:
+    figures_output_dir = output_dir + '\\figures\\questionnaire_plots'
+    sp1 = ScatterPlotQuestionnaire(df=df, output_dir=figures_output_dir, ax_var='block', marker_var='instrument')
+    sp1.create_plot()
+
+    sp2 = ScatterPlotQuestionnaire(df=df, output_dir=figures_output_dir, marker_var='block', ax_var='instrument',
+                                   one_reg=True)
+    sp2.create_plot()

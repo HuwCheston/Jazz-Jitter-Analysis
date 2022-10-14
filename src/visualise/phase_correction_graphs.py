@@ -481,7 +481,7 @@ def pointplot_lagged_latency_vs_correction(
     g.set_axis_labels(x_var='', y_var='')
     g.figure.supxlabel('Lag (s)', y=0.04)
     g.figure.supylabel('Coefficient, jitter vs. coupling', x=0.007)
-    g.set_titles('Duo {col_name}, Jitter: {row_name}x')
+    g.set_titles('{col_name}, Jitter: {row_name}x')
     # Set figure properties
     g.figure.subplots_adjust(bottom=0.1, top=0.95, left=0.07, right=0.97)
     sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01))
