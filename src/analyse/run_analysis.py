@@ -31,40 +31,25 @@ def main(
     data = autils.load_data(input_filepath)
     logger.info(f'loaded data from {len(data)} trials!')
 
-    # TEMPO SLOPES #
-    logger.info(f'Analysing tempo slope...')
-    # Get average tempos
+    # CREATE MODELS #
+    logger.info(f'Creating models...')
+    df = gen_phase_correction_models(raw_data=data, output_dir=output_filepath, logger=logger)
+
+    # VISUALISE OUTPUTS
+    logger.info(f'Creating tempo slope outputs...')
     avg_tempos = gen_avg_tempo(data)
     gen_avg_tempo_outputs(avg_tempos, output_dir=output_filepath + '\\figures\\tempo_slopes_plots')
-    # Get tempo slopes
-    tempo_slope_df = gen_tempo_slope_df(avg_tempos)
-    gen_tempo_slope_df_outputs(tempo_slope_df, output_dir=output_filepath + '\\figures\\tempo_slopes_plots')
-    # Regress tempo slopes
-    tempo_slope_mds = gen_tempo_slope_mds(tempo_slope_df)
-    gen_tempo_slope_mds_outputs(tempo_slope_mds, output_dir=output_filepath + '\\figures\\tempo_slopes_plots')
+    gen_tempo_slope_outputs(df=df, output_dir=output_filepath)
 
-    # TEMPO STABILITY #
-    logger.info(f'Analysing tempo stability...')
-    # Generate IOI stability and NPVI dataframe
-    tempo_stability_df = gen_tempo_stability_df(raw_data=data)
-    # Regress IOI stability and generate outputs
-    gen_tempo_stability_df_outputs(tempo_stability_df, output_dir=output_filepath + '\\figures\\tempo_stability_plots')
-    tempo_stability_mds = gen_tempo_stability_mds(tempo_stability_df)
-    gen_tempo_slope_mds_outputs(tempo_stability_mds, output_filepath + '\\figures\\tempo_stability_plots')
-    # Regress NPVI stability and generate outputs
-    gen_tempo_stability_df_outputs(tempo_stability_df, output_dir=output_filepath + '\\figures\\tempo_stability_plots',
-                                   xvar='ioi_npvi', xlabel='IOI normalised pairwise variability index (nPVI)')
-    npvi_mds = gen_tempo_stability_mds(tempo_stability_df, md='ioi_npvi~C(latency)+C(jitter)+C(instrument)')
-    gen_tempo_stability_mds_outputs(npvi_mds, output_filepath + '\\figures\\tempo_stability_plots',)
+    logger.info(f'Creating tempo stability outputs...')
+    gen_tempo_stability_outputs(df, output_dir=output_filepath)
 
-    # SYNCHRONISATION MODELS #
-    logger.info(f'Creating phase correction models...')
-    phase_correction_mds = gen_phase_correction_models(raw_data=data, output_dir=output_filepath, logger=logger)
-    gen_phase_correction_model_outputs(phase_correction_mds, output_dir=output_filepath)
+    logger.info(f'Creating phase correction outputs...')
+    gen_phase_correction_model_outputs(df, output_dir=output_filepath)
 
-    # QUESTIONNAIRES #
-    logger.info(f'Analysing questionnaires...')
+    logger.info(f'Creating questionnaire outputs...')
     questionnaire_analysis(raw_data=data, output_dir=output_filepath)
+
 
 
 if __name__ == '__main__':

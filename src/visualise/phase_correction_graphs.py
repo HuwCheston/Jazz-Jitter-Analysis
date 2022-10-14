@@ -13,7 +13,7 @@ import src.analyse.analysis_utils as autils
 @vutils.plot_decorator
 def pairgrid_correction_vs_condition(
         df: pd.DataFrame, output_dir: str, xvar: str = 'correction_partner_onset', xlim=(-1.5, 1.5),
-        xlabel: str = None
+        xlabel: str = None, cbar_var: str = 'tempo_slope', cbar_label: str = 'Tempo\nSlope\n(BPM/s)\n\n'
 ) -> tuple[plt.Figure, str]:
     """
     Creates a figure showing pairs of coefficients obtained for each performer in a condition,
@@ -24,7 +24,7 @@ def pairgrid_correction_vs_condition(
     df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
     df = df.sort_values(by=['latency', 'jitter'])
     # Sort the palette for the shading
-    norm = vutils.create_normalised_cmap(df['tempo_slope'])
+    norm = vutils.create_normalised_cmap(df[cbar_var])
     # Create the plot
     pg = sns.catplot(
         data=df, x=xvar, y='abbrev', row='block', col='trial', hue='instrument', hue_order=['Keys', 'Drums'],
@@ -36,15 +36,15 @@ def pairgrid_correction_vs_condition(
     # Format the axis by iterating through
     _format_pairgrid_ax(norm=norm, pg=pg, df=df, xlim=xlim)
     _format_pairgrid_fig(pg, norm, xvar=xlabel if xlabel is not None else xvar.replace('_', ' ').title())
-    fname = f'{output_dir}\\pairgrid_condition_vs_{xvar}.png'
+    fname = f'{output_dir}\\pairgrid_condition_vs_{xvar}_vs_{cbar_var}.png'
     return pg.fig, fname
 
 
 def _format_pairgrid_ax(
-        norm, pg, df: pd.DataFrame, xlim: tuple[float | int, float | int]
+        norm, pg, df: pd.DataFrame, xlim: tuple[float | int, float | int], cbar_var: str = 'tempo_slope'
 ) -> None:
     """
-    Formats each axies within a pairgrid
+    Formats each axes within a pairgrid
     """
     for num in range(0, 5):
         # When we want different formatting for each row
@@ -63,14 +63,14 @@ def _format_pairgrid_ax(
             # Add the span, shaded according to tempo slope
             d = df[
                 (df['trial'] == num + 1) & (df['block'] == x + 1) & (df['instrument'] == 'Keys')
-                ].sort_values(['latency', 'jitter'])['tempo_slope']
+                ].sort_values(['latency', 'jitter'])[cbar_var]
             for n in range(0, 13):
                 coef = vutils.SLOPES_CMAP(norm(d.iloc[n]))
                 pg.axes[x, num].axhspan(n - 0.5, n + 0.5, facecolor=coef)
 
 
 def _format_pairgrid_fig(
-        pg: sns.FacetGrid, norm, xvar: str = 'Correction'
+        pg: sns.FacetGrid, norm, xvar: str = 'Correction', cbar_label: str = 'Tempo\nSlope\n(BPM/s)\n\n'
 ) -> None:
     """
     Formats figure-level attributes for a horizontal pairgrid of all conditions
@@ -83,7 +83,7 @@ def _format_pairgrid_fig(
     # Add the color bar
     position = pg.fig.add_axes([0.94, 0.2, 0.01, 0.6])
     pg.fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position, ticks=vutils.CBAR_BINS)
-    position.text(0., 0.3, ' Slope\n(BPM/s)\n\n', fontsize=vutils.FONTSIZE)  # Super hacky way to add a title...
+    position.text(0., 0.3, cbar_label, fontsize=vutils.FONTSIZE)  # Super hacky way to add a title...
     # Add the legend
     pg.legend.remove()
     i = pg.fig.get_axes()[0].legend(loc='lower center', ncol=2, bbox_to_anchor=(2.85, -1.45), title=None, frameon=False)
@@ -461,21 +461,30 @@ def pointplot_lagged_latency_vs_correction(
     rows grouped by jitter.
     """
 
+    df = df.melt(id_vars=['trial', 'block', 'latency', 'jitter', 'instrument', 'abbrev'],
+                 value_vars=['lag_1', 'lag_2', 'lag_3', 'lag_4'], value_name='coef', var_name='lag').sort_values(
+        by=['trial', 'block', 'latency', 'jitter', 'instrument'])
+    df.lag = df.lag.str.extract(r'(\d+)')
+    plt.rcParams.update({'font.size': vutils.FONTSIZE})
     # Make the plot
     g = sns.catplot(
-        data=df, col='trial', row='jitter', x="lag", y="coef", hue='instrument', kind="point", height=vutils.HEIGHT,
-        aspect=vutils.ASPECT, dodge=0.2, palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'],
+        data=df[df['jitter'] != 0], col='trial', row='jitter', x="lag", y="coef", hue='instrument', kind="point",
+        height=5.5,
+        aspect=0.62, dodge=0.2, palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'], scale=1.25
     )
+    # Add horizontal line at y=0 and set axis/tick thickness
+    g.refline(y=0, alpha=1, linestyle='-', color=vutils.BLACK)
+    for ax in g.axes.flatten():
+        ax.tick_params(width=3, )
+        plt.setp(ax.spines.values(), linewidth=2)
     # Format titles, labels
-    g.set_titles('Duo {col_name}, Jitter: {row_name}x', size=vutils.FONTSIZE)
     g.set_axis_labels(x_var='', y_var='')
-    g.figure.supxlabel('Lag (s)', y=0.04, fontsize=vutils.FONTSIZE)
-    g.figure.supylabel('Coefficient', x=0.007, fontsize=vutils.FONTSIZE)
+    g.figure.supxlabel('Lag (s)', y=0.04)
+    g.figure.supylabel('Coefficient, jitter vs. coupling', x=0.007)
+    g.set_titles('Duo {col_name}, Jitter: {row_name}x')
     # Set figure properties
-    g.refline(y=0, alpha=vutils.ALPHA, linestyle='-', color=vutils.BLACK)
-    g.figure.subplots_adjust(bottom=0.1, top=0.95, left=0.09, right=0.97)
-    sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01),
-                    fontsize=vutils.FONTSIZE)
+    g.figure.subplots_adjust(bottom=0.1, top=0.95, left=0.07, right=0.97)
+    sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01))
     # Create filename and return to save
     fname = f'{output_dir}\\pointplot_lagged_latency_vs_correction.png'
     return g.figure, fname
@@ -539,8 +548,8 @@ def pairgrid_correction_vs_condition_iqr(
 
 
 @vutils.plot_decorator
-def regplot_abs_correction_vs_tempo_slope(
-        df: pd.DataFrame, output_dir: str, yvar: str = 'tempo_slope'
+def regplot_abs_correction_vs_var(
+        df: pd.DataFrame, output_dir: str, yvar: str = 'tempo_slope', ylabel='Tempo slope (BPM/s)'
 ) -> tuple[plt.Figure, str]:
     """
     Creates a regression & scatter plot for absolute correction difference between duo members versus another variable
@@ -561,22 +570,64 @@ def regplot_abs_correction_vs_tempo_slope(
     # Plot the scatter plot and single regression line
     ax = sns.scatterplot(data=df, x='abs_correction', y=yvar, hue='trial', style='trial', s=150, ax=ax, palette='tab10')
     ax = sns.regplot(data=df, x='abs_correction', y=yvar, scatter=None, truncate=True, ax=ax, color=vutils.BLACK)
-    ax.tick_params(width=3, )
-    ax.set(ylabel='', xlabel='')
-    plt.setp(ax.spines.values(), linewidth=2)
-    # Plot a horizontal line at x=0
-    ax.axhline(y=0, linestyle='-', alpha=vutils.ALPHA, color=vutils.BLACK)
-    # Set axis labels
-    fig.supylabel('Tempo slope (BPM/s)' if yvar == 'tempo_slope' else yvar, x=0.01)
-    fig.supxlabel('Absolute difference in coupling', y=0.09)
-    # Format axis positioning and move legend
-    plt.tight_layout()
+    # Format the plot
+    _format_regplot(ax=ax, fig=fig, xlabel='Coupling strength', ylabel=ylabel)
+    # Format the legend
     sns.move_legend(ax, 'lower center', ncol=6, title=None, frameon=False, bbox_to_anchor=(0.45, -0.33),
                     markerscale=1.6)
     ax.figure.subplots_adjust(bottom=0.22, top=0.95, left=0.12, right=0.95)
     # Return with filename to be saved and closed in outer function
-    fname = f'{output_dir}\\abs_correction_vs_{yvar}.png'
+    fname = f'{output_dir}\\regplot_abs_correction_vs_{yvar}.png'
     return ax.figure, fname
+
+
+@vutils.plot_decorator
+def regplot_rsquared_vs_var(
+        df: pd.DataFrame, output_dir: str, yvar: str = 'rsquared', xvar: str = 'ioi_std'
+) -> tuple[plt.Figure, str]:
+    """
+    Creates a regression plot of rsquared versus another variable, defaults to tempo stability
+    """
+    fig, ax = plt.subplots(1, 1, figsize=(9.4, 5))
+    df['trial'] = df['trial'].replace({n: f'Duo {n}' for n in range(1, 6)})
+    # Convert rsquared to percentage
+    if yvar == 'rsquared':
+        df['rsquared'] = df['rsquared'].apply(lambda x: x * 100)
+    plt.rcParams.update({'font.size': vutils.FONTSIZE})
+    # Create the plots
+    ax = sns.regplot(data=df, x=xvar, y=yvar, scatter=False, color=vutils.BLACK, ax=ax)
+    ax = sns.scatterplot(data=df, x=xvar, y=yvar, hue='trial', palette='tab10', style='instrument', s=100,
+                         ax=ax)
+    # Format the figure and axis
+    _format_regplot(ax=ax, fig=fig, hline=False, ylabel='R-Squared (%)', xlabel='Tempo stability (ms)')
+    # Create the legend
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles=handles[1:6] + handles[7:], labels=labels[1:6] + labels[7:], ncol=8, frameon=False,
+              markerscale=1.6, columnspacing=0.1, handletextpad=0.1, bbox_to_anchor=(1.05, -0.15), )
+    ax.figure.subplots_adjust(bottom=0.22, top=0.95, left=0.12, right=0.95)
+    # Return with filename to be saved and closed in outer function
+    fname = f'{output_dir}\\regplot_{xvar}_vs_{yvar}.png'
+    return ax.figure, fname
+
+
+def _format_regplot(
+       ax: plt.Axes, fig: plt.Figure, hline: bool = True, ylabel: str = '', xlabel: str = ''
+) -> None:
+    """
+    Formats a regression plot, including both the figure and axes
+    """
+    # Set axes level formatting
+    ax.tick_params(width=3, )
+    ax.set(ylabel='', xlabel='')
+    plt.setp(ax.spines.values(), linewidth=2)
+    # Plot a horizontal line at x=0
+    if hline:
+        ax.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK)
+    # Set axis labels
+    fig.supylabel(ylabel, x=0.01)
+    fig.supxlabel(xlabel, y=0.09)
+    # Format axis positioning and move legend
+    plt.tight_layout()
 
 
 def numberline_pw_async(
@@ -616,6 +667,7 @@ def numberline_pw_async(
     plt.yticks([], [])
     plt.legend([], [], frameon=False)
     fname = f'{output_dir}\\numberline_pairwise_asynchrony.png'
+    plt.savefig(fname)
     return g.figure, fname
 
 

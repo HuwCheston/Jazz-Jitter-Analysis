@@ -3,34 +3,7 @@ from datetime import timedelta
 
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
-from src.visualise.phase_correction_graphs import pairgrid_correction_vs_condition
-
-
-def extract_rolling_ioi_std(
-        df: pd.DataFrame, win_size
-) -> pd.Series:
-    """
-    Runs a sliding window along the dataset and extracts the standard deviation of IOI values
-    """
-    df['td'] = pd.to_timedelta([timedelta(seconds=val) for val in df['onset']])
-    return df.rolling(window=win_size, on='td')['ioi'].std()
-
-
-# TODO: consider making this its own package?
-def extract_npvi(
-        s: pd.Series,
-) -> float:
-    """
-    Extracts the normalised pairwise variability index (nPVI) from a column of IOIs
-    """
-    # Drop nan values and convert to list
-    li = s.dropna().tolist()
-    # Extract constant term (left side of equation)
-    m = 100 / (len(li) - 1)
-    # Calculate the right side of the equation
-    s = sum([abs((k - k1) / ((k + k1) / 2)) for (k, k1) in zip(li, li[1:])])
-    # Return nPVI
-    return s * m
+from src.analyse.phase_correction import extract_rolling_ioi_std, extract_npvi
 
 
 def gen_tempo_stability_df(
@@ -76,18 +49,6 @@ def gen_tempo_stability_df(
           .sort_values(by=['trial', 'block', 'latency', 'jitter', 'instrument'])
           .reset_index(drop=True)
     )
-
-
-def gen_tempo_stability_df_outputs(
-        tempo_stability_df: pd.DataFrame, output_dir: str, xvar: str = 'ioi_std',
-        xlabel='Median IOI standard deviation, 8-second window (ms)'
-) -> None:
-    """
-    Generates outputs from a dataframe including a tempo stability column
-    """
-    pairgrid_correction_vs_condition(tempo_stability_df, output_dir=output_dir, xvar=xvar,
-                                     xlabel=xlabel,
-                                     xlim=(0, tempo_stability_df[xvar].max() + (tempo_stability_df[xvar].max() / 10)))
 
 
 def gen_tempo_stability_mds(

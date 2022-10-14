@@ -9,7 +9,9 @@ import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
 from src.visualise.phase_correction_graphs import pairgrid_correction_vs_condition, single_condition_multiple_plot, \
     animation_tempo_slope_single_condition, boxplot_correction_vs_condition, pointplot_lagged_latency_vs_correction, \
-    regplot_abs_correction_vs_tempo_slope, numberline_pw_async, barplot_correction_vs_instrument
+    regplot_abs_correction_vs_var, numberline_pw_async, barplot_correction_vs_instrument, regplot_rsquared_vs_var
+from src.visualise.tempo_stability_graphs import regplot_ioi_std_vs_tempo_slope
+from src.visualise.tempo_slope_graphs import gen_tempo_slope_heatmap
 
 PC_MOD = 'my_next_ioi~my_prev_ioi+asynchrony'
 WINDOW_SIZE = 6
@@ -33,6 +35,33 @@ def delay_heard_onsets_by_latency(
     # Add the latency column (divided by 1000 to convert from ms to sec) to the onset column
     df['onset_delayed'] = (df['onset'] + (df['lat'] / 1000))
     return df
+
+
+def extract_rolling_ioi_std(
+        df: pd.DataFrame, win_size: timedelta = timedelta(seconds=WINDOW_SIZE)
+) -> pd.Series:
+    """
+    Runs a sliding window along the dataset and extracts the standard deviation of IOI values
+    """
+    df['td'] = pd.to_timedelta([timedelta(seconds=val) for val in df['onset']])
+    return df.rolling(window=win_size, on='td')['ioi'].std()
+
+
+# TODO: consider making this its own package?
+def extract_npvi(
+        s: pd.Series,
+) -> float:
+    """
+    Extracts the normalised pairwise variability index (nPVI) from a column of IOIs
+    """
+    # Drop nan values and convert to list
+    li = s.dropna().tolist()
+    # Extract constant term (left side of equation)
+    m = 100 / (len(li) - 1)
+    # Calculate the right side of the equation
+    s = sum([abs((k - k1) / ((k + k1) / 2)) for (k, k1) in zip(li, li[1:])])
+    # Return nPVI
+    return s * m
 
 
 def nearest_neighbor(
@@ -109,7 +138,7 @@ def extract_pairwise_asynchrony(
     return np.sqrt(np.mean(np.square([std(keys_nn), std(drms_nn)])))
 
 
-def construct_static_phase_correction_model(
+def construct_phase_correction_model(
         df: pd.DataFrame, mod: str = PC_MOD
 ):
     """
@@ -137,7 +166,7 @@ def predict_from_model(
     return df
 
 
-def construct_rolling_phase_correction_model(
+def construct_rolling_correction_model(
         nn: pd.DataFrame, orig: pd.DataFrame, mod: str = PC_MOD, sub: bool = True,
         win_size: timedelta = timedelta(seconds=8)
 ) -> pd.DataFrame:
@@ -174,7 +203,7 @@ def construct_rolling_phase_correction_model(
     return df[['td', 'my_onset', 'lat', 'correction_partner', 'ioi', 'aic', 'r2']]
 
 
-def construct_correction_jitter_model(
+def regress_rolling_correction_vs_jitter(
         df: pd.DataFrame, max_lag: int = ROLLING_LAG, var: str = 'correction_partner'
 ):
     """
@@ -222,28 +251,33 @@ def phase_correction_pre_processing(
 
 
 def gen_phase_correction_models(
-        raw_data: list, output_dir: str, make_anim: bool = False, make_single_plot: bool = False,
-        force_rebuild: bool = True, logger=None
-) -> list:
+        raw_data: list, output_dir: str, logger=None, make_anim: bool = False, make_single_plot: bool = True,
+        force_rebuild: bool = False,
+) -> pd.DataFrame:
     """
-    Generates phase correction models for each instrument in all conditions, using all of the data in a performance
+    Generates phase correction models for each instrument in all conditions, using all of the data in a performance.
     """
 
     # Try and load the models from the disk to save time, unless we're forcing them to rebuild anyway
     if not force_rebuild:
         try:
-            return pickle.load(open(f"{output_dir}\\phase_correction_mds.p", "rb"))
+            mds = pickle.load(open(f"{output_dir}\\output_mds.p", "rb"))
         # If we haven't generated the models in the first place, go ahead and generate them now
         except FileNotFoundError:
             pass
+        else:
+            if logger is not None:
+                logger.info(f'...skipping, loaded models from disc!')
+            return mds
 
     # Create the function used to format the results as a dictionary
-    def dic_create(c, md, jitter_md):
+    def dic_create(c, md, jitter_md, std, npvi):
         d = {
             'trial': c['trial'], 'block': c['block'], 'latency': c['latency'], 'jitter': c['jitter'],
-            'instrument': c['instrument'], 'tempo_slope': tempo_slope, 'pw_asym': pw_asym,
-            'rsquared': md.rsquared, 'correction_self': md.params.iloc[1],
-            'correction_partner': md.params.iloc[2]
+            'instrument': c['instrument'], 'tempo_slope': tempo_slope, 'ioi_std': std, 'ioi_npvi': npvi,
+            'pw_asym': pw_asym, 'rsquared': md.rsquared, 'correction_self': md.params.iloc[1],
+            'correction_partner': md.params.iloc[2], 'success': c['success'], 'interaction': c['interaction'],
+            'coordination': c['coordination']
         }
         d.update({f'lag_{n+1}': jitter_md[n] for n in range(ROLLING_LAG)})
         return d
@@ -258,18 +292,24 @@ def gen_phase_correction_models(
         for c1, c2 in z:
             # If we've passed a logger, start logging information to keep track of the analysis
             if logger is not None:
-                logger.info(f'Trial {c1["trial"]}, block {c1["block"]}, condition {c1["condition"]}...')
+                logger.info(f'Analysing: trial {c1["trial"]}, block {c1["block"]}, condition {c1["condition"]}')
             # Pre-processing
             keys, drms, keys_nn, drms_nn, tempo_slope, pw_asym = phase_correction_pre_processing(c1, c2)
+            # Extract tempo stability
+            keys_std = extract_rolling_ioi_std(keys).median()
+            drms_std = extract_rolling_ioi_std(drms).median()
+            # Extract IOI normalised pairwise variability index
+            keys_npvi = extract_npvi(keys['ioi'])
+            drms_npvi = extract_npvi(drms['ioi'])
             # Create models (can't be done in a loop, as we need to refer to them later)
-            keys_md = construct_static_phase_correction_model(keys_nn)
-            drms_md = construct_static_phase_correction_model(drms_nn)
+            keys_md = construct_phase_correction_model(keys_nn)
+            drms_md = construct_phase_correction_model(drms_nn)
             # Extract coefficients from a regression of rolling phase correction vs lagged jitter variation
-            keys_j = construct_correction_jitter_model(df=construct_rolling_phase_correction_model(nn=keys_nn, orig=keys))
-            drms_j = construct_correction_jitter_model(df=construct_rolling_phase_correction_model(nn=drms_nn, orig=drms))
+            keys_j = regress_rolling_correction_vs_jitter(df=construct_rolling_correction_model(nn=keys_nn, orig=keys))
+            drms_j = regress_rolling_correction_vs_jitter(df=construct_rolling_correction_model(nn=drms_nn, orig=drms))
             # Append the models and the parameters to the list as a dictionary
-            mds.append(dic_create(c1, keys_md, keys_j))
-            mds.append(dic_create(c2, drms_md, drms_j))
+            mds.append(dic_create(c1, keys_md, keys_j, keys_std, keys_npvi))
+            mds.append(dic_create(c2, drms_md, drms_j, drms_std, drms_npvi))
             # Generate output from single condition
             if make_single_plot:
                 single_condition_multiple_plot(
@@ -285,34 +325,80 @@ def gen_phase_correction_models(
                     keys_o=keys, drms_o=drms, meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
                     output_dir=figures_output_dir + '\\animations\\tempo_slope'
                 )
+    # Convert our list of dictionaries into a dataframe
+    df = pd.DataFrame(mds)
     # Pickle the results so we don't need to create them again
     # TODO: should be saved in the root//models directory!
-    pickle.dump(mds, open(f"{output_dir}\\phase_correction_mds.p", "wb"))
-    return mds
+    pickle.dump(df, open(f"{output_dir}\\output_mds.p", "wb"))
+    return df
 
 
 def gen_phase_correction_model_outputs(
-        phase_correction_mds: list[tuple], output_dir: str
+        df: pd.DataFrame, output_dir: str
 ) -> None:
     """
-    Generate output from rolling phase correction models
+    Generate output from phase correction models
     """
 
-    figures_output_dir = output_dir + '\\figures\\static_phase_correction_plots'
-    md_df = pd.DataFrame(phase_correction_mds)
+    figures_output_dir = output_dir + '\\figures\\phase_correction_plots'
     # Create regression table
     vutils.output_regression_table(
-            mds=autils.create_model_list(df=md_df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
+            mds=autils.create_model_list(df=df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
                                          avg_groupers=['latency', 'jitter', 'instrument']),
             output_dir=figures_output_dir, verbose_footer=False
         )
     # Create plots
-    boxplot_correction_vs_condition(df=md_df, output_dir=figures_output_dir,
+    boxplot_correction_vs_condition(df=df, output_dir=figures_output_dir,
                                     yvar='correction_partner', ylim=(-0.2, 1))
-    pairgrid_correction_vs_condition(df=md_df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(-1, 1))
-    regplot_abs_correction_vs_tempo_slope(df=md_df, output_dir=figures_output_dir)
+    pairgrid_correction_vs_condition(df=df, xvar='correction_partner', output_dir=figures_output_dir,
+                                     xlim=(-0.5, 1.5), xlabel='Coupling constant')
+    regplot_abs_correction_vs_var(df=df, output_dir=figures_output_dir)
+    regplot_abs_correction_vs_var(df=df, output_dir=figures_output_dir,
+                                  yvar='pw_asym', ylabel='Pairwise asynchrony (ms)')
+    regplot_rsquared_vs_var(df=df, output_dir=figures_output_dir, xvar='ioi_std')
     # TODO: corpus should be saved in the root//references directory!
-    numberline_pw_async(df=md_df, output_dir=figures_output_dir,
+    numberline_pw_async(df=df, output_dir=figures_output_dir,
                         corpus_filepath=f'{output_dir}\\pw_asymmetry_corpus.xlsx')
-    barplot_correction_vs_instrument(df=md_df, output_dir=figures_output_dir)
-    pointplot_lagged_latency_vs_correction(df=md_df, output_dir=figures_output_dir)
+    barplot_correction_vs_instrument(df=df, output_dir=figures_output_dir)
+    pointplot_lagged_latency_vs_correction(df=df, output_dir=figures_output_dir)
+
+
+def gen_tempo_slope_outputs(
+        df: pd.DataFrame, output_dir: str
+) -> None:
+    """
+    Generates outputs relating to tempo slope
+    """
+
+    figures_output_dir = output_dir + '\\figures\\tempo_slopes_plots'
+    df = df[df['instrument'] == 'Keys']
+    # TODO: generate the heatmap?
+    # gen_tempo_slope_heatmap(df=df, output_dir=figures_output_dir)
+    mds = autils.create_model_list(df=df, avg_groupers=['latency', 'jitter'], md='tempo_slope~C(latency)+C(jitter)')
+    vutils.output_regression_table(mds=mds, output_dir=figures_output_dir)
+
+
+def gen_tempo_stability_outputs(
+        df: pd.DataFrame, output_dir: str,
+) -> None:
+    """
+    Generates outputs from a dataframe including a tempo stability column
+    """
+    figures_output_dir = output_dir + '\\figures\\tempo_stability_plots'
+    # IOI STANDARD DEVIATION
+    pairgrid_correction_vs_condition(df, output_dir=figures_output_dir, xvar='ioi_std',
+                                     xlabel='Median IOI standard deviation, 8-second window (ms)',
+                                     xlim=(0, df['ioi_std'].max() + (df['ioi_std'].max() / 10)))
+    regplot_ioi_std_vs_tempo_slope(df, output_dir=figures_output_dir, xvar='ioi_std')
+    mds = autils.create_model_list(df=df, avg_groupers=['latency', 'jitter', 'instrument'],
+                                   md="ioi_std~C(latency)+C(jitter)+C(instrument)")
+    vutils.output_regression_table(mds=mds, output_dir=figures_output_dir)
+
+    # NORMALISED PAIRWISE VARIABILITY INDEX
+    pairgrid_correction_vs_condition(df, output_dir=figures_output_dir, xvar='ioi_npvi',
+                                     xlabel='IOI normalised pairwise variability index (nPVI) ',
+                                     xlim=(0, df['ioi_npvi'].max() + (df['ioi_npvi'].max() / 10)))
+    regplot_ioi_std_vs_tempo_slope(df, output_dir=figures_output_dir, xvar='ioi_npvi')
+    mds = autils.create_model_list(df=df, avg_groupers=['latency', 'jitter', 'instrument'],
+                                   md="ioi_npvi~C(latency)+C(jitter)+C(instrument)")
+    vutils.output_regression_table(mds=mds, output_dir=figures_output_dir)
