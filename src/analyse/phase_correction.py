@@ -1,15 +1,15 @@
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
+import statsmodels.api as sm
 import pickle
 from datetime import timedelta
 import warnings
 
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
-from src.visualise.phase_correction_graphs import pairgrid_correction_vs_condition, single_condition_multiple_plot, \
-    animation_tempo_slope_single_condition, boxplot_correction_vs_condition, pointplot_lagged_latency_vs_correction, \
-    regplot_abs_correction_vs_var, numberline_pw_async, barplot_correction_vs_instrument, regplot_rsquared_vs_var
+from src.visualise.phase_correction_graphs import PairGrid, SingleConditionPlot, BoxPlot, RegPlotAbsCorrection, \
+    RegPlotRSquared, PointPlotLaggedLatency, SingleConditionAnimation, NumberLine, BarPlot
 from src.visualise.tempo_stability_graphs import regplot_ioi_std_vs_tempo_slope
 from src.visualise.questionnaire_graphs import ScatterPlotQuestionnaire
 
@@ -140,7 +140,7 @@ def extract_pairwise_asynchrony(
 
 def construct_phase_correction_model(
         df: pd.DataFrame, mod: str = PC_MOD
-):
+) -> sm.regression.linear_model.RegressionResults:
     """
     Construct linear phase correction model by predicting next IOI of live musician from previous IOI of live musician
     and IOI difference between live and delayed musician.
@@ -251,7 +251,7 @@ def phase_correction_pre_processing(
 
 
 def gen_phase_correction_models(
-        raw_data: list, output_dir: str, logger=None, make_anim: bool = False, make_single_plot: bool = True,
+        raw_data: list, output_dir: str, logger=None, make_anim: bool = False, make_single_plot: bool = False,
         force_rebuild: bool = False,
 ) -> pd.DataFrame:
     """
@@ -312,19 +312,21 @@ def gen_phase_correction_models(
             mds.append(dic_create(c2, drms_md, drms_j, drms_std, drms_npvi))
             # Generate output from single condition
             if make_single_plot:
-                single_condition_multiple_plot(
+                single_plot = SingleConditionPlot(
                     keys_df=predict_from_model(keys_md, keys_nn), keys_md=keys_md, keys_o=keys,
                     drms_df=predict_from_model(drms_md, drms_nn), drms_md=drms_md, drms_o=drms,
-                    meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
+                    metadata=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
                     output_dir=figures_output_dir + '\\individual_plots'
                 )
+                single_plot.create_plot()
             # Generate animation if specified
             if make_anim:
-                animation_tempo_slope_single_condition(
+                anim = SingleConditionAnimation(
                     keys_df=predict_from_model(keys_md, keys_nn), drms_df=predict_from_model(drms_md, drms_nn),
-                    keys_o=keys, drms_o=drms, meta=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
-                    output_dir=figures_output_dir + '\\animations\\tempo_slope'
+                    keys_o=keys, drms_o=drms, metadata=(c1['trial'], c1['block'], c1['latency'], c1['jitter']),
+                    output_dir=figures_output_dir + '\\animations'
                 )
+                anim.create_animation()
     # Convert our list of dictionaries into a dataframe
     df = pd.DataFrame(mds)
     # Pickle the results so we don't need to create them again
@@ -349,20 +351,31 @@ def gen_phase_correction_model_outputs(
                                          avg_groupers=['latency', 'jitter', 'instrument']),
             output_dir=figures_output_dir, verbose_footer=False
         )
-    # Create plots
-    boxplot_correction_vs_condition(df=df, output_dir=figures_output_dir,
-                                    yvar='correction_partner', ylim=(-0.2, 1))
-    pairgrid_correction_vs_condition(df=df, xvar='correction_partner', output_dir=figures_output_dir,
-                                     xlim=(-0.5, 1.5), xlabel='Coupling constant')
-    regplot_abs_correction_vs_var(df=df, output_dir=figures_output_dir)
-    regplot_abs_correction_vs_var(df=df, output_dir=figures_output_dir,
-                                  yvar='pw_asym', ylabel='Pairwise asynchrony (ms)')
-    regplot_rsquared_vs_var(df=df, output_dir=figures_output_dir, xvar='ioi_std')
+    # Create boxplots
+    bp = BoxPlot(df=df, output_dir=figures_output_dir, yvar='correction_partner', ylim=(-0.2, 1))
+    bp.create_plot()
+    # Create pairgrid
+    pg = PairGrid(
+        df=df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(-0.5, 1.5), xlabel='Coupling constant'
+    )
+    pg.create_plot()
+    # Create regplots
+    rp1 = RegPlotAbsCorrection(df=df, output_dir=figures_output_dir)
+    rp1.create_plot()
+    rp2 = RegPlotAbsCorrection(df=df, output_dir=figures_output_dir, yvar='pw_asym', ylabel='Pairwise asynchrony (ms)')
+    rp2.create_plot()
+    rp3 = RegPlotRSquared(df=df, output_dir=figures_output_dir, xvar='ioi_std', yvar='rsquared', ylabel='R-Squared (%)',
+                          xlabel='Median IOI standard deviation, 8-second window (ms)')
+    rp3.create_plot()
+    # Create pointplot
+    pp = PointPlotLaggedLatency(df=df, output_dir=figures_output_dir)
+    pp.create_plot()
+
     # TODO: corpus should be saved in the root//references directory!
-    numberline_pw_async(df=df, output_dir=figures_output_dir,
-                        corpus_filepath=f'{output_dir}\\pw_asymmetry_corpus.xlsx')
-    barplot_correction_vs_instrument(df=df, output_dir=figures_output_dir)
-    pointplot_lagged_latency_vs_correction(df=df, output_dir=figures_output_dir)
+    nl = NumberLine(df=df, output_dir=figures_output_dir, corpus_filepath=f'{output_dir}\\pw_asymmetry_corpus.xlsx')
+    nl.create_plot()
+    bar = BarPlot(df=df, output_dir=figures_output_dir)
+    bar.create_plot()
 
 
 def gen_tempo_slope_outputs(
@@ -388,18 +401,25 @@ def gen_tempo_stability_outputs(
     """
     figures_output_dir = output_dir + '\\figures\\tempo_stability_plots'
     # IOI STANDARD DEVIATION
-    pairgrid_correction_vs_condition(df, output_dir=figures_output_dir, xvar='ioi_std',
-                                     xlabel='Median IOI standard deviation, 8-second window (ms)',
-                                     xlim=(0, df['ioi_std'].max() + (df['ioi_std'].max() / 10)))
+    pg_sd = PairGrid(
+        df=df, output_dir=figures_output_dir, xvar='ioi_std',
+        xlim=(0, df['ioi_std'].max() + (df['ioi_std'].max() / 10)),
+        xlabel='Median IOI standard deviation, 8-second window (ms)'
+    )
+    pg_sd.create_plot()
+    # TODO: use the classes defined in phase_correction_graphs here
     regplot_ioi_std_vs_tempo_slope(df, output_dir=figures_output_dir, xvar='ioi_std')
     mds = autils.create_model_list(df=df, avg_groupers=['latency', 'jitter', 'instrument'],
                                    md="ioi_std~C(latency)+C(jitter)+C(instrument)")
     vutils.output_regression_table(mds=mds, output_dir=figures_output_dir)
 
     # NORMALISED PAIRWISE VARIABILITY INDEX
-    pairgrid_correction_vs_condition(df, output_dir=figures_output_dir, xvar='ioi_npvi',
-                                     xlabel='IOI normalised pairwise variability index (nPVI) ',
-                                     xlim=(0, df['ioi_npvi'].max() + (df['ioi_npvi'].max() / 10)))
+    pg_npvi = PairGrid(
+        df=df, output_dir=figures_output_dir, xvar='ioi_npvi',
+        xlabel='IOI normalised pairwise variability index (nPVI)',
+        xlim=(0, df['ioi_npvi'].max() + (df['ioi_npvi'].max() / 10))
+    )
+    pg_npvi.create_plot()
     regplot_ioi_std_vs_tempo_slope(df, output_dir=figures_output_dir, xvar='ioi_npvi')
     mds = autils.create_model_list(df=df, avg_groupers=['latency', 'jitter', 'instrument'],
                                    md="ioi_npvi~C(latency)+C(jitter)+C(instrument)")

@@ -8,12 +8,13 @@ import src.visualise.visualise_utils as vutils
 import src.analyse.analysis_utils as autils
 
 
+# TODO: inherit from a base class?
 class ScatterPlotQuestionnaire:
     """
     Creates a scatterplot for each duo/question combination.
     """
     def __init__(self, **kwargs):
-        # Get from kwargs
+        # Get from kwargs (with default arguments)
         self.df: pd.DataFrame = kwargs.get('df', None)
         self.output_dir: str = kwargs.get('output_dir', None)
         self.jitter: bool = kwargs.get('jitter', True)
@@ -29,10 +30,13 @@ class ScatterPlotQuestionnaire:
             self.df.columns = self._format_df_columns()
             self.xvar, self.yvar = (col for col in self.df.columns if 'value' in col)
             if self.jitter:
-                self._apply_jitter()
+                self._apply_jitter_for_plotting()
 
     @vutils.plot_decorator
     def create_plot(self) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class to generate and save the image.
+        """
         self.g = self._create_facetgrid()
         self._map_facetgrid_plots()
         self._format_plot()
@@ -40,6 +44,9 @@ class ScatterPlotQuestionnaire:
         return self.g.figure, fname
 
     def _format_df(self):
+        """
+        Called from within the class
+        """
         return (
             self.df.replace({'block': {1: 'Block 1', 2: 'Block 2'}})
                 .melt(id_vars=['trial', 'block', 'latency', 'jitter', 'instrument'],
@@ -50,9 +57,15 @@ class ScatterPlotQuestionnaire:
         )
 
     def _format_df_columns(self):
+        """
+
+        """
         return [''.join(col) for col in self.df.columns.values]
 
-    def _apply_jitter(self):
+    def _apply_jitter_for_plotting(self):
+        """
+
+        """
         def jitter(x):
             return x + random.uniform(0, .5) - .25
 
@@ -60,6 +73,9 @@ class ScatterPlotQuestionnaire:
         self.df[self.yvar] = self.df[self.yvar].apply(lambda x: jitter(x))
 
     def _create_facetgrid(self):
+        """
+
+        """
         if self.one_reg:
             return sns.FacetGrid(
                 self.df, col='trial', row='variable', sharex=True, sharey=True, height=3, aspect=1.2545
@@ -71,6 +87,9 @@ class ScatterPlotQuestionnaire:
             )
 
     def _map_facetgrid_plots(self):
+        """
+
+        """
         def scatter(x, y, **kwargs):
             if self.one_reg:
                 sns.scatterplot(data=self.df, x=x, y=y, **kwargs)
@@ -84,6 +103,9 @@ class ScatterPlotQuestionnaire:
             ax.axline((0, 0), (10, 10), linewidth=2, color=vutils.BLACK, alpha=vutils.ALPHA)
 
     def _format_plot(self):
+        """
+
+        """
         self.g.set_titles('Duo {col_name} - {row_name}')
         self.g.set(xlim=(0, 10), ylim=(0, 10), xlabel='', ylabel='', xticks=[0, 5, 10], yticks=[0, 5, 10])
         self.g.figure.supxlabel(f'{self.xvar.replace("value", "")} rating', y=0.05)
