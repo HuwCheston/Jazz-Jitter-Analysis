@@ -221,7 +221,7 @@ def phase_correction_pre_processing(
 
 def gen_phase_correction_models(
         raw_data: list, output_dir: str, logger=None, make_anim: bool = False, make_single_plot: bool = False,
-        force_rebuild: bool = True, md_diagnostics: bool = False
+        force_rebuild: bool = False, md_diagnostics: bool = False
 ) -> pd.DataFrame:
     """
     Generates phase correction models for each instrument in all conditions, using all of the data in a performance.
