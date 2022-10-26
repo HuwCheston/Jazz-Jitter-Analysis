@@ -3,7 +3,8 @@ from datetime import timedelta
 
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
-from src.analyse.phase_correction import extract_rolling_ioi_std, extract_npvi
+from src.analyse.phase_correction import extract_rolling_ioi_std
+from src.analyse.analysis_utils import extract_npvi
 
 
 def gen_tempo_stability_df(

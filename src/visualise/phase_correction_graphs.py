@@ -2,12 +2,13 @@ import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 from statistics import mean
-import matplotlib.pyplot as plt
-from matplotlib import animation
+from random import uniform
+from matplotlib import animation, patches, pyplot as plt
+from matplotlib.transforms import ScaledTranslation
 import seaborn as sns
 
-import src.visualise.visualise_utils as vutils
 import src.analyse.analysis_utils as autils
+import src.visualise.visualise_utils as vutils
 
 
 class BasePlot:
@@ -20,6 +21,8 @@ class BasePlot:
         # Get from kwargs (with default arguments)
         self.df: pd.DataFrame = kwargs.get('df', None)
         self.output_dir: str = kwargs.get('output_dir', None)
+        # Create an empty attribute to store our plot in later
+        self.g = None
 
 
 class PairGrid(BasePlot):
@@ -33,8 +36,7 @@ class PairGrid(BasePlot):
         self.xlabel: str = kwargs.get('xlabel', None)
         self.cvar: str = kwargs.get('cvar', 'tempo_slope')
         self.clabel: str = kwargs.get('clabel', 'Tempo\nSlope\n(BPM/s)\n\n')
-        # Create an empty attribute to store our plot in later when we correct it
-        self.g = None
+
         # If we've passed our dataframe
         if self.df is not None:
             self.df = self._format_df()
@@ -133,8 +135,6 @@ class BoxPlot(BasePlot):
         self.yvar: str = kwargs.get('yvar', 'correction_partner_onset')
         self.ylim: tuple = kwargs.get('ylim', (-1, 1))
         self.ylabel: str = kwargs.get('ylabel', None)
-        # Initialise empty attribute to store the plot in
-        self.g = None
         # If we're removing 0 latency conditions
         if self.subset:
             self.df = self._format_df()
@@ -175,11 +175,11 @@ class BoxPlot(BasePlot):
         """
         # Add the reference line first or it messes up the plot titles
         self.g.refline(y=0, alpha=1, linestyle='-', color=vutils.BLACK, linewidth=3)
-        # Set axes labels, limits, titles
+        # Set axes labels, limits
         self.g.set(ylim=self.ylim, xlabel='', ylabel='')
-        self.g.set_titles("Duo {col_name}", )
         # Iterate through to set tick and axes line widths
-        for ax in self.g.axes.flatten():
+        for num, ax in enumerate(self.g.axes.flatten()):
+            ax.set_title(f'Duo {num + 1}')
             ax.tick_params(width=3, )
             plt.setp(ax.spines.values(), linewidth=2)
 
@@ -192,7 +192,7 @@ class BoxPlot(BasePlot):
         self.g.figure.supylabel(self.ylabel if self.ylabel is not None else self.yvar.replace('_', ' ').title(), x=0.01)
         # Move the legend
         sns.move_legend(self.g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01), )
-        # Adjust the plotsize a bit
+        # Adjust the plot size a bit
         self.g.figure.subplots_adjust(bottom=0.25, top=0.9, left=0.06, right=0.98)
 
 
@@ -363,6 +363,7 @@ class SingleConditionAnimation:
     """
     def __init__(self, **kwargs):
         plt.set_loglevel('critical')
+        plt.rcParams.update({'font.size': vutils.FONTSIZE})
         # Get attributes from kwargs
         self.keys_df: pd.DataFrame = kwargs.get('keys_df', None)
         self.drms_df: pd.DataFrame = kwargs.get('drms_df', None)
@@ -371,7 +372,7 @@ class SingleConditionAnimation:
         self.output_dir: str = kwargs.get('output_dir', None)
         self.metadata: tuple = kwargs.get('metadata', None)
         # Create the matplotlib objects we need
-        self.fig = plt.figure(figsize=(10, 10))
+        self.fig = plt.figure(figsize=(7.5, 7.5))
         self.ax = plt.axes(
             xlabel='Performance duration (s)', ylabel='Average tempo (BPM, four-beat rolling window)', xlim=(0, 100),
             ylim=(30, 160), title=f'Duo {self.metadata[0]} (measure {self.metadata[1]}): '
@@ -433,29 +434,34 @@ class RegPlot(BasePlot):
         super().__init__(**kwargs)
         self.yvar: str = kwargs.get('yvar', 'tempo_slope')
         self.ylabel: str = kwargs.get('ylabel', 'Tempo slope (BPM/s)')
+        self.ylim: tuple = kwargs.get('ylim', None)
         self.xvar: str = kwargs.get('xvar', 'abs_correction')
-        self.xlabel: str = kwargs.get('xlabel', 'Coupling strength')
+        self.xlabel: str = kwargs.get('xlabel', 'Coupling balance')
+        self.xlim: tuple = kwargs.get('xlim', None)
         self.hline: bool = kwargs.get('hline', True)
-        self.g = None
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 9.4))
 
     def _format_plot(self):
         """
         Formats a regression plot, including both the figure and axes
         """
         # Set axes level formatting
+
         self.ax.tick_params(width=3, )
-        self.ax.set(ylabel='', xlabel='')
+        self.ax.set(
+            ylabel='', xlabel='', xlim=self.xlim if self.xlim is not None else self.ax.get_xlim(),
+            ylim=self.ylim if self.ylim is not None else self.ax.get_ylim(),
+        )
         plt.setp(self.ax.spines.values(), linewidth=2)
         # Plot a horizontal line at x=0
         if self.hline:
             self.ax.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK)
         # Set axis labels
-        self.fig.supylabel(self.ylabel, x=0.01)
+        self.fig.supylabel(self.ylabel, x=0.03)
         self.fig.supxlabel(self.xlabel, y=0.09)
 
 
-class RegPlotAbsCorrection(RegPlot):
+class RegPlotDuo(RegPlot):
     """
     Creates a regression & scatter plot for absolute correction difference between duo members versus another variable
     (defaults to tempo slope, but can be changed by setting yvar argument)
@@ -475,16 +481,17 @@ class RegPlotAbsCorrection(RegPlot):
         # Format axis positioning and move legend
         plt.tight_layout()
         sns.move_legend(
-            self.ax, 'lower center', ncol=6, title=None, frameon=False, bbox_to_anchor=(0.45, -0.33), markerscale=1.6
+            self.ax, 'lower center', ncol=6, title=None, frameon=False, bbox_to_anchor=(0.45, -0.2), markerscale=1.6,
+            columnspacing=0.2, handletextpad=0.1,
         )
-        self.ax.figure.subplots_adjust(bottom=0.22, top=0.95, left=0.12, right=0.95)
+        self.ax.figure.subplots_adjust(bottom=0.17, top=0.93, left=0.14, right=0.90)
         # Return with filename to be saved and closed in outer function
         fname = f'{self.output_dir}\\regplot_{self.xvar}_vs_{self.yvar}.png'
         return self.ax.figure, fname
 
     def _format_df(self):
         self.df = self.df.groupby(by=['trial', 'block', 'latency', 'jitter']).apply(self._get_abs_correction)
-        self.df['trial'] = self.df['trial'].replace({n: f'Duo {n}' for n in range(1, 6)})  # Makes legend fmt easier
+        self.df['trial_abbrev'] = self.df['trial'].replace({n: f'Duo {n}' for n in range(1, 6)})
         return self.df
 
     def _get_abs_correction(self, grp: pd.DataFrame.groupby) -> pd.DataFrame.groupby:
@@ -496,7 +503,8 @@ class RegPlotAbsCorrection(RegPlot):
 
     def _create_plot(self):
         g = sns.scatterplot(
-            data=self.df, x=self.xvar, y=self.yvar, hue='trial', style='trial', s=150, ax=self.ax, palette='tab10'
+            data=self.df, x=self.xvar, y=self.yvar, hue='trial_abbrev', style='trial_abbrev',
+            s=150, ax=self.ax, palette='tab10'
         )
         g = sns.regplot(
             data=self.df, x=self.xvar, y=self.yvar, scatter=None, truncate=True, ax=g, color=vutils.BLACK
@@ -504,7 +512,7 @@ class RegPlotAbsCorrection(RegPlot):
         return g
 
 
-class RegPlotRSquared(RegPlot):
+class RegPlotSingle(RegPlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if self.df is not None:
@@ -520,15 +528,15 @@ class RegPlotRSquared(RegPlot):
         # Create the legend
         handles, labels = self.ax.get_legend_handles_labels()
         self.ax.legend(handles=handles[1:6] + handles[7:], labels=labels[1:6] + labels[7:], ncol=8, frameon=False,
-                       markerscale=1.6, columnspacing=0.1, handletextpad=0.1, bbox_to_anchor=(1.05, -0.15), )
-        self.ax.figure.subplots_adjust(bottom=0.22, top=0.95, left=0.12, right=0.95)
+                       markerscale=1.6, columnspacing=0.1, handletextpad=0.1, bbox_to_anchor=(1.15, -0.1))
+        self.ax.figure.subplots_adjust(bottom=0.17, top=0.93, left=0.14, right=0.90)
         # Return with filename to be saved and closed in outer function
         fname = f'{self.output_dir}\\regplot_{self.xvar}_vs_{self.yvar}.png'
         return self.ax.figure, fname
 
     def _format_df(self):
-        self.df['trial'] = self.df['trial'].replace({n: f'Duo {n}' for n in range(1, 6)})
-        # Convert rsquared to percentage
+        self.df['trial_abbrev'] = self.df['trial'].replace({n: f'Duo {n}' for n in range(1, 6)})
+        # Convert r-squared to percentage
         if self.yvar == 'rsquared':
             self.df['rsquared'] = self.df['rsquared'].apply(lambda x: x * 100)
         return self.df
@@ -538,7 +546,7 @@ class RegPlotRSquared(RegPlot):
             data=self.df, x=self.xvar, y=self.yvar, scatter=False, color=vutils.BLACK, ax=self.ax
         )
         g = sns.scatterplot(
-            data=self.df, x=self.xvar, y=self.yvar, hue='trial', palette='tab10', style='instrument', s=100, ax=g
+            data=self.df, x=self.xvar, y=self.yvar, hue='trial_abbrev', palette='tab10', style='instrument', s=100, ax=g
         )
         return g
 
@@ -550,7 +558,7 @@ class PointPlotLaggedLatency(BasePlot):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.g = None
+        self.lag_var_name = kwargs.get('lag_var_name', 'pc_l')
         if self.df is not None:
             self.df = self._format_df()
 
@@ -563,16 +571,18 @@ class PointPlotLaggedLatency(BasePlot):
         self._format_ax()
         self._format_fig()
         # Create filename and return to save
-        fname = f'{self.output_dir}\\pointplot_lagged_latency_vs_correction.png'
+        fname = f'{self.output_dir}\\pointplot_{self.lag_var_name}.png'
         return self.g.figure, fname
 
     def _format_df(self):
         """
         Formats the dataframe for the plot
         """
+        # Extract the value vars
+        val_vars = [col for col in self.df if self.lag_var_name in col and not col.endswith('_p')]
         self.df = (
             self.df.melt(id_vars=['trial', 'block', 'latency', 'jitter', 'instrument', 'abbrev'],
-                         value_vars=['lag_1', 'lag_2', 'lag_3', 'lag_4'], value_name='coef', var_name='lag')
+                         value_vars=val_vars, value_name='coef', var_name='lag')
                    .sort_values(by=['trial', 'block', 'latency', 'jitter', 'instrument'])
         )
         self.df.lag = self.df.lag.str.extract(r'(\d+)')
@@ -585,7 +595,7 @@ class PointPlotLaggedLatency(BasePlot):
         return sns.catplot(
             data=self.df[self.df['jitter'] != 0], col='trial', row='jitter', x="lag", y="coef", hue='instrument',
             kind="point", height=5.5, aspect=0.62, dodge=0.2, palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'],
-            scale=1.25
+            scale=1.25, estimator=np.median, ci=None
         )
 
     def _format_ax(self):
@@ -594,7 +604,7 @@ class PointPlotLaggedLatency(BasePlot):
         """
         # Add the reference line now or else it messes up the titles
         self.g.refline(y=0, alpha=1, linestyle='-', color=vutils.BLACK)
-        # Set axes tick parameters and linewidth
+        # Set axes tick parameters and line width
         self.g.set_axis_labels(x_var='', y_var='')
         for ax in self.g.axes.flatten():
             ax.tick_params(width=3, )
@@ -622,7 +632,6 @@ class NumberLine(BasePlot):
         super().__init__(**kwargs)
         self.df = self._format_df(corpus_filepath=kwargs.get('corpus_filepath', None))
         self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 4))
-        self.g = None
 
     @vutils.plot_decorator
     def create_plot(self) -> tuple[plt.Figure, str]:
@@ -703,7 +712,6 @@ class BarPlot(BasePlot):
         self.estimator: callable = kwargs.get('estimator', np.median)
         self.yvar: str = kwargs.get('yvar', 'correction_partner')
         self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
-        self.g = None
 
     @vutils.plot_decorator
     def create_plot(self):
@@ -726,7 +734,8 @@ class BarPlot(BasePlot):
         )
         ax = sns.barplot(
             data=self.df, x='trial', y=self.yvar, hue='instrument', ax=ax, ci=25, palette=vutils.INSTR_CMAP,
-            hue_order=['Keys', 'Drums'], errcolor='#3953a3', errwidth=10, estimator=self.estimator
+            hue_order=['Keys', 'Drums'], errcolor='#3953a3', errwidth=10, estimator=self.estimator,
+            edgecolor=vutils.BLACK, lw=2
         )
         return ax
 
@@ -757,83 +766,449 @@ class BarPlot(BasePlot):
         self.g.figure.subplots_adjust(bottom=0.22, top=0.95, left=0.14, right=0.95)
 
 
-@vutils.plot_decorator
-def histplot_r2(
-        r: pd.DataFrame, output_dir: str, xvar: str = 'r2', kind: str = 'hist'
-) -> tuple[plt.Figure, str]:
+class HistPlotR2(BasePlot):
     """
     Creates histograms of model parameters stratified by trial and instrument, x-axis variable defaults to R-squared
     """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.xvar: str = kwargs.get('xvar', 'r2')
+        self.kind: str = kwargs.get('kind', 'hist')
 
-    # Create the dis plot
-    g = sns.displot(r, col='trial', kind=kind, x=xvar, hue="instrument", multiple="stack", palette=vutils.INSTR_CMAP,
-                    height=vutils.HEIGHT, aspect=vutils.ASPECT, )
-    # Format figure-level properties
-    g.set(xlabel='', ylabel='')
-    g.set_titles("Duo {col_name}", size=vutils.FONTSIZE)
-    g.figure.supxlabel(xvar.title(), y=0.06)
-    g.figure.supylabel('Count', x=0.007)
-    # Move legend and adjust subplots
-    sns.move_legend(g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.03),
-                    fontsize=vutils.FONTSIZE)
-    g.figure.subplots_adjust(bottom=0.17, top=0.92, left=0.055, right=0.97)
-    # Return, with plot_decorator used for saving
-    fname = f'{output_dir}\\histplot_{xvar}.png'
-    return g.figure, fname
+    @vutils.plot_decorator
+    def create_plot(self):
+        """
+        Called from outside the class to generate and save the image.
+        """
+        self.g = self._create_plot()
+        self._format_plot()
+        fname = f'{self.output_dir}\\histplot_{self.xvar}.png'
+        return self.g.figure, fname
+
+    def _create_plot(self):
+        """
+        Creates the plot in seaborn and returns
+        """
+        return sns.displot(
+            self.df, col='trial', kind=self.kind, x=self.xvar, hue="instrument", multiple="stack",
+            palette=vutils.INSTR_CMAP, height=vutils.HEIGHT, aspect=vutils.ASPECT,
+        )
+
+    def _format_plot(self):
+        """
+        Format figure and axes level properties (titles, labels, legend)
+        """
+        self.g.set(xlabel='', ylabel='')
+        self.g.set_titles("Duo {col_name}", size=vutils.FONTSIZE)
+        self.g.figure.supxlabel(self.xvar.title(), y=0.06)
+        self.g.figure.supylabel('Count', x=0.007)
+        # Move legend and adjust subplots
+        sns.move_legend(self.g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.03),
+                        fontsize=vutils.FONTSIZE)
+        self.g.figure.subplots_adjust(bottom=0.17, top=0.92, left=0.055, right=0.97)
 
 
-@vutils.plot_decorator
-def boxplot_r2_vs_windowsize(
-        df: pd.DataFrame, output_dir: str
-) -> tuple[plt.Figure, str]:
+class BoxPlotR2WindowSize(BasePlot):
     """
     Creates a boxplot of average R2 values per rolling window size
     """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.df is not None:
+            self.df = self._format_df()
 
-    test = df.replace([np.inf, -np.inf], np.nan).dropna().groupby(['trial', 'win_size']).mean()[
-        ['aic', 'r2']].reset_index(drop=False)
-    g = (
-        sns.boxplot(data=test, hue='trial', x='win_size', y='r2', color=vutils.INSTR_CMAP[0])
-           .set(xlabel='Window Size (s)', ylabel='Adjusted R2')
-    )
-    plt.tight_layout()
-    fname = f'{output_dir}\\boxplot_r2_vs_windowsize.png'
-    return g.figure, fname
+    @vutils.plot_decorator
+    def create_plot(self):
+        """
+        Called from outside the class to generate and save the image.
+        """
+        self.g = self._create_plot()
+        self._format_plot()
+        fname = f'{self.output_dir}\\boxplot_r2_vs_windowsize.png'
+        return self.g.figure, fname
+
+    def _format_df(self):
+        """
+        Formats dataframe by dropping nan values, grouping by trial and window size, extracting mean...
+        """
+        return (
+            self.df.replace([np.inf, -np.inf], np.nan)
+                .dropna()
+                .groupby(['trial', 'win_size'])
+                .mean()[['aic', 'r2']]
+                .reset_index(drop=False)
+        )
+
+    def _create_plot(self):
+        """
+        Creates the plot in seaborn and returns
+        """
+        return sns.boxplot(data=self.df, hue='trial', x='win_size', y='r2', color=vutils.INSTR_CMAP[0])
+
+    def _format_plot(self):
+        """
+        Format figure and axes level properties
+        """
+        self.g.set(xlabel='Window Size (s)', ylabel='Adjusted R2')
+        plt.tight_layout()
 
 
-# @vutils.plot_decorator
-# def pairgrid_correction_vs_condition_iqr(
-#         df: pd.DataFrame, value_vars: list, value_name: str, output_dir: str, xvar: str = 'correction_partner',
-# ) -> tuple[plt.Figure, str]:
-#     """
-#     Creates a figure showing pairs of coefficients obtained for each performer in a condition,
-#     stratified by block and trial number, with shading according to tempo slope
-#     """
-#     # Melt the dataframe
-#     df = (
-#             pd.melt(df, id_vars=['trial', 'block', 'latency', 'jitter', 'instrument', 'tempo_slope'],
-#                     value_vars=value_vars, value_name=value_name)
-#               .sort_values(by=['trial', 'block', 'latency', 'jitter', 'instrument'])
-#               .reset_index(drop=False)
-#     )
-#
-#     # Create the abbreviation column, showing latency and jitter
-#     df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
-#     df = df.sort_values(by=['latency', 'jitter'])
-#     # Create the plot
-#     plt.rcParams.update({'font.size': vutils.FONTSIZE})
-#     pg = sns.catplot(
-#         data=df, x=xvar, y='abbrev', row='block', col='trial', hue='instrument',
-#         hue_order=['Keys', 'Drums'], palette=vutils.INSTR_CMAP, kind='point', linestyles='', marker='.', s=10,
-#         errorbar=lambda v: (min(v), max(v)), estimator=np.median, height=5.5, sharex=True, sharey=True,
-#         aspect=0.62, dodge=0.2, plot_kws={'alpha': 1}
-#     )
-#     ts_df = df.drop_duplicates(subset='tempo_slope', keep='last')
-#     norm = vutils.create_normalised_cmap(ts_df['tempo_slope'])
-#     # Add the reference line in here or it messes up the plot titles
-#     pg.refline(x=0, alpha=1, linestyle='-', color=vutils.BLACK)
-#     # Format the axis by iterating through
-#     _format_pairgrid_ax(norm, pg, ts_df, xlim=(-1.5, 1.5))
-#     _format_pairgrid_fig(pg, norm, xvar=xvar.replace('_', ' ').title() + ' (Q1:Q3)')
-#     fname = f'{output_dir}\\pairgrid_condition_vs_{xvar}_iqr.png'
-#     return pg.fig, fname
+class ScatterPlotQuestionnaire(BasePlot):
+    """
+    Creates a scatterplot for each duo/question combination.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.jitter: bool = kwargs.get('jitter', True)
+        self.ax_var: str = kwargs.get('ax_var', 'instrument')
+        self.marker_var: str = kwargs.get('marker_var', 'block')
+        self.one_reg: bool = kwargs.get('one_reg', False)
+        # If we've passed our dataframe
+        if self.df is not None:
+            self.df = self._format_df()
+            self.df.columns = self._format_df_columns()
+            self.xvar, self.yvar = (col for col in self.df.columns if 'value' in col)
+            if self.jitter:
+                self._apply_jitter_for_plotting()
+
+    @vutils.plot_decorator
+    def create_plot(self) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class to generate and save the image.
+        """
+        self.g = self._create_facetgrid()
+        self._map_facetgrid_plots()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\scatterplot_{self.ax_var}_{self.marker_var}.png'
+        return self.g.figure, fname
+
+    def _format_df(self) -> pd.DataFrame:
+        """
+        Called from within the class to format the dataframe for plotting
+        """
+        return (
+            self.df.replace({'block': {1: 'Block 1', 2: 'Block 2'}})
+                .melt(id_vars=['trial', 'block', 'latency', 'jitter', 'instrument'],
+                      value_vars=['success', 'coordination', 'interaction'])
+                .pivot(index=['trial', self.marker_var, 'latency', 'jitter', 'variable'],
+                       columns=self.ax_var, values=['value'])
+                .reset_index(drop=False)
+        )
+
+    def _format_df_columns(self):
+        """
+        Flattens the multiindex of columns to one level
+        """
+        return [''.join(col) for col in self.df.columns.values]
+
+    def _apply_jitter_for_plotting(self):
+        """
+        Applies jitter to categorical data to increase readability when plotting
+        """
+        self.df[self.xvar] = self.df[self.xvar].apply(lambda x: x + uniform(0, .5) - .25)
+        self.df[self.yvar] = self.df[self.yvar].apply(lambda x: x + uniform(0, .5) - .25)
+
+    def _create_facetgrid(self):
+        """
+        Creates the facetgrid object for plotting onto and returns
+        """
+        if self.one_reg:
+            return sns.FacetGrid(
+                self.df, col='trial', row='variable', sharex=True, sharey=True, height=3, aspect=1.2545
+            )
+        else:
+            return sns.FacetGrid(
+                self.df, col='trial', row='variable', hue=self.marker_var, sharex=True, sharey=True, height=3,
+                aspect=1.2545
+            )
+
+    def _map_facetgrid_plots(self):
+        """
+        Maps plots onto the facetgrid
+        """
+        def scatter(x, y, **kwargs):
+            if self.one_reg:
+                sns.scatterplot(data=self.df, x=x, y=y, **kwargs)
+            else:
+                sns.scatterplot(data=self.df, x=x, y=y, style=self.marker_var, **kwargs)
+
+        self.g.map(scatter, self.xvar, self.yvar, s=100, )
+        self.g.map(sns.regplot, self.xvar, self.yvar, scatter=False, ci=None)
+
+    def _format_ax(self):
+        """
+        Formats plot by setting axes-level properties
+        """
+        # Add in the axes diagonal line
+        for ax in self.g.axes.flatten():
+            ax.axline((0, 0), (10, 10), linewidth=2, color=vutils.BLACK, alpha=vutils.ALPHA)
+        # Add titles, labels to each axes
+        self.g.set_titles('Duo {col_name} - {row_name}')
+        self.g.set(xlim=(0, 10), ylim=(0, 10), xlabel='', ylabel='', xticks=[0, 5, 10], yticks=[0, 5, 10])
+
+    def _format_fig(self):
+        """
+        Formats plot by setting figure-level properties
+        """
+        self.g.figure.supxlabel(f'{self.xvar.replace("value", "")} rating', y=0.05)
+        self.g.figure.supylabel(f'{self.yvar.replace("value", "")} rating', x=0.01)
+        self.g.figure.subplots_adjust(bottom=0.12, top=0.93, wspace=0.15, left=0.05, right=0.93)
+
+
+class HeatmapQuestionnaire(BasePlot):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.data = self._format_df()
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=5, figsize=(18.8, 5.5), )
+        self.ax[1].get_shared_x_axes().join(*[self.ax[n] for n in range(1, 5)])
+        self.cbar_ax = self.fig.add_axes([0.915, 0.1, 0.015, 0.8])
+
+    def _format_df(self):
+        res = []
+        for idx, grp in self.df.groupby('trial'):
+            grp = grp.pivot(index=['trial', 'block', 'latency', 'jitter', ], columns='instrument',
+                            values=['interaction', 'coordination', 'success']).reset_index(drop=True)
+            grp.columns = [''.join(col) for col in grp.columns]
+            corr = grp[['successKeys', 'interactionKeys', 'coordinationKeys', 'successDrums', 'interactionDrums',
+                        'coordinationDrums']].corr()
+            matrix = np.triu(corr)
+            res.append([corr, matrix])
+        return res
+
+    @vutils.plot_decorator
+    def create_plot(self):
+        self._create_plot()
+        self._format_fig()
+        fname = f'{self.output_dir}\\heatmap_duo_correlations.png'
+        return self.fig, fname
+
+    def _format_ax(self, g, i):
+        ti = ['Successful', 'Interaction', 'Coordination', 'Successful', 'Interaction', 'Coordination']
+        self._add_lines_to_ax(g)
+        if i == 0:
+            g.set_yticks(ticks=g.get_yticks(), labels=ti, minor=False)
+            self._shift_ax_ticks(tick_labels=g.yaxis.get_majorticklabels(), x=-15 / 72., y=0 / 72.)
+        else:
+            g.set_xticks(g.get_xticks(), ['' for _ in range(6)], minor=False)
+            g.set_yticks(g.get_yticks(), ['' for _ in range(6)], minor=False)
+        g.set_xticks(ticks=g.get_xticks(), labels=ti, minor=False)
+        g.set_xticks([1.51, 4.51], labels=['Keys', 'Drums'], rotation=0, minor=True)
+        g.set_yticks([1, 3.51], labels=['Keys', 'Drums'], rotation=90, minor=True)
+        g.set_title(f'Duo {i + 1}')
+        g.tick_params(axis='both', which='minor', length=0)
+        self._shift_ax_ticks(tick_labels=g.xaxis.get_majorticklabels(), x=0 / 72., y=-15 / 72.)
+
+    @staticmethod
+    def _add_lines_to_ax(g):
+        g.plot([0, 6, 0, 0], [0, 6, 6, 0], clip_on=False, color='black', lw=2)
+        g.plot((0, 3), (3, 3), color='black', lw=2)
+        g.plot((3, 3), (3, 6), color='black', lw=2)
+        for i in range(3):
+            g.add_patch(patches.Rectangle((i, i + 3), 1, 1, linewidth=2, edgecolor=vutils.BLACK, facecolor='none',
+                                          alpha=vutils.ALPHA))
+
+    def _shift_ax_ticks(self, tick_labels, x, y):
+        for label in tick_labels:
+            offset = ScaledTranslation(x, y, self.fig.dpi_scale_trans)
+            label.set_transform(label.get_transform() + offset)
+
+    def _create_plot(self):
+        for i, ax in enumerate(self.ax.flat):
+            g = sns.heatmap(
+                self.data[i][0], mask=self.data[i][1], ax=ax, cmap=sns.color_palette('vlag', as_cmap=True),
+                annot=True, center=0, square=True, cbar=i == 0, vmin=-1, vmax=1, cbar_ax=None if i else self.cbar_ax,
+                annot_kws={'size': 10}, fmt='.2f', cbar_kws={'label': 'Correlation ($r$)'})
+            self._format_ax(g, i)
+
+    def _format_fig(self):
+        self.fig.supylabel('Question, respondant', y=0.5)
+        self.fig.supxlabel('Question, respondant', y=0.03)
+        plt.subplots_adjust(bottom=0.3, top=1.1, wspace=0.15, left=0.15, right=0.90)
+
+
+class BarPlotInterpolatedIOIs(BasePlot):
+    """
+    Creates a stacked barplot showing the total number of IOIs per duo and the number of these which were interpolated
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fmt = self._format_df()
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4, 5))
+
+    def _format_df(self):
+        # Group the dataframe and get the sum
+        fmt = self.df.groupby(by=['trial', 'instrument']).sum()[['total_beats', 'interpolated_beats']]
+        # Create the percentage columns
+        fmt['total_raw'] = fmt['total_beats'] - fmt['interpolated_beats']
+        fmt['percent_interpolated'] = (fmt['interpolated_beats'] / fmt['total_beats']) * 100
+        fmt['percent_raw'] = 100 - fmt['percent_interpolated']
+        return fmt.reset_index(drop=False)
+
+    @vutils.plot_decorator
+    def create_plot(self) -> tuple[plt.Figure, str]:
+        self._create_plot()
+        self._add_total_beats_to_plot()
+        self._format_ax()
+        self._format_plot()
+        fname = f'{self.output_dir}\\barplot_total_vs_interpolated_beats.png'
+        return self.fig, fname
+
+    def _format_plot(self):
+        self.ax.tick_params(width=3, )
+        self.ax.set(ylabel='', xlabel='',)
+        self.fig.supxlabel('Duo number', y=0.09)
+        self.fig.supylabel('Total IOIs', x=0.01)
+        plt.setp(self.ax.spines.values(), linewidth=2)
+        self.fig.subplots_adjust(bottom=0.22, top=0.95, left=0.12, right=0.95)
+
+    def _format_ax(self):
+        # Add invisible data to add another legend for instrument
+        n1 = [self.ax.bar(0, 0, color=cmap) for i, cmap in zip(range(2), vutils.INSTR_CMAP)]
+        l1 = plt.legend(n1, ['Keys', 'Drums'], loc=[0, -0.32], ncol=2, frameon=False, columnspacing=1,
+                        handletextpad=0.1)
+        self.ax.add_artist(l1)
+        # Add invisible data to add another legend for interpolation
+        n2 = [self.ax.bar(0, 0, color='gray', hatch=h, alpha=vutils.ALPHA) for i, h in zip(range(2), ['', '//'])]
+        l2 = plt.legend(n2, ['No interpolation', 'Interpolation'], loc=[0.37, -0.32], ncol=2, frameon=False,
+                        columnspacing=1, handletextpad=0.1)
+        self.ax.add_artist(l2)
+        # Set ticks
+        self.ax.set_xticks([t + 0.09 for t in self.ax.get_xticks()], labels=[f'{n}' for n in range(1, 6)], rotation=0)
+        self.ax.set_yticks([int(num) for num in np.linspace(0, 5000, 6)],
+                           labels=[int(num) for num in np.linspace(0, 5000, 6)])
+        # Add a bit of padding for the plot labels
+        self.ax.set_ylim(0, 5750)
+
+    def _format_rect(self, dfall):
+        n_df = len(dfall)
+        n_col = len(dfall[0].columns)
+        hand, lab = self.ax.get_legend_handles_labels()  # get the handles we want to modify
+        for i in range(0, n_df * n_col, n_col):  # len(h) = n_col * n_df
+            for j, pa in enumerate(hand[i:i + n_col]):
+                for rect in pa.patches:  # for each index
+                    rect.set_x(rect.get_x() + 1 / float(n_df + 1) * i / float(n_col))
+                    rect.set_width(1 / float(n_df + 1))
+                    if rect.get_y() > 0:
+                        rect.set_hatch('///')  # edited part
+
+    def _add_total_beats_to_plot(self):
+        for num, ins in enumerate([self.ax.containers[:2], self.ax.containers[2:]]):
+            for c1, c2 in zip(ins[0], ins[1]):
+                self.ax.text(c2.get_x() + (c2.get_width() / 2), c2.get_y() + c2.get_height() + 100,
+                             int(c2.get_height()), fontsize=14, color=vutils.BLACK, ha='center')
+
+    def _create_plot(self):
+        dfall = [self.fmt[self.fmt['instrument'] == 'Keys'][['total_raw', 'interpolated_beats']],
+                 self.fmt[self.fmt['instrument'] != 'Keys'][['total_raw', 'interpolated_beats']]]
+        for df, cmap in zip(dfall, vutils.INSTR_CMAP):
+            df.plot(kind="bar", stacked=True, ax=self.ax, legend=False,
+                    grid=False, color=cmap, edgecolor=vutils.BLACK, lw=2)
+        self._format_rect(dfall)
+
+
+class BarPlotTestRetestReliability(BasePlot):
+    """
+    Creates a plot showing test-retest reliability coefficients across measures for each question, instrument, and duo.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.questions = ['interaction', 'coordination', 'success']
+        self.data = self._format_df()
+
+    def _format_df(self):
+        res = []
+        for idx, grp in self.df.groupby(['trial', 'instrument']):
+            corr = (
+                grp.pivot(index=['trial', 'latency', 'jitter', ], columns='block', values=self.questions)
+                .reset_index(drop=True)
+                .corr()
+            )
+            res.append({
+                'trial': idx[0], 'instrument': idx[1], 'interaction': corr.iloc[0, 1],
+                'coordination': corr.iloc[2, 3], 'success': corr.iloc[4, 5]
+            })
+        return pd.DataFrame(res).melt(
+            id_vars=['trial', 'instrument'], value_vars=self.questions, var_name='question', value_name='correlation'
+        )
+
+    @vutils.plot_decorator
+    def create_plot(self):
+        self.g = self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\barplot_test_retest_reliability.png'
+        return self.g.figure, fname
+
+    def _create_plot(self):
+        return sns.catplot(
+            data=self.data, kind='bar', col='trial', hue='instrument', x='question', y='correlation',
+            palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'],
+            height=5.5, aspect=0.62, sharex=True, sharey=True, edgecolor=vutils.BLACK, lw=2
+        )
+
+    def _format_fig(self):
+        self.g.fig.supxlabel('Question', y=0.09)
+        self.g.fig.supylabel('Correlation ($r$)', x=0.005, y=0.65)
+        # Move the legend
+        sns.move_legend(self.g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01), )
+        # Adjust the plot size a bit
+        self.g.fig.subplots_adjust(bottom=0.4, top=0.9, left=0.06, right=0.98)
+
+    def _format_ax(self):
+        self.g.refline(y=0, alpha=1, linestyle='-', color=vutils.BLACK)
+        self.g.set(ylim=(-1, 1), yticks=[val for val in np.linspace(-1, 1, 5)],
+                   xticklabels=['Interaction', 'Coordination', 'Successful'],
+                   ylabel='', xlabel='')
+        for num, ax in enumerate(self.g.axes.flatten()):
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+            ax.tick_params(width=3)
+            plt.setp(ax.spines.values(), linewidth=2)
+            ax.set_title(f'Duo {num + 1}')
+
+
+class BarPlotQuestionnairePercentAgreement(BasePlot):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.data = self._format_df()
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
+
+    def _format_df(self):
+        res = []
+        for idx, grp in self.df.groupby(['trial']):
+            g = grp.pivot(index=['trial', 'block', 'latency', 'jitter', ], columns='instrument',
+                          values=['interaction', 'coordination', 'success'])
+            g.columns = [''.join(col) for col in g.columns]
+            for s in ['success', 'coordination', 'interaction']:
+                lista = g[f'{s}Keys'].to_numpy()
+                listb = g[f'{s}Drums'].to_numpy()
+                arr = lista == listb
+                perc = (len(np.where(arr)[0]) / len(lista)) * 100
+                res.append({'trial': idx, 'question': s.title(), 'agreement': perc})
+        return pd.DataFrame(res)
+
+    @vutils.plot_decorator
+    def create_plot(self):
+        self.g = self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\barplot_questionnaire_percent_aggrement.png'
+        return self.fig, fname
+
+    def _create_plot(self):
+        return sns.barplot(
+            data=self.data, x='trial', y='agreement', hue='question', ax=self.ax, edgecolor=vutils.BLACK, lw=2
+        )
+
+    def _format_fig(self):
+        self.fig.supxlabel('Duo', y=0.09)
+        self.fig.supylabel('Agreement (%)', x=0.03, y=0.6)
+        sns.move_legend(self.ax, 'lower center', ncol=3, title=None, frameon=False, bbox_to_anchor=(0.45, -0.33),
+                        markerscale=1.6, handletextpad=0.1, )
+        self.fig.subplots_adjust(bottom=0.22, top=0.95, left=0.12, right=0.95)
+
+    def _format_ax(self):
+        self.g.set(ylim=(0, 100), ylabel='', xlabel='')
+        self.ax.tick_params(width=3)
+        plt.setp(self.ax.spines.values(), linewidth=2)

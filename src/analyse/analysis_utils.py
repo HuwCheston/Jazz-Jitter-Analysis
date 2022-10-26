@@ -138,11 +138,12 @@ def extract_event_density(
 
 
 def append_zoom_array(
-        perf_df: pd.DataFrame, zoom_arr: np.array
+        perf_df: pd.DataFrame, zoom_arr: np.array, onset_col: str = 'onset'
 ) -> pd.DataFrame:
     """
     Appends a column to a dataframe showing the approx amount of latency by AV-Manip for each event in a performance
     """
+
     # Create a new array with our Zoom latency times and the approx timestamp they were applied to the performance
     # 8 = performance start time (after count-in, 0.75 = refresh rate
     z = np.c_[zoom_arr, np.linspace(8, 8 + (len(zoom_arr) * 0.75), num=len(zoom_arr), endpoint=False)]
@@ -151,9 +152,7 @@ def append_zoom_array(
     # Loop through successive timestamps in our zoom dataframe
     for first, second in zip(z, z[1:]):
         # Set any rows in the performance dataframe between our timestamps to the respective latency time
-        perf_df.loc[perf_df['onset'].between(first[1], second[1]), 'lat'] = first[0]
-    # Create a new column with rolling latency standard deviation
-    perf_df['lat_std'] = perf_df['lat'].rolling(4).std()
+        perf_df.loc[perf_df[onset_col].between(first[1], second[1]), 'lat'] = first[0]
     return perf_df
 
 
@@ -232,41 +231,6 @@ def average_bpms(
     return df
 
 
-def ioi_nearest_neighbours_intersection(
-        a1, a2
-) -> list:
-    # Subset pianist/drummer arrays to same length
-    if a1.shape[0] < a2.shape[0]:
-        a2 = a2[:a1.shape[0]]
-    elif a2.shape[0] < a1.shape[0]:
-        a1 = a1[:a2.shape[0]]
-    # Calculate upper and lower IOI quantiles
-    quant = lambda a: (np.quantile(np.diff(a), 0.05), np.quantile(np.diff(a), 0.95))
-    a1_l, a1_u = quant(a1)
-    a2_l, a2_u = quant(a2)
-    # Remove onsets below upper and lower quartiles
-    a1_e = np.array([i1 for i1, i2 in zip(a1, a1[1:]) if a1_l < i2 - i1 < a1_u])
-    a2_e = np.array([i1 for i1, i2 in zip(a2, a2[1:]) if a2_l < i2 - i1 < a2_u])
-    # Create nearest neighbour array for keys -> drums and drums -> keys
-    a1_l = [tuple(i) for i in np.vstack((a1_e, a2_e[np.argmin(np.abs(a1_e[:, None] - a2_e), axis=1)])).T.tolist()]
-    a2_l = [tuple(i) for i in np.vstack((a1_e[np.argmin(np.abs(a2_e[:, None] - a1_e), axis=1)], a2_e)).T.tolist()]
-    # Subset array to only include nearest neighbors in both list
-    c = list(set(a1_l) & set(a2_l))
-    return c
-
-
-def ioi_nearest_neighbours_one(
-        a1, a2
-) -> list:
-    # Subset pianist/drummer arrays to same length
-    if a1.shape[0] < a2.shape[0]:
-        a2 = a2[:a1.shape[0]]
-    elif a2.shape[0] < a1.shape[0]:
-        a1 = a1[:a2.shape[0]]
-    # Create nearest neighbour array for keys -> drums and drums -> keys
-    return [tuple(i) for i in np.vstack((a1, a2[np.argmin(np.abs(a1[:, None] - a2), axis=1)])).T.tolist()]
-
-
 def create_model_list(
         df, avg_groupers: list, md='correction_partner_onset~C(latency)+C(jitter)+C(instrument)'
 ) -> list:
@@ -285,3 +249,54 @@ def create_model_list(
         # Create the model and append to the list
         mds.append(smf.ols(md, data=grp).fit())
     return mds
+
+
+def extract_interpolated_beats(
+        c: np.array
+) -> tuple[int, int]:
+    """
+    Extracts the number of beats in the performance that required interpolation in REAPER. This was usually due to a
+    performer 'pushing' ahead a crotchet beat by a swung quaver, or due to an implied metric modulation.
+    """
+
+    # Define the sorter function
+    sorter = lambda s: sorted([i[0] for i in c[s]])
+    # Generate an array showing if a note from the cleaned array is in the raw array
+    arr = np.isin(sorter('midi_bpm'), sorter('midi_raw'))
+    # Extract the number of notes from the cleaned array that are also in the raw array
+    in_raw = len(np.where(arr)[0])
+    # Extract the total length of the cleaned array
+    total = len(arr)
+    # Calculate the number of interpolated beats by subtracting in_raw from the total length of the cleaned array
+    num_interpolated = total - in_raw
+    # Return as a tuple containing the total number of beats and the number of interpolated beats
+    return total, num_interpolated
+
+
+def extract_pairwise_asynchrony(
+    keys_nn: pd.DataFrame, drms_nn: pd.DataFrame
+) -> float:
+    """
+    Rasch (2015) defines pairwise asynchrony as as the root-mean-square of the standard deviations of the onset time
+    differences for all pairs of voice parts. We can calculate this for each condition, using the nearest-neighbour
+    model for both the keyboard and drummer.
+    """
+
+    std = lambda i: (i.asynchrony * 1000).std()
+    return np.sqrt(np.mean(np.square([std(keys_nn), std(drms_nn)])))
+
+
+def extract_npvi(
+        s: pd.Series,
+) -> float:
+    """
+    Extracts the normalised pairwise variability index (nPVI) from a column of IOIs
+    """
+    # Drop nan values and convert to list
+    li = s.dropna().tolist()
+    # Extract constant term (left side of equation)
+    m = 100 / (len(li) - 1)
+    # Calculate the right side of the equation
+    s = sum([abs((k - k1) / ((k + k1) / 2)) for (k, k1) in zip(li, li[1:])])
+    # Return nPVI
+    return s * m
