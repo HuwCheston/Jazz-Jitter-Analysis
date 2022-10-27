@@ -7,20 +7,28 @@ import src.visualise.visualise_utils as vutils
 
 
 class PhaseCorrectionSimulation:
-    def __init__(self, keys_data, drms_data, parameter, latency, **kwargs):
-        self._initial_onset: float = 8.0
-        self._initial_ioi: float = 0.5
-        self._end: float = 101.5
-        self._max_iter: int = 500
-        self._resample_interval: str = '1s'
-        self._rolling_period: str = '8s'
-        self._debug_params: dict = {
+    """
+
+    """
+
+    def __init__(
+            self, keys_data, drms_data, parameter, latency, **kwargs
+    ):
+        # Default parameters
+        self._initial_onset: float = 8.0  # The initial onset of a performance, after 8 second count-in
+        self._initial_ioi: float = 0.5  # The presumed initial length of the first IOI = crotchet at 120BPM
+        self._end: float = 101.5  # Stop generating data after we exceed this onset value
+        self._max_iter: int = 500  # If we generate more than this number of IOIs, we're probably stuck in a loop
+        self._resample_interval: timedelta = timedelta(seconds=1)  # Get mean of IOIs within this window
+        self._rolling_period: timedelta = timedelta(seconds=4)  # Apply a rolling window of this size to the data
+        self._debug_params: dict = {  # Used when debugging: will generate the same simulation every time
             'correction_self': 0.5,
             'correction_partner': 0.5,
             'intercept': 0.5,
             'noise': np.array([0.02])
         }
 
+        # Check and generate our input data
         self.keys_data: pd.DataFrame = self._check_input_data(keys_data)
         self.drms_data: pd.DataFrame = self._check_input_data(drms_data)
         self.leader: str = kwargs.get('leader', None)
@@ -35,13 +43,25 @@ class PhaseCorrectionSimulation:
         self.drms_simulations: list[pd.DataFrame] = []
 
     @staticmethod
-    def _check_input_data(input_data: pd.DataFrame) -> pd.DataFrame | None:
+    def _check_input_data(
+            input_data: pd.DataFrame
+    ) -> pd.DataFrame | None:
         """
         Checks to make sure that input dataframe is in correct format and has all necessary columns.
         Raises ValueError if any checks are failed
         """
-        required_cols: list[str] = ['instrument', 'correction_self', 'correction_partner', 'intercept', 'resid_std',
-                                    'resid_len', ]
+        required_cols: list[str] = [
+            'instrument',
+            'total_beats',
+            'correction_self',
+            'correction_self_stderr',
+            'correction_partner',
+            'correction_partner_stderr',
+            'intercept',
+            'intercept_stderr',
+            'resid_std',
+            'resid_len',
+        ]
         # If we didn't pass a dataframe
         if not isinstance(input_data, pd.DataFrame):
             raise ValueError('Data input was either not provided or is of invalid type')
@@ -58,11 +78,20 @@ class PhaseCorrectionSimulation:
         else:
             return input_data[required_cols]
 
-    def _check_simulation_parameter(self, input_parameter: str) -> str | None:
+    def _check_simulation_parameter(
+            self, input_parameter: str
+    ) -> str | None:
         """
         Checks if the simulation parameter given by the user is acceptable , and raises value error if not
         """
-        acceptable_parameters: list[str] = ['original', 'democracy', 'dictatorship', 'anarchy', 'debug']
+        acceptable_parameters: list[str] = [
+            'original',  # Use the original coefficients we've passed in
+            'original_variable',  # Use the original coefficients, but add random noise according to std err
+            'democracy',  # Coefficients for both performers set to the mean
+            'dictatorship',
+            'anarchy',
+            'debug'
+        ]
         # If we haven't passed an acceptable parameter
         if input_parameter not in acceptable_parameters:
             raise ValueError(
@@ -81,8 +110,9 @@ class PhaseCorrectionSimulation:
         return input_parameter
 
     @staticmethod
-    def _append_timestamps_to_latency_array(latency_array, offset: int = 8,
-                                            resample_rate: float = 0.75) -> np.array:
+    def _append_timestamps_to_latency_array(
+            latency_array, offset: int = 8, resample_rate: float = 0.75
+    ) -> np.array:
         """
         Appends timestampts showing the onset time for each value in the latency array applied to a performance
         """
@@ -94,12 +124,16 @@ class PhaseCorrectionSimulation:
         # Append the two arrays together
         return np.c_[latency_array / 1000, lin]
 
-    def _get_simulation_params(self, input_data: pd.DataFrame) -> dict:
+    def _get_simulation_params(
+            self, input_data: pd.DataFrame
+    ) -> dict:
         """
         Returns the simulation parameters from the given input parameter.
         """
         # Averaging function: returns average of keys and drums value for a given variable
         mean = lambda s: np.mean([self.keys_data[s], self.drms_data[s]])
+        rand = lambda s: np.random.normal(loc=input_data[s], scale=input_data[f'{s}_stderr'],
+                                          size=int(input_data['total_beats']))
         # Define the initial dictionary, with the noise term and the latency array (with timestamps)
         d: dict = {
             'noise': np.random.normal(loc=0, scale=input_data['resid_std'], size=int(input_data['resid_len'])),
@@ -111,6 +145,12 @@ class PhaseCorrectionSimulation:
                 'correction_self': input_data['correction_self'].iloc[0],
                 'correction_partner': input_data['correction_partner'].iloc[0],
                 'intercept': input_data['intercept'].iloc[0],
+            })
+        elif self.parameter == 'original_variable':
+            d.update({
+                'correction_self': rand('correction_self'),
+                'correction_partner': rand('correction_partner'),
+                'intercept': rand('intercept'),
             })
         # Democracy: uses mean coefficients and intercepts from across the duo
         elif self.parameter == 'democracy':
@@ -148,7 +188,9 @@ class PhaseCorrectionSimulation:
             d = self._debug_params
         return d
 
-    def _initialise_empty_data(self, first_latency_value: float = 0) -> dict:
+    def _initialise_empty_data(
+            self, first_latency_value: float = 0
+    ) -> dict:
         """
         Initialises an empty dictionary that we will fill with data as the simulation runs
         """
@@ -162,7 +204,9 @@ class PhaseCorrectionSimulation:
             'asynchrony': [first_latency_value]
         }
 
-    def run_simulations(self):
+    def run_simulations(
+            self
+    ) -> None:
         """
         Run the simulations and create a list of dataframes for each individual performer
         """
@@ -176,20 +220,23 @@ class PhaseCorrectionSimulation:
             self.keys_simulations.append(keys)
             self.drms_simulations.append(drms)
 
-    def _generate_data(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def _generate_data(
+            self
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Generates data for one simulation
         """
 
         def predict_next_ioi(sim_data: dict, sim_params: dict) -> float:
+            get = lambda s: np.random.choice(sim_params[s]) if isinstance(sim_params[s], np.ndarray) else sim_params[s]
             # Multiply previous IOI by coupling to self coefficient
-            correction_self: float = sim_data['my_prev_ioi'][-1] * sim_params['correction_self']
-            # Multiply asynchrony by coupling to partner coefficient
-            correction_partner: float = sim_data['asynchrony'][-1] * sim_params['correction_partner']
+            correction_self: float = sim_data['my_prev_ioi'][-1] * get('correction_self')
+            # Multiply async by coupling to partner coefficient
+            correction_partner: float = sim_data['asynchrony'][-1] * get('correction_partner')
             # Get the intercept (this is a constant)
-            intercept: float = sim_params['intercept']
+            intercept: float = get('intercept')
             # Take a random sample from the noise array
-            noise: float = np.random.choice(sim_params['noise'])
+            noise: float = get('noise')
             # Add all the terms together and return as our predicted next IOI
             return correction_self + correction_partner + intercept + noise
 
@@ -201,7 +248,8 @@ class PhaseCorrectionSimulation:
             # Get the closest minimum latency onset time to our partner's onset
             matched_latency_onset = latency_onsets[latency_onsets < partner_onset].max()
             # Get the latency value associated with that latency onset time and return
-            return float(sim_params['latency'][latency_onsets == matched_latency_onset][:, 0])
+            latency_value: float = float(sim_params['latency'][latency_onsets == matched_latency_onset][:, 0])
+            return latency_value
 
         # Generate our starter data
         keys_data = self._initialise_empty_data(self.latency[0][0])
@@ -234,48 +282,69 @@ class PhaseCorrectionSimulation:
             iter_count += 1
             if iter_count >= self._max_iter:
                 raise RuntimeError(f'Maximum number of iterations {self._max_iter} exceeded')
+
         # Once the simulation has finished, return the data as a tuple
         return self._format_simulated_data(keys_data), self._format_simulated_data(drms_data)
 
-    def _format_simulated_data(self, data: dict) -> pd.DataFrame:
+    def _format_simulated_data(
+            self, data: dict
+    ) -> pd.DataFrame:
         """
         Formats data from one simulation by creating a dataframe, adding in the timedelta column, and resampling
-        to get the mean IOI for every second
+        to get the mean IOI (defaults to every second)
         """
+        # Create the dataframe from the dictionary
         df = pd.DataFrame(data)
+        # Convert my onset column to a timedelta
         df['td'] = pd.to_timedelta([timedelta(seconds=val) for val in df['my_actual_onset']])
-        return df.set_index('td').resample(self._resample_interval).mean()
+        # Set the index to our timedelta column, resample (default every second), and get mean
+        return df.set_index('td').resample(rule=self._resample_interval).mean()
 
     @staticmethod
-    def _get_grand_average_tempo(all_perf: list[pd.DataFrame]) -> pd.DataFrame:
+    def _get_grand_average_tempo(
+            all_perf: list[pd.DataFrame]
+    ) -> pd.DataFrame:
         """
         Concatenate all simulations together and get the row-wise average (i.e. avg IOI every second)
         """
-        return pd.DataFrame(pd.concat([df['my_prev_ioi'] for df in all_perf], axis=1).mean(axis=1), columns=['my_prev_ioi'])
+        return pd.DataFrame(pd.concat([df['my_prev_ioi'] for df in all_perf], axis=1).mean(axis=1),
+                            columns=['my_prev_ioi'])
 
-    def plot_simulations(self):
+    @staticmethod
+    def _get_grand_average_stdev(all_perf):
+        return pd.DataFrame(pd.concat([df['my_prev_ioi'] for df in all_perf], axis=1).std(axis=1),
+                            columns=['my_prev_ioi'])
+
+    def plot_simulations(
+            self
+    ) -> None:
         """
         Plot all simulations and add in the grand average tempo
         """
         # Raise an error if we haven't generated our simulations
         if len(self.keys_simulations) == 0 or len(self.drms_simulations) == 0:
             raise ValueError('Generate simulations first before plotting')
+        # Define the roller function for converting IOIs to BPM and rolling
+        roller = lambda s: (60 / s).rolling(window=self._rolling_period, min_periods=1).mean()
+        # Iterate through keys and drums simulations and plot rolled BPM
+        for keys, drms in zip(self.keys_simulations, self.drms_simulations):
+            avg = self._get_grand_average_tempo([keys, drms])
+            plt.plot(avg.index.seconds, roller(avg['my_prev_ioi']), alpha=0.05, lw=1, color=vutils.BLACK)
         # Get our grand average tempo for keys and drums simulations
         keys_avg = self._get_grand_average_tempo(self.keys_simulations)
         drms_avg = self._get_grand_average_tempo(self.drms_simulations)
-        # Define the roller function for converting IOIs to BPM and rolling
-        roller = lambda s: (60 / s).rolling(window=self._rolling_period).mean()
-        # Iterate through keys and drums simulations and plot rolled BPM
-        for keys, drms in zip(self.keys_simulations, self.drms_simulations):
-            plt.plot(keys.index, roller(keys['my_prev_ioi']), alpha=0.05, color=vutils.INSTR_CMAP[0])
-            plt.plot(drms.index, roller(drms['my_prev_ioi']), alpha=0.05, color=vutils.INSTR_CMAP[1])
         # Plot the rolled BPM of our grand average dataframe
         grand_average = self._get_grand_average_tempo([keys_avg, drms_avg])
-        plt.plot(grand_average.index, roller(grand_average['my_prev_ioi']), alpha=1, color=vutils.BLACK)
-        # Set ylim
-        plt.ylim((60, 140))
+        plt.plot(grand_average.index.seconds, roller(grand_average['my_prev_ioi']), alpha=1, lw=2, color=vutils.BLACK)
+        sd_plus1 = self._get_grand_average_tempo([keys_avg + self._get_grand_average_stdev(self.keys_simulations),
+                                                  drms_avg + self._get_grand_average_stdev(self.drms_simulations)])
+        sd_neg1 = self._get_grand_average_tempo([keys_avg - self._get_grand_average_stdev(self.keys_simulations),
+                                                 drms_avg - self._get_grand_average_stdev(self.drms_simulations)])
+        plt.fill_between(grand_average.index.seconds, roller(sd_neg1['my_prev_ioi']), roller(sd_plus1['my_prev_ioi']),
+                         alpha=0.1, color=vutils.BLACK)
+        # Set y limit
+        plt.ylim((30, 160))
         plt.show()
-
 
 # zoom_arr = mds[(mds['latency'] == 45) & (mds['jitter'] == 1)]['zoom_arr'].iloc[0].copy()
 # for idx, grp in mds.groupby('trial'):

@@ -242,13 +242,30 @@ def gen_phase_correction_models(
     # Create the function used to format the results as a dictionary
     def dic_create(c, md, pc_jitter_md, ioi_jitter_md, std, npvi):
         dic = {
-            'trial': c['trial'], 'block': c['block'], 'latency': c['latency'], 'jitter': c['jitter'],
-            'instrument': c['instrument'], 'total_beats': autils.extract_interpolated_beats(c)[0],
-            'interpolated_beats': autils.extract_interpolated_beats(c)[1], 'tempo_slope': tempo_slope,
-            'ioi_std': std, 'ioi_npvi': npvi, 'pw_asym': pw_asym, 'rsquared': md.rsquared,
-            'intercept': md.params.iloc[0], 'correction_self': md.params.iloc[1], 'zoom_arr': c['zoom_array'],
-            'correction_partner': md.params.iloc[2], 'resid_std': np.std(md.resid), 'resid_len': len(md.resid),
-            'success': c['success'], 'interaction': c['interaction'], 'coordination': c['coordination']
+            'trial': c['trial'],
+            'block': c['block'],
+            'latency': c['latency'],
+            'jitter': c['jitter'],
+            'instrument': c['instrument'],
+            'total_beats': autils.extract_interpolated_beats(c)[0],
+            'interpolated_beats': autils.extract_interpolated_beats(c)[1],
+            'tempo_slope': tempo_slope,
+            'ioi_std': std,
+            'ioi_npvi': npvi,
+            'pw_asym': pw_asym,
+            'intercept': md.params.iloc[0],
+            'intercept_stderr': md.bse.iloc[0],
+            'correction_self': md.params.iloc[1],
+            'correction_self_stderr': md.bse.iloc[1],
+            'correction_partner': md.params.iloc[2],
+            'correction_partner_stderr': md.bse.iloc[2],
+            'resid_std': np.std(md.resid),
+            'resid_len': len(md.resid),
+            'rsquared': md.rsquared,
+            'zoom_arr': c['zoom_array'],
+            'success': c['success'],
+            'interaction': c['interaction'],
+            'coordination': c['coordination']
         }
         dic.update({f'correction_partner_lag{n + 1}_coef': c[0] for n, c in enumerate(pc_jitter_md)})
         dic.update({f'correction_partner_lag{n + 1}_p': c[1] for n, c in enumerate(pc_jitter_md)})
