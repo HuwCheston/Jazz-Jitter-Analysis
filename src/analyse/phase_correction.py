@@ -108,15 +108,20 @@ def format_df_for_model(
 
 
 def construct_phase_correction_model(
-        df: pd.DataFrame, mod: str = PC_MOD
+        df: pd.DataFrame, mod: str = PC_MOD, centre: bool = False
 ) -> sm.regression.linear_model.RegressionResults:
     """
     Construct linear phase correction model by predicting next IOI of live musician from previous IOI of live musician
     and IOI difference between live and delayed musician.
     Returns a tuple containing coefficients for all predictors and rsquared value.
     """
-
-    return smf.ols(mod, data=df).fit()
+    if centre:
+        local_df = df.copy(deep=True)
+        local_df['my_prev_ioi'] -= local_df['my_prev_ioi'].mean()
+        local_df['asynchrony'] -= local_df['asynchrony'].mean()
+        return smf.ols(mod, data=local_df).fit()
+    else:
+        return smf.ols(mod, data=df).fit()
 
 
 def predict_from_model(
@@ -247,6 +252,7 @@ def gen_phase_correction_models(
             'latency': c['latency'],
             'jitter': c['jitter'],
             'instrument': c['instrument'],
+            'raw_beats': [c['midi_bpm']],
             'total_beats': autils.extract_interpolated_beats(c)[0],
             'interpolated_beats': autils.extract_interpolated_beats(c)[1],
             'tempo_slope': tempo_slope,

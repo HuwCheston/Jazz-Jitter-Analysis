@@ -188,3 +188,17 @@ def output_regression_table(
     # Render to html and write the result
     with open(f"{fold}\\regress_{t}.html", "w") as f:
         f.write(out.render_html())
+
+
+class BasePlot:
+    """
+    Base plotting class from which others inherit
+    """
+    def __init__(self, **kwargs):
+        # Set fontsize
+        plt.rcParams.update({'font.size': FONTSIZE})
+        # Get from kwargs (with default arguments)
+        self.df: pd.DataFrame = kwargs.get('df', None)
+        self.output_dir: str = kwargs.get('output_dir', None)
+        # Create an empty attribute to store our plot in later
+        self.g = None

@@ -11,21 +11,7 @@ import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
 
 
-class BasePlot:
-    """
-    Base plotting class from which others inherit
-    """
-    def __init__(self, **kwargs):
-        # Set fontsize
-        plt.rcParams.update({'font.size': vutils.FONTSIZE})
-        # Get from kwargs (with default arguments)
-        self.df: pd.DataFrame = kwargs.get('df', None)
-        self.output_dir: str = kwargs.get('output_dir', None)
-        # Create an empty attribute to store our plot in later
-        self.g = None
-
-
-class PairGrid(BasePlot):
+class PairGrid(vutils.BasePlot):
     """
     Creates a scatterplot for each duo/question combination.
     """
@@ -120,7 +106,7 @@ class PairGrid(BasePlot):
         self.g.fig.subplots_adjust(bottom=0.12, top=0.93, wspace=0.15, left=0.11, right=0.93)
 
 
-class BoxPlot(BasePlot):
+class BoxPlot(vutils.BasePlot):
     """
     Creates a figure showing correction to partner coefficients obtained for each performer in a duo, stratified by a
     given variable (defaults to jitter scale). By default, the control condition is included in this plot,
@@ -429,7 +415,7 @@ class SingleConditionAnimation:
         )
 
 
-class RegPlot(BasePlot):
+class RegPlot(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.yvar: str = kwargs.get('yvar', 'tempo_slope')
@@ -551,7 +537,7 @@ class RegPlotSingle(RegPlot):
         return g
 
 
-class PointPlotLaggedLatency(BasePlot):
+class PointPlotLaggedLatency(vutils.BasePlot):
     """
     Make a pointplot showing lagged timestamps on x-axis and regression coefficients on y. Columns grouped by trial,
     rows grouped by jitter.
@@ -623,7 +609,7 @@ class PointPlotLaggedLatency(BasePlot):
         sns.move_legend(self.g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01))
 
 
-class NumberLine(BasePlot):
+class NumberLine(vutils.BasePlot):
     """
     Creates a numberline showing difference in pairwise asynchrony between duos this experiment during the control
     condition and a corpus of pairwise asynchrony values from other studies and genres
@@ -700,7 +686,7 @@ class NumberLine(BasePlot):
         plt.legend([], [], frameon=False)
 
 
-class BarPlot(BasePlot):
+class BarPlot(vutils.BasePlot):
     """
     Creates a plot showing the coupling coefficients per instrument and duo, designed to look similar to fig 2.(c)
     in Jacoby et al. (2021). However, by default this plot will use the median as an estimator of central tendency,
@@ -766,7 +752,7 @@ class BarPlot(BasePlot):
         self.g.figure.subplots_adjust(bottom=0.22, top=0.95, left=0.14, right=0.95)
 
 
-class HistPlotR2(BasePlot):
+class HistPlotR2(vutils.BasePlot):
     """
     Creates histograms of model parameters stratified by trial and instrument, x-axis variable defaults to R-squared
     """
@@ -808,7 +794,7 @@ class HistPlotR2(BasePlot):
         self.g.figure.subplots_adjust(bottom=0.17, top=0.92, left=0.055, right=0.97)
 
 
-class BoxPlotR2WindowSize(BasePlot):
+class BoxPlotR2WindowSize(vutils.BasePlot):
     """
     Creates a boxplot of average R2 values per rolling window size
     """
@@ -853,7 +839,7 @@ class BoxPlotR2WindowSize(BasePlot):
         plt.tight_layout()
 
 
-class ScatterPlotQuestionnaire(BasePlot):
+class ScatterPlotQuestionnaire(vutils.BasePlot):
     """
     Creates a scatterplot for each duo/question combination.
     """
@@ -956,7 +942,7 @@ class ScatterPlotQuestionnaire(BasePlot):
         self.g.figure.subplots_adjust(bottom=0.12, top=0.93, wspace=0.15, left=0.05, right=0.93)
 
 
-class HeatmapQuestionnaire(BasePlot):
+class HeatmapQuestionnaire(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.data = self._format_df()
@@ -1027,7 +1013,7 @@ class HeatmapQuestionnaire(BasePlot):
         plt.subplots_adjust(bottom=0.3, top=1.1, wspace=0.15, left=0.15, right=0.90)
 
 
-class BarPlotInterpolatedIOIs(BasePlot):
+class BarPlotInterpolatedIOIs(vutils.BasePlot):
     """
     Creates a stacked barplot showing the total number of IOIs per duo and the number of these which were interpolated
     """
@@ -1108,7 +1094,7 @@ class BarPlotInterpolatedIOIs(BasePlot):
         self._format_rect(dfall)
 
 
-class BarPlotTestRetestReliability(BasePlot):
+class BarPlotTestRetestReliability(vutils.BasePlot):
     """
     Creates a plot showing test-retest reliability coefficients across measures for each question, instrument, and duo.
     """
@@ -1168,7 +1154,7 @@ class BarPlotTestRetestReliability(BasePlot):
             ax.set_title(f'Duo {num + 1}')
 
 
-class BarPlotQuestionnairePercentAgreement(BasePlot):
+class BarPlotQuestionnairePercentAgreement(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.data = self._format_df()
