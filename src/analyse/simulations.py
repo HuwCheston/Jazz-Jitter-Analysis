@@ -1,9 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 from datetime import timedelta
-from scipy import stats
 import statsmodels.formula.api as smf
 import warnings
 
@@ -13,7 +11,15 @@ import src.analyse.analysis_utils as autils
 
 class Simulation:
     """
+    Creates a series of simulated musical performances according to the parameters of two provided regression models,
+    one for the pianist and one for the drummer.
 
+    Available parameter:
+    - original
+    - original_variable
+    - anarchy
+    - democracy
+    - dictatorship
     """
 
     def __init__(
@@ -24,6 +30,7 @@ class Simulation:
         self._initial_ioi: float = 0.5  # The presumed initial length of the first IOI = crotchet at 120BPM
         self._end: float = 101.5  # Stop generating data after we exceed this onset value
         self._max_iter: int = 500  # If we generate more than this number of IOIs, we're probably stuck in a loop
+        self._num_broken: int = 0   # The number of simulations that failed to complete
         self._resample_interval: timedelta = timedelta(seconds=1)  # Get mean of IOIs within this window
         self._rolling_period: timedelta = timedelta(seconds=4)  # Apply a rolling window of this size to the data
         self._debug_params: dict = {  # Used when debugging: will generate the same simulation every time
@@ -58,8 +65,7 @@ class Simulation:
         required_cols: list[str] = [
             'instrument',
             'total_beats',
-            'raw_beats_1',
-            'raw_beats_2',
+            'raw_beats',
             'correction_self',
             'correction_self_stderr',
             'correction_partner',
@@ -226,16 +232,37 @@ class Simulation:
             keys, drms = self._generate_data()
             self.keys_simulations.append(keys)
             self.drms_simulations.append(drms)
-        # Remove simulations that failed to complete
-        self.keys_simulations = self._remove_broken_simulations(self.keys_simulations)
-        self.drms_simulations = self._remove_broken_simulations(self.drms_simulations)
+            # Remove simulations that failed to complete
+            self._remove_broken_simulations()
 
-    @staticmethod
-    def _remove_broken_simulations(data: list[pd.DataFrame | None]):
+    def _remove_broken_simulations(
+            self
+    ) -> None:
         """
-        Remove simulations that have failed to complete
+        Remove simulations from our dataset that have failed to complete
         """
-        return [x for x in data if x is not None]
+        cleaned_keys = []
+        cleaned_drms = []
+        # Iterate through keys and drums performances TOGETHER
+        for keys, drms in zip(self.keys_simulations, self.drms_simulations):
+            # If we broke out of our loop while creating the simulation, remove:
+            if keys is None or drms is None:
+                self._num_broken += 1
+                continue
+            # If the performance exceeds the maximum length (plus a bit of tolerance), remove:
+            elif keys.index.seconds.max() >= self._end + 1 or drms.index.seconds.max() >= self._end + 1:
+                self._num_broken += 1
+                continue
+            # If the performance exceeds the maximum number of beats, remove:
+            elif len(keys) >= self._max_iter or len(drms) >= self._max_iter:
+                self._num_broken += 1
+                continue
+            # Else, performance is ok and can be used.
+            else:
+                cleaned_keys.append(keys)
+                cleaned_drms.append(drms)
+        self.keys_simulations = cleaned_keys
+        self.drms_simulations = cleaned_drms
 
     def _generate_data(
             self
@@ -244,7 +271,13 @@ class Simulation:
         Generates data for one simulation
         """
 
-        def predict_next_ioi(sim_data: dict, sim_params: dict) -> float:
+        def predict_next_ioi(
+                sim_data: dict, sim_params: dict
+        ) -> float:
+            """
+            Predict the next inter-onset interval from the provided data
+            """
+            # Define the function for either getting a random term from a distribution or a constant, depending on type
             get = lambda s: np.random.choice(sim_params[s]) if isinstance(sim_params[s], np.ndarray) else sim_params[s]
             # Multiply previous IOI by coupling to self coefficient
             correction_self: float = sim_data['my_prev_ioi'][-1] * get('correction_self')
@@ -257,12 +290,17 @@ class Simulation:
             # Add all the terms together and return as our predicted next IOI
             return correction_self + correction_partner + intercept + noise
 
-        def get_latency_at_onset(sim_data: dict, sim_params: dict) -> float | None:
+        def get_latency_at_onset(
+                sim_data: dict, sim_params: dict
+        ) -> float | None:
+            """
+            Get the amount of latency applied to our simulated partner's feed at the particular point in the performance
+            """
+            # Subset our latency array for just the onset times times
+            latency_onsets: np.array = sim_params['latency'][:, 1]
+            # Get the last onset our partner played
+            partner_onset: float = sim_data['their_actual_onset'][-1]
             try:
-                # Subset our latency array for just the onset times times
-                latency_onsets: np.array = sim_params['latency'][:, 1]
-                # Get the last onset our partner played
-                partner_onset: float = sim_data['their_actual_onset'][-1]
                 # Get the closest minimum latency onset time to our partner's onset
                 matched_latency_onset = latency_onsets[latency_onsets < partner_onset].max()
                 # Get the latency value associated with that latency onset time and return
@@ -290,8 +328,7 @@ class Simulation:
             # Calculate the amount of latency applied when our partner played their last onset
             keys_latency_now = get_latency_at_onset(keys_data, self.keys_params)
             drms_latency_now = get_latency_at_onset(drms_data, self.drms_params)
-            # If we've received a ValueError at the previous stage, break out of the loop
-            # We'll discard this simulation
+            # If we've received a ValueError at the previous stage, break: we'll discard this failed simulation later
             if keys_latency_now is None or drms_latency_now is None:
                 return None, None
             # Else continue
@@ -307,13 +344,13 @@ class Simulation:
             # Predict our next IOI
             keys_data['my_next_ioi'].append(predict_next_ioi(keys_data, self.keys_params))
             drms_data['my_next_ioi'].append(predict_next_ioi(drms_data, self.drms_params))
-            # Increase the iteration counter by one and raise a warning
+            # Increase the iteration counter by one
             iter_count += 1
+            # Raise a warning if we've exceeded the maximum number of iterations and return None to discard broken data
             if iter_count >= self._max_iter:
                 warnings.warn(f'Maximum number of iterations {self._max_iter} exceeded')
                 return None, None
-
-        # Once the simulation has finished, return the data as a tuple
+        # Once the simulation has finished, return the data as a tuple = keys simulated data, drums simulated data
         return self._format_simulated_data(keys_data), self._format_simulated_data(drms_data)
 
     def _format_simulated_data(
@@ -337,15 +374,27 @@ class Simulation:
         """
         Concatenate all simulations together and get the row-wise average (i.e. avg IOI every second)
         """
-        return pd.DataFrame(pd.concat([df['my_prev_ioi'] for df in all_perf], axis=1).mean(axis=1),
-                            columns=['my_prev_ioi'])
+        return pd.DataFrame(
+            pd.concat([df['my_prev_ioi'] for df in all_perf], axis=1).mean(axis=1), columns=['my_prev_ioi']
+        )
 
     @staticmethod
-    def _get_grand_average_stdev(all_perf):
-        return pd.DataFrame(pd.concat([df['my_prev_ioi'] for df in all_perf], axis=1).std(axis=1),
-                            columns=['my_prev_ioi'])
+    def _get_grand_average_stdev(
+            all_perf: list[pd.DataFrame]
+    ) -> pd.DataFrame:
+        """
+        Concatenate all simulations together and get the standard deviation of every second across all simulations
+        """
+        return pd.DataFrame(
+            pd.concat([df['my_prev_ioi'] for df in all_perf], axis=1).std(axis=1), columns=['my_prev_ioi']
+        )
 
-    def get_avg_tempo_slope(self,):
+    def get_avg_tempo_slope(
+            self
+    ) -> float:
+        """
+
+        """
         # TODO: this is gross
         # Raise an error if we haven't generated our simulations
         if len(self.keys_simulations) == 0 or len(self.drms_simulations) == 0:
@@ -359,7 +408,18 @@ class Simulation:
             res.append(reg)
         return np.mean(res)
 
-    def _plot_original_performance(self):
+    def get_avg_pairwise_async(
+            self
+    ) -> float:
+        """
+        Extract average pairwise asynchrony for all simulations
+        """
+        z = zip(self.keys_simulations, self.drms_simulations)
+        return np.mean([autils.extract_pairwise_asynchrony(k, n) for k, n in z])
+
+    def _plot_original_performance(
+            self
+    ) -> None:
         # TODO: gross
         for num, (k, d) in enumerate(zip([self.keys_data['raw_beats_1'][0], self.keys_data['raw_beats_2'][0]],
                                          [self.drms_data['raw_beats_1'][0], self.drms_data['raw_beats_2'][0]])):
@@ -368,7 +428,9 @@ class Simulation:
                 avg.elapsed, avg.bpm_rolling, alpha=0.5, lw=2, color=vutils.LINE_CMAP[num], label=f'Repeat {num+1}'
             )
 
-    def _roll_bpm(self, s: pd.Series):
+    def _roll_bpm(
+            self, s: pd.Series
+    ) -> pd.Series:
         return (60 / s).rolling(window=self._rolling_period, min_periods=1).mean()
 
     def plot_simulations(
@@ -409,115 +471,78 @@ class Simulation:
         plt.show()
 
 
-class BarPlotSimulationParameters(vutils.BasePlot):
+class SimulationsByParameter:
     """
+    Create simulations for every condition and parameter combination. E.g. create original/democracy/leadership-keys/
+    leadership-drums/anarchy simulations for Duo 2 permance with 23ms of latency, 1.0x jitter...
 
+    Only required argument is mds, which should be a dataframe with every row containing model data extracted from an
+    actual performance. This will be iterated over and simulations created when the .create_simulations method
+    is called. The results from the simulations can then be accessed from the .res parameter.
     """
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.res = kwargs.get('res', None)
-        self.df = self._format_df()
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(18.8, 7))
+    def __init__(self, mds: pd.DataFrame, **kwargs):
+        self.mds: pd.DataFrame = mds
+        self.res: list = []
+        self._num_simulations: int = kwargs.get('num_simulations', 100)
+        self.parameters: list[str] = ['original', 'democracy', 'dictatorship', 'anarchy']
 
     @staticmethod
-    def _normalise_values(df: pd.DataFrame) -> pd.DataFrame:
-        df['norm'] = 1 - df['original']
-        for s in [col for col in df.columns.to_list() if col != 'norm' or 'original']:
-            df[s] += df['norm']
-        df['original'] = 1
-        return df
+    def _dic_create(
+            md: Simulation, i: tuple
+    ) -> dict:
+        """
+        Used to format the data from a simulation into the required format
+        """
+        dic = {
+            'trial': i,
+            'type': md.parameter + md.leader if md.leader is not None else md.parameter,
+            'keys_correction_partner': md.keys_params['correction_partner'],
+            'drms_correction_partner': md.drms_params['correction_partner'],
+            'keys_correction_self': md.keys_params['correction_self'],
+            'drms_correction_self': md.drms_params['correction_self'],
+            'keys_intercept': md.keys_params['intercept'],
+            'drms_intercept': md.drms_params['intercept'],
+        }
+        try:
+            md.run_simulations()
+            dic.update({'tempo_slope': md.get_avg_tempo_slope(), 'pw_async': md.get_avg_pairwise_async()})
+        except ValueError:
+            dic.update({'tempo_slope': np.nan, 'pw_async': np.nan})
+        return dic
 
-    def _format_df(self) -> pd.DataFrame:
-        df = pd.DataFrame(self.res).pivot_table(values='tempo_slope', index='trial', columns='type')
-        df = self._normalise_values(df)
-        df.to_clipboard(sep=',')
-        return (
-            df.reset_index(drop=False)
-              .drop(columns='norm')
-              .rename(columns={'dictatorshipkeys': 'Leadership - Keys', 'dictatorshipdrums': 'Leadership - Drums'})
-              .rename(columns={col: col.title() for col in df.columns.to_list()})
-              .melt(id_vars='trial',
-                    value_vars=['Original', 'Leadership - Keys', 'Leadership - Drums', 'Democracy', 'Anarchy'])
-        )
-
-    @vutils.plot_decorator
-    def create_plot(self):
-        self.g = self._create_plot()
-        self._format_ax()
-        self._format_fig()
-        fname = f'{self.output_dir}\\barplot_simulation_by_parameter.png'
-        return self.fig, fname
-
-    def _create_plot(self):
-        return sns.barplot(
-            data=self.df, x='type', y='value', color=vutils.LINE_CMAP[0], ax=self.ax,
-            errcolor=vutils.BLACK, errwidth=2, edgecolor=vutils.BLACK, lw=2,
-            capsize=0.03
-        )
-
-    @staticmethod
-    def _get_significance_asterisks(p: float) -> str:
-        if p < 0.001:
-            return '***'
-        elif p < 0.01:
-            return '**'
-        elif p < 0.05:
-            return '*'
-        else:
-            return ''
-
-    def _add_parameter_graphic(self):
-        x = 0.26
-        for i in range(1, 5):
-            self.g.add_patch(plt.Rectangle((x + 0.005, -0.24), width=0.023, height=0.08, clip_on=False, linewidth=0,
-                                           transform=self.ax.transAxes, facecolor=vutils.INSTR_CMAP[0]))
-            self.g.text(s='K', x=x + 0.007, y=-0.225, transform=self.ax.transAxes, fontsize=24)
-            if i == 2 or i == 3:
-                self.ax.arrow(x=x + 0.033, y=-0.18, dx=0.025, dy=0, clip_on=False, transform=self.ax.transAxes,
-                              linewidth=5, color=vutils.INSTR_CMAP[0], head_width=0.015, head_length=0.005)
-
-            self.g.add_patch(plt.Rectangle((x + 0.07, -0.24), width=0.023, height=0.08, clip_on=False, linewidth=0,
-                                           transform=self.ax.transAxes, facecolor=vutils.INSTR_CMAP[1]))
-            self.g.text(s='D', x=x + 0.072, y=-0.225, transform=self.ax.transAxes, fontsize=24)
-            if i == 1 or i == 3:
-                self.ax.arrow(x=x + 0.063, y=-0.22, dx=-0.025, dy=0, clip_on=False, transform=self.ax.transAxes,
-                              linewidth=5, color=vutils.INSTR_CMAP[1], head_width=0.015, head_length=0.005)
-
-            self.g.add_patch(
-                plt.Rectangle((x, -0.26), width=0.1, height=0.12, facecolor='silver', clip_on=False, linewidth=0,
-                              transform=self.ax.transAxes, alpha=vutils.ALPHA))
-            x += 0.19
-
-    def _add_significance_asterisks_to_plot(self):
-        df = self.df.pivot_table(values='value', index='trial', columns='type')
-        z = zip(self.ax.patches[1:], ['Leadership - Keys', 'Leadership - Drums', 'Democracy', 'Anarchy'])
-        orig_x = self.ax.patches[0].xy[0] + (self.ax.patches[0].get_width() / 2)
-
-        for n, (p, s) in enumerate(z):
-            r, sig = stats.ttest_ind(df['Original'], df[s], nan_policy='omit')
-            x = p.xy[0] + p.get_width() - (self.ax.patches[0].get_width() / 2)
-            self.ax.text(s=self._get_significance_asterisks(sig), x=x / 2, y=1.27 + n / 14, fontsize=24)
-            self.ax.arrow(x=orig_x, y=1.29 + n / 14, dx=x, dy=0, )
-
-    def _format_ax(self):
-        self.ax.axhline(y=1, linestyle='--', alpha=vutils.ALPHA, color=vutils.BLACK, linewidth=2)
-        self.g.set(xlabel='', ylabel='', ylim=(0, 1.6),
-                   xticklabels=[col.replace(' - ', '\n') for col in self.df['type'].unique()])
-        self.ax.tick_params(width=3, )
-        plt.setp(self.ax.spines.values(), linewidth=2)
-        new_value = 0.3
-        for patch in self.ax.patches:
-            diff = patch.get_width() - new_value
-            patch.set_width(new_value)
-            patch.set_x(patch.get_x() + diff * .5)
-        self._add_significance_asterisks_to_plot()
-        self._add_parameter_graphic()
-
-    def _format_fig(self):
-        self.fig.supylabel('Normalised tempo slope\n(BPM/s, 1 = original slope)', y=0.6, x=0.01)
-        self.fig.supxlabel('Parameter', y=0.03)
-        self.fig.subplots_adjust(bottom=0.27, top=0.95, left=0.08, right=0.97)
+    def create_simulations(
+            self, logger=None
+    ):
+        """
+        Called from outside the class, used to create simulations for each condition and parameter
+        """
+        # Iterate through every condition individually
+        for idx, grp in self.mds.groupby(by=['trial', 'block', 'latency', 'jitter']):
+            # If we've passed a logger in, indicate where we are in the analysis
+            if logger is not None:
+                logger.info(f'Creating {self._num_simulations} simulations for {len(self.parameters) + 1} parameters '
+                            f'for performance {idx}...')
+            # Get the zoom array applied to the performance
+            zoom_arr = grp.iloc[0]['zoom_arr']
+            # Subset for the keys and drums model data
+            k = pd.DataFrame(grp[grp['instrument'] == 'Keys'])
+            d = pd.DataFrame(grp[grp['instrument'] != 'Keys'])
+            # Iterate through all the parameters and create simulations for each
+            for param in self.parameters:
+                # If we're creating leader-follower models, need to create these for both combinations of leader
+                if param == 'dictatorship':
+                    for ins in ['keys', 'drums']:
+                        md = Simulation(
+                            k, d, parameter=param, latency=zoom_arr, num_simulations=self._num_simulations, leader=ins
+                        )
+                        self.res.append(self._dic_create(md, idx))
+                else:
+                    md = Simulation(
+                        k, d, parameter=param, latency=zoom_arr, num_simulations=self._num_simulations,
+                    )
+                    self.res.append(self._dic_create(md, idx))
+        if logger is not None:
+            logger.info(f'Created simulations!')
 
 
 def _get_weighted_average(
@@ -584,6 +609,46 @@ def create_simulations_by_condition(
         md.run_simulations()
         md.plot_simulations()
 
+## RATIOED
+# def dic_create(c, md,):
+#     dic = {
+#         'trial': c['trial'],
+#         'block': c['block'],
+#         'latency': c['latency'],
+#         'jitter': c['jitter'],
+#         'instrument': c['instrument'],
+#         'intercept': md.params.iloc[0],
+#         'correction_self': md.params.iloc[1],
+#         'correction_partner': md.params.iloc[2],
+#         'resid_std': np.std(md.resid),
+#         'resid_len': len(md.resid),
+#         'zoom_arr': c['zoom_array'],
+#     }
+#     return dic
+
+# res = []
+# for z in autils.zip_same_conditions_together(raw_data=raw_data):
+#     # Iterate through keys and drums performances in a condition together
+#     for c1, c2 in z:
+#         keys, drms, keys_nn, drms_nn, tempo_slope, pw_asym = phase_correction_pre_processing(c1, c2)
+#         keys_nn['my_next_ioi_r'] = keys_nn['my_next_ioi'] / keys_nn['my_next_ioi'].shift(1)
+#         drms_nn['my_next_ioi_r'] = drms_nn['my_next_ioi'] / drms_nn['my_next_ioi'].shift(1)
+#         keys_nn['my_prev_ioi_r'] = keys_nn['my_prev_ioi'] / keys_nn['my_prev_ioi'].shift(1)
+#         drms_nn['my_prev_ioi_r'] = drms_nn['my_prev_ioi'] / drms_nn['my_prev_ioi'].shift(1)
+#         keys_nn['asynchrony_r'] = keys_nn['asynchrony'] / keys_nn['my_prev_ioi']
+#         drms_nn['asynchrony_r'] = drms_nn['asynchrony'] / drms_nn['my_prev_ioi']
+#
+#         keys_md = smf.ols('my_next_ioi_r~my_prev_ioi_r+asynchrony_r', data=keys_nn).fit()
+#         drms_md = smf.ols('my_next_ioi_r~my_prev_ioi_r+asynchrony_r', data=drms_nn).fit()
+#         res.append(dic_create(c1, keys_md))
+#         res.append(dic_create(c2, drms_md))
+
+
+
+
+
+
+
 
 #
 # def dic_create(md, i):
@@ -632,10 +697,6 @@ def create_simulations_by_condition(
 #     anarc = Simulation(pd.DataFrame(k), pd.DataFrame(d), parameter='anarchy', latency=zoom_arr,
 #                        num_simulations=100)
 #     res.append(dic_create(anarc, idx))
-
-
-
-
 
 # zoom_arr = mds[(mds['latency'] == 45) & (mds['jitter'] == 1)]['zoom_arr'].iloc[0].copy()
 # for idx, grp in mds.groupby('trial'):

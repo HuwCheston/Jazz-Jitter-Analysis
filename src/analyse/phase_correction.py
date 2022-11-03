@@ -12,6 +12,7 @@ from src.analyse.analysis_utils import extract_npvi
 from src.visualise.phase_correction_graphs import PairGrid, SingleConditionPlot, BoxPlot, RegPlotDuo, \
     RegPlotSingle, PointPlotLaggedLatency, SingleConditionAnimation, NumberLine, BarPlot, ScatterPlotQuestionnaire, \
     HeatmapQuestionnaire, BarPlotInterpolatedIOIs, BarPlotTestRetestReliability, BarPlotQuestionnairePercentAgreement
+from src.analyse.simulations import SimulationsByParameter
 
 PC_MOD = 'my_next_ioi~my_prev_ioi+asynchrony'
 WINDOW_SIZE = 8
