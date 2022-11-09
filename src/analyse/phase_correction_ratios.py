@@ -2,9 +2,11 @@ import pandas as pd
 import numpy as np
 import statsmodels.formula.api as smf
 from datetime import timedelta
+import matplotlib.pyplot as plt
 
 import src.analyse.analysis_utils as autils
-
+import src.visualise.visualise_utils as vutils
+from src.analyse.simulations_ratio import Simulation
 
 class PhaseCorrectionModel:
     def __init__(
@@ -15,17 +17,17 @@ class PhaseCorrectionModel:
         """
         # Parameters
         self._nn_tolerance: float = 0.1  # The amount of tolerance to use when matching onsets
-        self._iqr_filter_range: tuple[float] = (0.05, 0.95)  # Filter IOIs above and below this
+        self._iqr_filter_range: tuple[float] = (0.25, 0.75)  # Filter IOIs above and below this
         self._model = kwargs.get('model', 'my_next_ioi_diff~my_prev_ioi_diff+asynchrony')  # regression model
         # The raw data converted into dataframe format
         self.keys_raw: pd.DataFrame = self._generate_df(c1_keys)
         self.drms_raw: pd.DataFrame = self._generate_df(c2_drms)
         # The nearest neighbour models, matching live and delayed onsets together
         self.keys_nn: pd.DataFrame = self._nearest_neighbour(
-            live_arr=self.keys_raw['onset'].to_numpy(), delayed_arr=self.drms_raw['onset_delayed'].to_numpy()
+            live_arr=self.keys_raw['my_onset'].to_numpy(), delayed_arr=self.drms_raw['my_onset_delayed'].to_numpy()
         )
         self.drms_nn: pd.DataFrame = self._nearest_neighbour(
-            live_arr=self.drms_raw['onset'].to_numpy(), delayed_arr=self.keys_raw['onset_delayed'].to_numpy()
+            live_arr=self.drms_raw['my_onset'].to_numpy(), delayed_arr=self.keys_raw['my_onset_delayed'].to_numpy()
         )
         # The phase correction models
         self.keys_md = self._create_phase_correction_model(self.keys_nn)
@@ -33,25 +35,55 @@ class PhaseCorrectionModel:
         # Additional summary statistics
         # TODO: need to have functions here to extract tempo stability, etc
         self.tempo_slope: float = self._extract_tempo_slope()
-        self.pairwise_asynchrony: float = self._extract_pairwise_asynchrony()
+        # self.pairwise_asynchrony: float = self._extract_pairwise_asynchrony()
         # The summary dictionaries, which can be appended to a dataframe of all performances
         self.keys_dic = self._create_summary_dictionary(c1_keys, self.keys_md)
         self.drms_dic = self._create_summary_dictionary(c2_drms, self.drms_md)
 
-    @staticmethod
+    def _append_zoom_array(
+            self, perf_df: pd.DataFrame, zoom_arr: np.array, onset_col: str = 'my_onset'
+    ) -> pd.DataFrame:
+        """
+        Appends a column to a dataframe showing the approx amount of latency by AV-Manip for each event in a performance
+        """
+        # TODO: need to add in the constant amount of delay induced by the testbed - 12ms?
+        # Create a new array with our Zoom latency times and the approx timestamp they were applied to the performance
+        # 8 = performance start time (after count-in, 0.75 = refresh rate
+        z = np.c_[zoom_arr, np.linspace(8, 8 + (len(zoom_arr) * 0.75), num=len(zoom_arr), endpoint=False)]
+        # Initialise an empty column in our performance dataframe
+        perf_df['latency'] = np.nan
+        # Loop through successive timestamps in our zoom dataframe
+        for first, second in zip(z, z[1:]):
+            # Set any rows in the performance dataframe between our timestamps to the respective latency time
+            perf_df.loc[perf_df[onset_col].between(first[1], second[1]), 'latency'] = first[0]
+        return perf_df
+
     def _generate_df(
-            data: list
+            self, data: list, threshold: float = 0.2
     ) -> pd.DataFrame:
         """
         Create dataframe, append zoom array, and add a column with our delayed onsets.
         This latter column replicates the performance as it would have been heard by our partner.
         """
-        # TODO: need to add in the constant amount of delay induced by the testbed - 12ms?
-        df = autils.append_zoom_array(autils.generate_df(data['midi_bpm']), data['zoom_array'])
+        df = pd.DataFrame(data['midi_bpm'], columns=['my_onset', 'pitch', 'velocity']).sort_values('my_onset')
+        df = self._append_zoom_array(df,  data['zoom_array'])
+        # Drop pitch and velocity columns if not needed (default)
+        df['my_prev_ioi'] = df['my_onset'].diff().astype(float)
+
+        # Clean to remove any spurious onsets
+        # df['ioi'] = iqr_filter('ioi', df, iqr_range, )
+
+        # Remove iois below threshold
+        temp = df.dropna()
+        temp = temp[temp['my_prev_ioi'] < threshold]
+        df = df[~df.index.isin(temp.index)]
+        # Recalculate IOI column after removing those below threshold
+        df['my_prev_ioi'] = df['my_onset'].diff().astype(float)
         # Fill na in latency column with next/previous valid observation
-        df['lat'] = df['lat'].bfill().ffill()
+        df['latency'] = df['latency'].bfill().ffill()
         # Add the latency column (divided by 1000 to convert from ms to sec) to the onset column
-        df['onset_delayed'] = (df['onset'] + (df['lat'] / 1000))
+        df['my_onset_delayed'] = (df['my_onset'] + (df['latency'] / 1000))
+
         return df
 
     def _extract_tempo_slope(
@@ -69,9 +101,10 @@ class PhaseCorrectionModel:
 
         def resample(perf: pd.DataFrame):
             # Create the timedelta index
-            idx = pd.to_timedelta([timedelta(seconds=val) for val in perf['onset']])
+            idx = pd.to_timedelta([timedelta(seconds=val) for val in perf['my_onset']])
+            perf['bpm'] = 60 / perf['my_prev_ioi']
             # Create the offset = 8 - first onset time
-            offset = timedelta(seconds=8 - perf.iloc[0]['onset'])
+            offset = timedelta(seconds=8 - perf.iloc[0]['my_onset'])
             # Set the index, resample to every second, and take the mean
             return perf.set_index(idx).resample('1s', offset=offset).mean()
 
@@ -130,34 +163,116 @@ class PhaseCorrectionModel:
         - For any of our onsets where we matched with the same partner onset twice, set the duplicate appearance to NaN
         """
         results = []
-        # Iterate through all values in our live array
+        nearest_neighbour = lambda tr, m: delayed_arr[np.where(tr == m)][0]
+
         for i in range(live_arr.shape[0]):
             # Matrix subtraction
             temp_result = delayed_arr - live_arr[i]
-            # Get the closest onset ahead of where I currently am
-            closest_onset_played_ahead_of_me = np.min(np.where(temp_result > 0, temp_result, np.inf))
             # Get the closest onset played before where I currently am
-            closest_onset_played_behind_me = np.max(np.where(temp_result < 0, temp_result, -np.inf))
-            # In general, we can assume that we're going to be playing behind our delayed partner
-            # If the next onset ahead of me is closer than the one behind me (with tolerance), match with it
-            if abs(closest_onset_played_ahead_of_me - self._nn_tolerance) < abs(closest_onset_played_behind_me):
-                match = closest_onset_played_ahead_of_me
-            # However, if the onset behind me is closer to where I currently am:
-            else:
-                match = closest_onset_played_behind_me
-            # Get the index of our match from our partner's array of onsets
-            nearest_neighbour = delayed_arr[np.where(temp_result == match)][0]
-            # Append my onset and our nearest neighbour match to our results
-            results.append((live_arr[i], nearest_neighbour))
-        # Create the dataframe
-        nn_df = pd.DataFrame(results, columns=['my_onset', 'their_onset'])
-        # Attempt to pair remaining unmatched onsets by our partner with duplicate matches
-        if match_duplicates:
-            self._attempt_to_match_duplicates_with_remainders(nn_df, delayed_arr)
-        # Set any remaining duplicate values to NaN
-        nn_df.loc[nn_df.duplicated(subset='their_onset'), 'their_onset'] = np.nan
-        # Format the dataframe for our model
-        return self._format_df_for_model(nn_df)
+            try:
+                their_onset_behind_me = nearest_neighbour(
+                    temp_result, np.max(np.where(temp_result < 0, temp_result, -np.inf))
+                )
+                # Get the closest onset ahead of where I currently am
+                their_onset_ahead_of_me = nearest_neighbour(
+                    temp_result, np.min(np.where(temp_result > 0, temp_result, np.inf))
+                )
+            except IndexError:
+                continue
+
+            position = np.nan
+            try:
+                position = min([abs(their_onset_behind_me), abs(their_onset_ahead_of_me)]) / max(
+                    [abs(their_onset_behind_me), abs(their_onset_ahead_of_me)])
+            except IndexError:
+                pass
+            finally:
+                results.append((live_arr[i], position))
+
+        nn_df = pd.DataFrame(results, columns=['my_onset', 'asynchrony'])
+        nn_df['my_prev_ioi'] = nn_df['my_onset'].diff()
+        nn_df['my_next_ioi'] = nn_df['my_prev_ioi'].shift(-1)
+        nn_df['my_next_ioi_diff'] = nn_df['my_next_ioi'].diff()
+        nn_df['my_prev_ioi_diff'] = nn_df['my_prev_ioi'].diff()
+        return nn_df
+
+
+
+        # nearest_neighbour = lambda tr, m: delayed_arr[np.where(tr == m)][0]
+        # results = []
+        # for i in range(live_arr.shape[0]):
+        #     temp_result = delayed_arr - live_arr[i]
+        #     their_onset_behind_me = np.max(np.where(temp_result < 0, temp_result, -np.inf))
+        #     # Get the closest onset ahead of where I currently am
+        #     their_onset_ahead_of_me = np.min(np.where(temp_result > 0, temp_result, np.inf))
+        #     try:
+        #         their_ioi = nearest_neighbour(temp_result, their_onset_ahead_of_me) - nearest_neighbour(temp_result,
+        #                                                                                                 their_onset_behind_me)
+        #         my_position_in_their_ioi = (live_arr[i] - nearest_neighbour(temp_result,
+        #                                                                     their_onset_behind_me)) / their_ioi
+        #     except IndexError:
+        #         results.append((live_arr[i], np.nan))
+        #     else:
+        #         results.append((live_arr[i], my_position_in_their_ioi))
+        # nn_df = pd.DataFrame(results, columns=['my_onset', 'asynchrony'])
+        # nn_df['my_prev_ioi'] = nn_df['my_onset'].diff()
+        # nn_df['my_next_ioi'] = nn_df['my_prev_ioi'].shift(-1)
+        # nn_df['my_next_ioi_diff'] = nn_df['my_next_ioi'].diff()
+        # nn_df['my_prev_ioi_diff'] = nn_df['my_prev_ioi'].diff()
+        # return nn_df
+
+        # results = []
+        # nearest_neighbour = lambda tr, m: delayed_arr[np.where(tr == m)][0]
+        # for i in range(live_arr.shape[0]):
+        #     # Matrix subtraction
+        #     temp_result = delayed_arr - live_arr[i]
+        #     # Get the closest onset played before where I currently am
+        #     their_onset_behind_me = np.max(np.where(temp_result < 0, temp_result, -np.inf))
+        #     # Get the closest onset ahead of where I currently am
+        #     their_onset_ahead_of_me = np.min(np.where(temp_result > 0, temp_result, np.inf))
+        #     try:
+        #         results.append((live_arr[i], nearest_neighbour(temp_result, their_onset_ahead_of_me)))
+        #     except IndexError:
+        #         results.append((live_arr[i], np.nan))
+        # nn_df = pd.DataFrame(results, columns=['my_onset', 'their_onset'])
+        # nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
+        # nn_df['my_prev_ioi'] = nn_df['my_onset'].diff()
+        # nn_df['my_next_ioi'] = nn_df['my_prev_ioi'].shift(-1)
+        # nn_df['my_next_ioi_diff'] = nn_df['my_next_ioi'].diff()
+        # nn_df['my_prev_ioi_diff'] = nn_df['my_prev_ioi'].diff()
+
+
+
+
+
+        # # Iterate through all values in our live array
+        # for i in range(live_arr.shape[0]):
+        #     # Matrix subtraction
+        #     temp_result = delayed_arr - live_arr[i]
+        #     # Get the closest onset ahead of where I currently am
+        #     closest_onset_played_ahead_of_me = np.min(np.where(temp_result > 0, temp_result, np.inf))
+        #     # Get the closest onset played before where I currently am
+        #     closest_onset_played_behind_me = np.max(np.where(temp_result < 0, temp_result, -np.inf))
+        #     # In general, we can assume that we're going to be playing behind our delayed partner
+        #     # If the next onset ahead of me is closer than the one behind me (with tolerance), match with it
+        #     if abs(closest_onset_played_ahead_of_me) < abs(closest_onset_played_behind_me):
+        #         match = closest_onset_played_ahead_of_me
+        #     # However, if the onset behind me is closer to where I currently am:
+        #     else:
+        #         match = closest_onset_played_behind_me
+        #     # Get the index of our match from our partner's array of onsets
+        #     nearest_neighbour = delayed_arr[np.where(temp_result == match)][0]
+        #     # Append my onset and our nearest neighbour match to our results
+        #     results.append((live_arr[i], nearest_neighbour))
+        # # Create the dataframe
+        # nn_df = pd.DataFrame(results, columns=['my_onset', 'their_onset'])
+        # # Attempt to pair remaining unmatched onsets by our partner with duplicate matches
+        # if match_duplicates:
+        #     self._attempt_to_match_duplicates_with_remainders(nn_df, delayed_arr)
+        # # Set any remaining duplicate values to NaN
+        # nn_df.loc[nn_df.duplicated(subset='their_onset'), 'their_onset'] = np.nan
+        # # Format the dataframe for our model
+        # return self._format_df_for_model(nn_df)
 
     @staticmethod
     def _attempt_to_match_duplicates_with_remainders(
@@ -171,7 +286,6 @@ class PhaseCorrectionModel:
         - Iterate through all of our onsets that were matched to the same onset played by our partner.
         - For each duplicate match, if we can find an onset played by our partner not yet matched with one of ours,
         and this is between our previous and next match, automatically match with it, regardless of distance.
-
         """
         # Find duplicate matches
         duplicated = nn_with_dup[nn_with_dup.duplicated(subset='their_onset')]
@@ -224,12 +338,12 @@ class PhaseCorrectionModel:
         """
         # Extract inter-onset intervals
         df['my_prev_ioi'] = df['my_onset'].diff()
-        # Filter inter-onset intervals
         df = self._iqr_filter(df, 'my_prev_ioi')
         # Shift to get next IOI
         df['my_next_ioi'] = df['my_prev_ioi'].shift(-1)
         # Extract asynchrony between onsets
         df['asynchrony'] = df['their_onset'] - df['my_onset']
+        df = self._iqr_filter(df, 'asynchrony')
         # Extract difference of IOIs
         df['my_next_ioi_diff'] = df['my_next_ioi'].diff()
         df['my_prev_ioi_diff'] = df['my_prev_ioi'].diff()
@@ -258,13 +372,10 @@ class PhaseCorrectionModel:
             'tempo_slope': self.tempo_slope,
             # 'ioi_std': std,
             # 'ioi_npvi': npvi,
-            'pw_asym': self.pairwise_asynchrony,
+            # 'pw_asym': self.pairwise_asynchrony,
             'intercept': md.params.iloc[0],
-            'intercept_stderr': md.bse.iloc[0],
             'correction_self': md.params.iloc[1],
-            'correction_self_stderr': md.bse.iloc[1],
             'correction_partner': md.params.iloc[2],
-            'correction_partner_stderr': md.bse.iloc[2],
             'resid_std': np.std(md.resid),
             'resid_len': len(md.resid),
             'rsquared': md.rsquared,
@@ -274,16 +385,58 @@ class PhaseCorrectionModel:
             'coordination': c['coordination']
         }
 
-#
-# if __name__ == '__main__':
-#     raw_data = autils.load_data(input_filepath)
-#     res = []
-#     for z in autils.zip_same_conditions_together(raw_data=raw_data):
-#         # Iterate through keys and drums performances in a condition together
-#         for c1, c2 in z:
-#             pcm = PhaseCorrectionModel(c1, c2)
-#             res.append(pcm.keys_dic)
-#             res.append(pcm.drms_dic)
-#
-#     d = pd.DataFrame(res)
 
+if __name__ == '__main__':
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_rows', 500)
+    raw_data = autils.load_data(r"C:\Python Projects\jazz-jitter-analysis\data\processed")
+    res = []
+    for z in autils.zip_same_conditions_together(raw_data=raw_data):
+        # Iterate through keys and drums performances in a condition together
+        for c1, c2 in z:
+            if c1['trial'] == 2 and c1['latency'] == 180:
+                pcm = PhaseCorrectionModel(c1, c2,)
+                res.append(pcm.keys_dic)
+                res.append(pcm.drms_dic)
+    d = pd.DataFrame(res)
+
+
+    # coef = []
+    # for idx, grp in d.groupby(by=['trial', 'latency', 'jitter']):
+    #     ke = grp[grp['instrument'] == 'Keys'].groupby('block').mean().reset_index(drop=False)
+    #     dr = grp[grp['instrument'] != 'Keys'].groupby('block').mean().reset_index(drop=False)
+    #     z = grp.reset_index().iloc[0]['zoom_arr']
+    #     sim = Simulation(ke, dr, z, num_simulations=1000)
+    #     sim.create_all_simulations()
+    #     ts = sim.get_average_tempo_slope()
+    #     print(idx, ke['tempo_slope'].iloc[0], ts)
+    #     coef.append((*idx, ke['tempo_slope'].iloc[0], ts))
+    #
+    #     for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
+    #         avg = sim._get_grand_average_tempo([keys, drms])
+    #         avg = avg[(avg.index.seconds > 8) & (avg.index.seconds < 93)]
+    #         plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='8s').mean(), alpha=0.01,
+    #                  color=vutils.BLACK)
+    #     grand_avg = sim._get_grand_average_tempo(
+    #         [sim._get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
+    #     )
+    #     grand_avg = grand_avg[(grand_avg.index.seconds > 8) & (grand_avg.index.seconds < 93)]
+    #     plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='8s').mean(), alpha=1,
+    #              color=vutils.BLACK)
+    #     plt.ylim(30, 160)
+    #     plt.show()
+
+
+
+# import seaborn as sns
+# import matplotlib.pyplot as plt
+# from src.visualise.phase_correction_graphs import PairGrid
+# df = pd.DataFrame(res)
+# g = sns.FacetGrid(data=df, col='trial', hue='instrument')
+# g.map(sns.histplot, 'correction_partner')
+# plt.show()
+#
+# pg = PairGrid(
+#     df=df, xvar='correction_partner', output_dir=r"C:\Python Projects\jazz-jitter-analysis\reports\test", xlim=(-0.5, 1), xlabel='Coupling constant'
+# )
+# pg.create_plot()
