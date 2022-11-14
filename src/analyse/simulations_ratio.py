@@ -101,7 +101,6 @@ class Simulation:
         """
         Run the simulations and create a list of dataframes for each individual performer
         """
-
         for i in range(0, self.num_simulations):
             # Create the simulation: Numba doesn't work as a class method, so we need to pass arguments in seperately
             keys, drms = self._create_one_simulation(
