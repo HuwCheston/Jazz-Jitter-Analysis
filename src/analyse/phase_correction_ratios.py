@@ -4,6 +4,7 @@ import statsmodels.formula.api as smf
 import seaborn as sns
 from datetime import timedelta
 import matplotlib.pyplot as plt
+from sklearn.covariance import EllipticEnvelope
 
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
@@ -216,49 +217,80 @@ class PhaseCorrectionModel:
                                 nn_df.at[idx, 'their_onset'] = np.nan
                 nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
 
-        filt = (0.25, 0.75)
-        # OTHER TRIALS -- IQR RANGE CLEANING
-        # Get lower quartile
-        q1 = nn_df['asynchrony'].quantile(filt[0])
-        # Get upper quartile
-        q3 = nn_df['asynchrony'].quantile(filt[1])
-        # Get interquartile range
-        iqr = q3 - q1
-        # Multiply by 1.5
-        s = 1.5 * iqr
-        # Get lower bound for filtering
-        lb = q1 - s
-        # Get upper bound for filtering
-        ub = q3 + s
+        ee = EllipticEnvelope(contamination=0.15)
+        ee.fit(nn_df['asynchrony'].to_numpy().reshape(-1, 1))
+        nn_df['outliers'] = ee.predict(nn_df['asynchrony'].to_numpy().reshape(-1, 1))
+        median = nn_df[nn_df['outliers'] != -1]['asynchrony'].median()
 
-        higher = nn_df[nn_df['asynchrony'] > ub]
-        lower = nn_df[nn_df['asynchrony'] < lb]
-
-        for idx, row in higher.iterrows():
+        for idx, row in nn_df[nn_df['outliers'] == -1].iterrows():
             matrix_subtract = delayed_arr - row['my_onset']
-            nxt = np.max(np.where(matrix_subtract < 0, matrix_subtract, -np.inf))
-            try:
-                nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
-            except IndexError:
-                nn_df.at[idx, 'their_onset'] = np.nan
-            else:
-                if lb < nxt < ub:
-                    nn_df.at[idx, 'their_onset'] = nxt_nearest
-                else:
+            if row['asynchrony'] > median:
+                nxt = np.max(np.where(matrix_subtract < 0, matrix_subtract, -np.inf))
+                try:
+                    nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
+                except IndexError:
                     nn_df.at[idx, 'their_onset'] = np.nan
+                else:
+                    if ee.predict(np.float64(nxt).reshape(-1, 1))[0] == 1:
+                        nn_df.at[idx, 'their_onset'] = nxt_nearest
+                    else:
+                        nn_df.at[idx, 'their_onset'] = np.nan
+            else:
+                nxt = np.min(np.where(matrix_subtract > 0, matrix_subtract, np.inf))
+                try:
+                    nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
+                except IndexError:
+                    nn_df.at[idx, 'their_onset'] = np.nan
+                else:
+                    if ee.predict(np.float64(nxt).reshape(-1, 1))[0] == 1:
+                        nn_df.at[idx, 'their_onset'] = nxt_nearest
+                    else:
+                        nn_df.at[idx, 'their_onset'] = np.nan
 
-        for idx, row in lower.iterrows():
-            matrix_subtract = delayed_arr - row['my_onset']
-            nxt = np.min(np.where(matrix_subtract > 0, matrix_subtract, np.inf))
-            try:
-                nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
-            except IndexError:
-                nn_df.at[idx, 'their_onset'] = np.nan
-            else:
-                if lb < nxt < ub:
-                    nn_df.at[idx, 'their_onset'] = nxt_nearest
-                else:
-                    nn_df.at[idx, 'their_onset'] = np.nan
+
+        # filt = (0.15, 0.85)
+        # # OTHER TRIALS -- IQR RANGE CLEANING
+        # # Get lower quartile
+        # q1 = nn_df['asynchrony'].quantile(filt[0])
+        # # Get upper quartile
+        # q3 = nn_df['asynchrony'].quantile(filt[1])
+        # # Get interquartile range
+        # iqr = q3 - q1
+        # # Multiply by 1.5
+        # s = 1.5 * iqr
+        # # Get lower bound for filtering
+        # lb = q1 - s
+        # # Get upper bound for filtering
+        # ub = q3 + s
+        #
+        # higher = nn_df[nn_df['asynchrony'] > ub]
+        # lower = nn_df[nn_df['asynchrony'] < lb]
+        #
+        # for idx, row in higher.iterrows():
+        #     matrix_subtract = delayed_arr - row['my_onset']
+        #     nxt = np.max(np.where(matrix_subtract < 0, matrix_subtract, -np.inf))
+        #     try:
+        #         nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
+        #     except IndexError:
+        #         nn_df.at[idx, 'their_onset'] = np.nan
+        #     else:
+        #         if lb < nxt < ub:
+        #             nn_df.at[idx, 'their_onset'] = nxt_nearest
+        #         else:
+        #             nn_df.at[idx, 'their_onset'] = np.nan
+        #
+        # for idx, row in lower.iterrows():
+        #     matrix_subtract = delayed_arr - row['my_onset']
+        #     nxt = np.min(np.where(matrix_subtract > 0, matrix_subtract, np.inf))
+        #     try:
+        #         nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
+        #     except IndexError:
+        #         nn_df.at[idx, 'their_onset'] = np.nan
+        #     else:
+        #         if lb < nxt < ub:
+        #             nn_df.at[idx, 'their_onset'] = nxt_nearest
+        #         else:
+        #             nn_df.at[idx, 'their_onset'] = np.nan
 
         nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
         median = nn_df['asynchrony'].median()
@@ -272,38 +304,6 @@ class PhaseCorrectionModel:
         nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
         nn_df = nn_df.drop(['latency'], axis=1)
         return self._format_df_for_model(nn_df)
-
-    @staticmethod
-    def _attempt_to_match_duplicates_with_remainders(
-            nn_with_dup: pd.DataFrame, remaining_unmatched_partner_onsets: np.ndarray
-    ):
-        """
-        Attempts to pair duplicate matches from the nearest neighbour algorithm with unmatched onsets from our partner
-
-        Method:
-        ---
-        - Iterate through all of our onsets that were matched to the same onset played by our partner.
-        - For each duplicate match, if we can find an onset played by our partner not yet matched with one of ours,
-        and this is between our previous and next match, automatically match with it, regardless of distance.
-        """
-        # Find duplicate matches
-        duplicated = nn_with_dup[nn_with_dup.duplicated(subset='their_onset')]
-        # Find onsets from our partner that have not been matched yet
-        unmatched = np.in1d(remaining_unmatched_partner_onsets, nn_with_dup['their_onset'].to_numpy())
-        remainders = remaining_unmatched_partner_onsets[unmatched]
-        # If we have unmatched onsets
-        if len(remainders) > 0:
-            # Iterate through our duplicate matches
-            for idx, row in duplicated.iterrows():
-                try:
-                    # Find the closest unmatched partner onset to our onset
-                    temp = abs(remainders - row['my_onset'])
-                    match = remainders[np.where(temp == np.min(temp))][0]
-                    # If the match is between our previous matched onset and our next matched onset, use it instead
-                    if nn_with_dup.iloc[idx - 1]['my_onset'] < match < nn_with_dup.iloc[idx + 1]['my_onset']:
-                        nn_with_dup.iloc[idx]['their_onset'] = match
-                except IndexError:
-                    pass
 
     def _iqr_filter(
             self, df: pd.DataFrame, col: str, filter: tuple = (0.25, 0.75)
@@ -397,50 +397,53 @@ if __name__ == '__main__':
             res.append(pcm.drms_dic)
     d = pd.DataFrame(res)
 
-    # from src.visualise.phase_correction_graphs import PairGrid
-    # g = sns.FacetGrid(data=d, col='trial', hue='instrument')
-    # g.map(sns.histplot, 'correction_partner')
-    # plt.show()
-    #
-    # pg = PairGrid(
-    #     df=d, xvar='correction_partner', output_dir=r"C:\Python Projects\jazz-jitter-analysis\reports\test", xlim=(-0.5, 1.5), xlabel='Coupling constant'
-    # )
-    # pg.create_plot()
-    #
-    #
-    # coef = []
-    # for idx, grp in d.groupby(by=['trial', 'latency', 'jitter']):
-    #     ke = grp[grp['instrument'] == 'Keys'].groupby('instrument').mean().reset_index(drop=False)
-    #     dr = grp[grp['instrument'] != 'Keys'].groupby('instrument').mean().reset_index(drop=False)
-    #     z = grp.reset_index().iloc[0]['zoom_arr']
-    #     sim = Simulation(ke, dr, z, num_simulations=1000)
-    #     sim.create_all_simulations()
-    #     ts = sim.get_average_tempo_slope()
-    #     print(idx, ke['tempo_slope'].iloc[0], ts)
-    #     coef.append((*idx, ke['tempo_slope'].iloc[0], ts))
-    #
-    #     for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
-    #         avg = sim._get_grand_average_tempo([keys, drms])
-    #         avg = avg[(avg.index.seconds > 8) & (avg.index.seconds < 93)]
-    #         plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='8s').mean(), alpha=0.01,
-    #                  color=vutils.BLACK)
-    #     grand_avg = sim._get_grand_average_tempo(
-    #         [sim._get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
-    #     )
-    #     grand_avg = grand_avg[(grand_avg.index.seconds > 8) & (grand_avg.index.seconds < 93)]
-    #     plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='8s').mean(), alpha=1,
-    #              color=vutils.BLACK)
-    #     plt.title(f'Duo {idx[0]}, latency {idx[1]}, jitter {idx[2]}')
-    #     plt.ylim(30, 160)
-    #     plt.show()
-    #
-    # coef_df = pd.DataFrame(coef, columns=['trial', 'latency', 'jitter', 'actual', 'simulated'])
-    # fig, ax = plt.subplots(1, 1)
-    # g = sns.scatterplot(data=coef_df, x='simulated', y='actual', hue='latency', palette='tab10')
-    # # g = sns.regplot(data=coef_df, x='simulated', y='actual', scatter=False, ci=None)
-    # g.set(ylim=(-0.8, 0.8), xlim=(-0.8, 0.8), xlabel='Simulated slope (BPM/s)', ylabel='Actual slope (BPM/s)')
-    # g.plot([0, 1], [0, 1], transform=ax.transAxes, c='#000000')
-    # plt.show()
+    from src.visualise.phase_correction_graphs import PairGrid
+    g = sns.FacetGrid(data=d, col='trial', hue='instrument')
+    g.map(sns.histplot, 'correction_partner')
+    plt.show()
+
+    pg = PairGrid(
+        df=d, xvar='correction_partner', output_dir=r"C:\Python Projects\jazz-jitter-analysis\reports\test", xlim=(-0.5, 1.5), xlabel='Coupling constant'
+    )
+    pg.create_plot()
+
+
+    coef = []
+    for idx, grp in d.groupby(by=['trial', 'latency', 'jitter']):
+        ke = grp[grp['instrument'] == 'Keys'].groupby('instrument').mean().reset_index(drop=False)
+        dr = grp[grp['instrument'] != 'Keys'].groupby('instrument').mean().reset_index(drop=False)
+        z = grp.reset_index().iloc[0]['zoom_arr']
+        try:
+            sim = Simulation(ke, dr, z, num_simulations=1000)
+            sim.create_all_simulations()
+            ts = sim.get_average_tempo_slope()
+            print(idx, ke['tempo_slope'].iloc[0], ts)
+            coef.append((*idx, ke['tempo_slope'].iloc[0], ts))
+
+            for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
+                avg = sim._get_grand_average_tempo([keys, drms])
+                avg = avg[(avg.index.seconds > 8) & (avg.index.seconds < 93)]
+                plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='8s').mean(), alpha=0.01,
+                         color=vutils.BLACK)
+            grand_avg = sim._get_grand_average_tempo(
+                [sim._get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
+            )
+            grand_avg = grand_avg[(grand_avg.index.seconds > 8) & (grand_avg.index.seconds < 93)]
+            plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='8s').mean(), alpha=1,
+                     color=vutils.BLACK)
+            plt.title(f'Duo {idx[0]}, latency {idx[1]}, jitter {idx[2]}')
+            plt.ylim(30, 160)
+            plt.show()
+        except:
+            print(idx, ke['tempo_slope'].iloc[0], 'NAN')
+
+    coef_df = pd.DataFrame(coef, columns=['trial', 'latency', 'jitter', 'actual', 'simulated'])
+    fig, ax = plt.subplots(1, 1)
+    g = sns.scatterplot(data=coef_df, x='simulated', y='actual', hue='latency', palette='tab10')
+    # g = sns.regplot(data=coef_df, x='simulated', y='actual', scatter=False, ci=None)
+    g.set(ylim=(-0.8, 0.8), xlim=(-0.8, 0.8), xlabel='Simulated slope (BPM/s)', ylabel='Actual slope (BPM/s)')
+    g.plot([0, 1], [0, 1], transform=ax.transAxes, c='#000000')
+    plt.show()
 
 
 
