@@ -1,14 +1,15 @@
 import pandas as pd
 import numpy as np
+import json
+import os
 import statsmodels.formula.api as smf
-import seaborn as sns
 from datetime import timedelta
-import matplotlib.pyplot as plt
 from sklearn.covariance import EllipticEnvelope
 
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
 from src.analyse.simulations_ratio import Simulation
+
 
 class PhaseCorrectionModel:
     def __init__(
@@ -28,6 +29,7 @@ class PhaseCorrectionModel:
         self.keys_df: pd.DataFrame = self._generate_df(c1_keys)
         self.drms_df: pd.DataFrame = self._generate_df(c2_drms)
         # The nearest neighbour models, matching live and delayed onsets together
+        self._contamination = self._get_contamination_value_from_json()
         self.keys_nn: pd.DataFrame = self._nearest_neighbour(
              live_arr=self.keys_df['my_onset'].to_numpy(), delayed_arr=self.drms_df['my_onset'].to_numpy(),
              zoom_arr=self.keys_raw['zoom_array'], instr='Keys'
@@ -44,8 +46,22 @@ class PhaseCorrectionModel:
         self.tempo_slope = self._extract_tempo_slope()
         # self.pairwise_asynchrony: float = self._extract_pairwise_asynchrony()
         # The summary dictionaries, which can be appended to a dataframe of all performances
-        self.keys_dic = self._create_summary_dictionary(c1_keys, self.keys_md)
-        self.drms_dic = self._create_summary_dictionary(c2_drms, self.drms_md)
+        self.keys_dic = self._create_summary_dictionary(c1_keys, self.keys_md, self.keys_nn)
+        self.drms_dic = self._create_summary_dictionary(c2_drms, self.drms_md, self.drms_nn)
+
+    def _get_contamination_value_from_json(
+            self
+    ) -> float:
+        """
+
+        """
+        cwd = os.path.dirname(os.path.abspath(__file__)) + '\contamination_params.json'
+        js = json.load(open(cwd))
+        return [
+            i['contamination'] for i in js
+            if i['trial'] == self.keys_raw['trial'] and i['block'] == self.keys_raw['block']
+            and i['latency'] == self.keys_raw['latency'] and i['jitter'] == self.keys_raw['jitter']
+        ][0]
 
     def _append_zoom_array(
             self, perf_df: pd.DataFrame, zoom_arr: np.array, onset_col: str = 'my_onset'
@@ -217,80 +233,20 @@ class PhaseCorrectionModel:
                                 nn_df.at[idx, 'their_onset'] = np.nan
                 nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
 
-        ee = EllipticEnvelope(contamination=0.15)
-        ee.fit(nn_df['asynchrony'].to_numpy().reshape(-1, 1))
-        nn_df['outliers'] = ee.predict(nn_df['asynchrony'].to_numpy().reshape(-1, 1))
-        median = nn_df[nn_df['outliers'] != -1]['asynchrony'].median()
+        if self._contamination != 0:
+            ee = EllipticEnvelope(contamination=self._contamination, random_state=1)
+            ee.fit(nn_df['asynchrony'].to_numpy().reshape(-1, 1))
+            nn_df['outliers'] = ee.predict(nn_df['asynchrony'].to_numpy().reshape(-1, 1))
 
-        for idx, row in nn_df[nn_df['outliers'] == -1].iterrows():
-            matrix_subtract = delayed_arr - row['my_onset']
-            if row['asynchrony'] > median:
-                nxt = np.max(np.where(matrix_subtract < 0, matrix_subtract, -np.inf))
-                try:
-                    nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
-                except IndexError:
-                    nn_df.at[idx, 'their_onset'] = np.nan
+            for idx, row in nn_df[nn_df['outliers'] == -1].iterrows():
+                matrix_subtract = abs(delayed_arr - row['my_onset'])
+                i = np.where(matrix_subtract == np.partition(matrix_subtract, 2)[2])
+                next_nearest = delayed_arr[i]
+                predicted_async = next_nearest - row['my_onset']
+                if ee.predict(np.float64(predicted_async).reshape(-1, 1))[0] == 1:
+                    nn_df.at[idx, 'their_onset'] = next_nearest.astype(np.float64)
                 else:
-                    if ee.predict(np.float64(nxt).reshape(-1, 1))[0] == 1:
-                        nn_df.at[idx, 'their_onset'] = nxt_nearest
-                    else:
-                        nn_df.at[idx, 'their_onset'] = np.nan
-            else:
-                nxt = np.min(np.where(matrix_subtract > 0, matrix_subtract, np.inf))
-                try:
-                    nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
-                except IndexError:
                     nn_df.at[idx, 'their_onset'] = np.nan
-                else:
-                    if ee.predict(np.float64(nxt).reshape(-1, 1))[0] == 1:
-                        nn_df.at[idx, 'their_onset'] = nxt_nearest
-                    else:
-                        nn_df.at[idx, 'their_onset'] = np.nan
-
-
-        # filt = (0.15, 0.85)
-        # # OTHER TRIALS -- IQR RANGE CLEANING
-        # # Get lower quartile
-        # q1 = nn_df['asynchrony'].quantile(filt[0])
-        # # Get upper quartile
-        # q3 = nn_df['asynchrony'].quantile(filt[1])
-        # # Get interquartile range
-        # iqr = q3 - q1
-        # # Multiply by 1.5
-        # s = 1.5 * iqr
-        # # Get lower bound for filtering
-        # lb = q1 - s
-        # # Get upper bound for filtering
-        # ub = q3 + s
-        #
-        # higher = nn_df[nn_df['asynchrony'] > ub]
-        # lower = nn_df[nn_df['asynchrony'] < lb]
-        #
-        # for idx, row in higher.iterrows():
-        #     matrix_subtract = delayed_arr - row['my_onset']
-        #     nxt = np.max(np.where(matrix_subtract < 0, matrix_subtract, -np.inf))
-        #     try:
-        #         nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
-        #     except IndexError:
-        #         nn_df.at[idx, 'their_onset'] = np.nan
-        #     else:
-        #         if lb < nxt < ub:
-        #             nn_df.at[idx, 'their_onset'] = nxt_nearest
-        #         else:
-        #             nn_df.at[idx, 'their_onset'] = np.nan
-        #
-        # for idx, row in lower.iterrows():
-        #     matrix_subtract = delayed_arr - row['my_onset']
-        #     nxt = np.min(np.where(matrix_subtract > 0, matrix_subtract, np.inf))
-        #     try:
-        #         nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
-        #     except IndexError:
-        #         nn_df.at[idx, 'their_onset'] = np.nan
-        #     else:
-        #         if lb < nxt < ub:
-        #             nn_df.at[idx, 'their_onset'] = nxt_nearest
-        #         else:
-        #             nn_df.at[idx, 'their_onset'] = np.nan
 
         nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
         median = nn_df['asynchrony'].median()
@@ -303,6 +259,7 @@ class PhaseCorrectionModel:
         nn_df['their_onset'] += (nn_df['latency'] / 1000)
         nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
         nn_df = nn_df.drop(['latency'], axis=1)
+
         return self._format_df_for_model(nn_df)
 
     def _iqr_filter(
@@ -351,7 +308,7 @@ class PhaseCorrectionModel:
         return smf.ols(self._model, data=df.dropna(), missing='drop').fit()
 
     def _create_summary_dictionary(
-            self, c, md,
+            self, c, md, nn,
     ):
         """
         Creates a dictionary of summary statistics, used when analysing all models.
@@ -367,6 +324,8 @@ class PhaseCorrectionModel:
             'interpolated_beats': autils.extract_interpolated_beats(c)[1],
             'tempo_slope': self.tempo_slope.params.iloc[1],
             'tempo_intercept': self.tempo_slope.params.iloc[0],
+            'contamination': self._contamination,
+            'asynchrony_na': nn['asynchrony'].isna().sum(),
             # 'ioi_std': std,
             # 'ioi_npvi': npvi,
             # 'pw_asym': self.pairwise_asynchrony,
@@ -392,52 +351,50 @@ if __name__ == '__main__':
         # Iterate through keys and drums performances in a condition together
         for c1, c2 in z:
             print(c1['trial'], c1['block'], c1['latency'], c1['jitter'])
-            pcm = PhaseCorrectionModel(c1, c2,)
+            pcm = PhaseCorrectionModel(c1, c2)
             res.append(pcm.keys_dic)
             res.append(pcm.drms_dic)
-    d = pd.DataFrame(res)
 
+    import seaborn as sns
+    import matplotlib.pyplot as plt
     from src.visualise.phase_correction_graphs import PairGrid
-    g = sns.FacetGrid(data=d, col='trial', hue='instrument')
+    df = pd.DataFrame(res)
+    g = sns.FacetGrid(data=df, col='trial', hue='instrument')
     g.map(sns.histplot, 'correction_partner')
     plt.show()
 
     pg = PairGrid(
-        df=d, xvar='correction_partner', output_dir=r"C:\Python Projects\jazz-jitter-analysis\reports\test", xlim=(-0.5, 1.5), xlabel='Coupling constant'
+        df=df, xvar='correction_partner', output_dir=r"C:\Python Projects\jazz-jitter-analysis\reports\test", xlim=(-0.5, 1.5), xlabel='Coupling constant'
     )
     pg.create_plot()
 
-
     coef = []
-    for idx, grp in d.groupby(by=['trial', 'latency', 'jitter']):
-        ke = grp[grp['instrument'] == 'Keys'].groupby('instrument').mean().reset_index(drop=False)
-        dr = grp[grp['instrument'] != 'Keys'].groupby('instrument').mean().reset_index(drop=False)
+    for idx, grp in df.groupby(by=['trial', 'block', 'latency', 'jitter']):
+        ke = grp[grp['instrument'] == 'Keys'].reset_index(drop=False)
+        dr = grp[grp['instrument'] != 'Keys'].reset_index(drop=False)
         z = grp.reset_index().iloc[0]['zoom_arr']
-        try:
-            sim = Simulation(ke, dr, z, num_simulations=1000)
-            sim.create_all_simulations()
-            ts = sim.get_average_tempo_slope()
-            print(idx, ke['tempo_slope'].iloc[0], ts)
-            coef.append((*idx, ke['tempo_slope'].iloc[0], ts))
+        sim = Simulation(ke, dr, z, num_simulations=500)
+        sim.create_all_simulations()
+        ts = sim.get_average_tempo_slope()
+        print(idx, ke['tempo_slope'].iloc[0], ts)
+        coef.append((*idx, ke['tempo_slope'].iloc[0], ts))
 
-            for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
-                avg = sim._get_grand_average_tempo([keys, drms])
-                avg = avg[(avg.index.seconds > 8) & (avg.index.seconds < 93)]
-                plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='8s').mean(), alpha=0.01,
-                         color=vutils.BLACK)
-            grand_avg = sim._get_grand_average_tempo(
-                [sim._get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
-            )
-            grand_avg = grand_avg[(grand_avg.index.seconds > 8) & (grand_avg.index.seconds < 93)]
-            plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='8s').mean(), alpha=1,
+        for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
+            avg = sim._get_grand_average_tempo([keys, drms])
+            avg = avg[(avg.index.seconds > 8) & (avg.index.seconds < 93)]
+            plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='8s').mean(), alpha=0.01,
                      color=vutils.BLACK)
-            plt.title(f'Duo {idx[0]}, latency {idx[1]}, jitter {idx[2]}')
-            plt.ylim(30, 160)
-            plt.show()
-        except:
-            print(idx, ke['tempo_slope'].iloc[0], 'NAN')
+        grand_avg = sim._get_grand_average_tempo(
+            [sim._get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
+        )
+        grand_avg = grand_avg[(grand_avg.index.seconds > 8) & (grand_avg.index.seconds < 93)]
+        plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='8s').mean(), alpha=1,
+                 color=vutils.BLACK)
+        plt.title(f'Duo {idx[0]}, block {idx[1]}, latency {idx[2]}, jitter {idx[3]}')
+        plt.ylim(30, 160)
+        plt.show()
 
-    coef_df = pd.DataFrame(coef, columns=['trial', 'latency', 'jitter', 'actual', 'simulated'])
+    coef_df = pd.DataFrame(coef, columns=['trial', 'block', 'latency', 'jitter', 'actual', 'simulated'])
     fig, ax = plt.subplots(1, 1)
     g = sns.scatterplot(data=coef_df, x='simulated', y='actual', hue='latency', palette='tab10')
     # g = sns.regplot(data=coef_df, x='simulated', y='actual', scatter=False, ci=None)
@@ -446,16 +403,55 @@ if __name__ == '__main__':
     plt.show()
 
 
-
-# import seaborn as sns
-# import matplotlib.pyplot as plt
-# from src.visualise.phase_correction_graphs import PairGrid
-# df = pd.DataFrame(res)
-# g = sns.FacetGrid(data=df, col='trial', hue='instrument')
-# g.map(sns.histplot, 'correction_partner')
-# plt.show()
-#
-# pg = PairGrid(
-#     df=df, xvar='correction_partner', output_dir=r"C:\Python Projects\jazz-jitter-analysis\reports\test", xlim=(-0.5, 1.5), xlabel='Coupling constant'
-# )
-# pg.create_plot()
+    # coef = []
+    # for idx, grp in d.groupby(by=['trial', 'block', 'latency', 'jitter', 'contamination']):
+    #     ke = grp[grp['instrument'] == 'Keys'].reset_index(drop=False)
+    #     dr = grp[grp['instrument'] != 'Keys'].reset_index(drop=False)
+    #     z = grp.reset_index().iloc[0]['zoom_arr']
+    #     try:
+    #         sim = Simulation(ke, dr, z, num_simulations=1000)
+    #         sim.create_all_simulations()
+    #         ts = sim.get_average_tempo_slope()
+    #         dic = {
+    #             'trial': idx[0],
+    #             'block': idx[1],
+    #             'latency': idx[2],
+    #             'jitter': idx[3],
+    #             'contamination': idx[4],
+    #             'actual_slope': ke['tempo_slope'].iloc[0],
+    #             'keys_asynchrony_na': ke['asynchrony_na'].iloc[0],
+    #             'drms_asynchrony_na': dr['asynchrony_na'].iloc[0],
+    #             'keys_self_coupling': ke['correction_self'].iloc[0],
+    #             'drms_self_coupling': dr['correction_self'].iloc[0],
+    #             'keys_partner_coupling': ke['correction_partner'].iloc[0],
+    #             'drms_partner_coupling': dr['correction_partner'].iloc[0],
+    #             'keys_intercept': ke['intercept'].iloc[0],
+    #             'drms_intercept': dr['intercept'].iloc[0],
+    #             'predicted_slope': ts
+    #         }
+    #         print(dic)
+    #         coef.append(dic)
+    #     except:
+    #         dic = {
+    #             'trial': idx[0],
+    #             'block': idx[1],
+    #             'latency': idx[2],
+    #             'jitter': idx[3],
+    #             'contamination': idx[4],
+    #             'actual_slope': ke['tempo_slope'].iloc[0],
+    #             'keys_asynchrony_na': ke['asynchrony_na'].iloc[0],
+    #             'drms_asynchrony_na': dr['asynchrony_na'].iloc[0],
+    #             'keys_self_coupling': ke['correction_self'].iloc[0],
+    #             'drms_self_coupling': dr['correction_self'].iloc[0],
+    #             'keys_partner_coupling': ke['correction_partner'].iloc[0],
+    #             'drms_partner_coupling': dr['correction_partner'].iloc[0],
+    #             'keys_intercept': ke['intercept'].iloc[0],
+    #             'drms_intercept': dr['intercept'].iloc[0],
+    #             'predicted_slope': np.nan
+    #         }
+    #         print(dic)
+    #         coef.append(dic)
+    # df = pd.DataFrame(coef)
+    # print(df)
+    # df.to_clipboard(sep=',')
+    # df.to_csv(r'C:\Python Projects\jazz-jitter-analysis\reports\test\df_zeroed.csv', sep=',')
