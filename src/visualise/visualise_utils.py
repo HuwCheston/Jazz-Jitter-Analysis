@@ -4,6 +4,7 @@ from matplotlib.colors import TwoSlopeNorm, ListedColormap
 from matplotlib.cm import ScalarMappable
 from seaborn import color_palette
 from statistics import median
+from datetime import timedelta
 import numpy as np
 import pandas as pd
 import functools
@@ -202,3 +203,16 @@ class BasePlot:
         self.output_dir: str = kwargs.get('output_dir', None)
         # Create an empty attribute to store our plot in later
         self.g = None
+
+def resample(
+        perf: pd.DataFrame, col: str = 'my_onset', resample_window: str = '1s'
+) -> pd.DataFrame:
+    """
+    Resamples an individual performance dataframe to get mean of every second.
+    """
+    # Create the timedelta index
+    idx = pd.to_timedelta([timedelta(seconds=val) for val in perf[col]])
+    # Create the offset: 8 - first onset time
+    offset = timedelta(seconds=8 - perf.iloc[0][col])
+    # Set the index, resample to every second, and take the mean
+    return perf.set_index(idx).resample(resample_window, offset=offset).mean()

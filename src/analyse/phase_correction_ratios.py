@@ -3,12 +3,15 @@ import numpy as np
 import json
 import os
 import statsmodels.formula.api as smf
-from datetime import timedelta
 from sklearn.covariance import EllipticEnvelope
+import matplotlib.pyplot as plt
 
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
+from src.visualise.simulations_graphs import LinePlotAllParameters
 from src.analyse.simulations_ratio import Simulation
+
+MAX_SNR = 36.36539158019338
 
 
 class PhaseCorrectionModel:
@@ -20,8 +23,10 @@ class PhaseCorrectionModel:
         """
         # Parameters
         self._nn_tolerance: float = 0.1  # The amount of tolerance to use when matching onsets
-        self._iqr_filter_range: tuple[float] = (0.25, 0.75)  # Filter IOIs above and below this
-        self._model = kwargs.get('model', 'my_next_ioi_diff~my_prev_ioi_diff+asynchrony')  # regression model
+        self._iqr_filter_range: tuple[float] = kwargs.get('iqr_filter', (0.25, 0.75))  # Filter IOIs above and below this
+        self._robust_model: bool = kwargs.get('robust', False)  # Whether to use a robust linear model
+        self._model: str = kwargs.get('model', 'my_next_ioi_diff~my_prev_ioi_diff+asynchrony')  # regression model
+        self._centre: bool = kwargs.get('centre', False)
         # The cleaned data, before dataframe conversion
         self.keys_raw: dict = c1_keys
         self.drms_raw: dict = c2_drms
@@ -29,7 +34,7 @@ class PhaseCorrectionModel:
         self.keys_df: pd.DataFrame = self._generate_df(c1_keys)
         self.drms_df: pd.DataFrame = self._generate_df(c2_drms)
         # The nearest neighbour models, matching live and delayed onsets together
-        self._contamination = self._get_contamination_value_from_json()
+        self._contamination = self._get_contamination_value_from_json(default=kwargs.get('contamination', None))
         self.keys_nn: pd.DataFrame = self._nearest_neighbour(
              live_arr=self.keys_df['my_onset'].to_numpy(), delayed_arr=self.drms_df['my_onset'].to_numpy(),
              zoom_arr=self.keys_raw['zoom_array'], instr='Keys'
@@ -41,20 +46,18 @@ class PhaseCorrectionModel:
         # The phase correction models
         self.keys_md = self._create_phase_correction_model(self.keys_nn)
         self.drms_md = self._create_phase_correction_model(self.drms_nn)
-        # Additional summary statistics
-        # TODO: need to have functions here to extract tempo stability, etc
-        self.tempo_slope = self._extract_tempo_slope()
-        # self.pairwise_asynchrony: float = self._extract_pairwise_asynchrony()
         # The summary dictionaries, which can be appended to a dataframe of all performances
         self.keys_dic = self._create_summary_dictionary(c1_keys, self.keys_md, self.keys_nn)
         self.drms_dic = self._create_summary_dictionary(c2_drms, self.drms_md, self.drms_nn)
 
     def _get_contamination_value_from_json(
-            self
+            self, default: float = None
     ) -> float:
         """
 
         """
+        if default is not None:
+            return default
         cwd = os.path.dirname(os.path.abspath(__file__)) + '\contamination_params.json'
         js = json.load(open(cwd))
         return [
@@ -92,10 +95,6 @@ class PhaseCorrectionModel:
         df = self._append_zoom_array(df,  data['zoom_array'])
         # Drop pitch and velocity columns if not needed (default)
         df['my_prev_ioi'] = df['my_onset'].diff().astype(float)
-
-        # Clean to remove any spurious onsets
-        # df['ioi'] = iqr_filter('ioi', df, iqr_range, )
-
         # Remove iois below threshold
         temp = df.dropna()
         temp = temp[temp['my_prev_ioi'] < threshold]
@@ -121,18 +120,11 @@ class PhaseCorrectionModel:
         - Concatenate these dataframes together, and get the mean BPM by both performers each second
         - Compute a regression of this mean BPM against the overall elapsed time and extract the coefficient
         """
-
-        def resample(perf: pd.DataFrame):
-            # Create the timedelta index
-            idx = pd.to_timedelta([timedelta(seconds=val) for val in perf['my_onset']])
-            perf['bpm'] = 60 / perf['my_prev_ioi']
-            # Create the offset = 8 - first onset time
-            offset = timedelta(seconds=8 - perf.iloc[0]['my_onset'])
-            # Set the index, resample to every second, and take the mean
-            return perf.set_index(idx).resample('1s', offset=offset).mean()
-
         # Resample both raw dataframes
-        resampled = [resample(data) for data in [self.keys_df.copy(), self.drms_df.copy()]]
+        resampled = [vutils.resample(data) for data in [self.keys_df.copy(), self.drms_df.copy()]]
+        # Create the BPM column
+        for d in resampled:
+            d['bpm'] = 60 / d['my_prev_ioi']
         # Concatenate the resampled dataframes together and get the row-wise mean
         conc = pd.DataFrame(pd.concat([df['bpm'] for df in resampled], axis=1).mean(axis=1), columns=['bpm'])
         # Get the elapsed time column as an integer
@@ -159,7 +151,7 @@ class PhaseCorrectionModel:
         - Take the square root of the mean (RMS = Root-Mean-Square)
         - Multiply the result by 1000 to convert to milliseconds
         """
-        return np.sqrt(np.mean(np.square([self.keys_nn.asynchrony.std(), self.drms_nn.asynchrony.std()]))) * 1000
+        return np.sqrt(np.mean(np.square([self.keys_nn['asynchrony'].std(), self.drms_nn['asynchrony'].std()]))) * 1000
 
     def _nearest_neighbour(
             self, live_arr: np.ndarray, delayed_arr: np.ndarray, zoom_arr: np.ndarray, instr: str
@@ -198,42 +190,42 @@ class PhaseCorrectionModel:
         nn_df = pd.DataFrame(results, columns=['my_onset', 'their_onset'])
         nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
 
+        no_180_cleaning = [(3, 2, 0.0)]
         # 180ms CLEANING ONLY
         if self.keys_raw['latency'] == 180:
             # TRIALS 1/5 -- HISTOGRAM CLEANING
-            if self.keys_raw['trial'] == 1 or self.keys_raw['trial'] == 5:
-                cut = pd.cut(nn_df['asynchrony'], bins=2)
-                smallest_bin = cut.value_counts().reset_index().iloc[1].rename({'index': 'bound'}).bound.mid
-                largest_bin = cut.value_counts().reset_index().iloc[0].rename({'index': 'bound'}).bound.mid
-                nn_df['category'] = cut
-                for idx, row in nn_df.iterrows():
-                    if smallest_bin > largest_bin:
-                        matrix_subtract = delayed_arr - row['my_onset']
-                        nxt = np.max(np.where(matrix_subtract < 0, matrix_subtract, -np.inf))
-                        try:
-                            nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
-                        except IndexError:
-                            continue
+            cut = pd.cut(nn_df['asynchrony'], bins=2)
+            smallest_bin = cut.value_counts().reset_index().iloc[1].rename({'index': 'bound'}).bound.mid
+            largest_bin = cut.value_counts().reset_index().iloc[0].rename({'index': 'bound'}).bound.mid
+            nn_df['category'] = cut
+            for idx, row in nn_df.iterrows():
+                if smallest_bin > largest_bin:
+                    matrix_subtract = delayed_arr - row['my_onset']
+                    nxt = np.max(np.where(matrix_subtract < 0, matrix_subtract, -np.inf))
+                    try:
+                        nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
+                    except IndexError:
+                        continue
+                    else:
+                        if nxt_nearest != row['my_onset']:
+                            nn_df.at[idx, 'their_onset'] = nxt_nearest
                         else:
-                            if nxt_nearest != row['my_onset']:
-                                nn_df.at[idx, 'their_onset'] = nxt_nearest
-                            else:
-                                nn_df.at[idx, 'their_onset'] = np.nan
-                    elif smallest_bin < largest_bin:
-                        matrix_subtract = delayed_arr - row['my_onset']
-                        nxt = np.min(np.where(matrix_subtract > 0, matrix_subtract, np.inf))
-                        try:
-                            nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
-                        except IndexError:
-                            continue
+                            nn_df.at[idx, 'their_onset'] = np.nan
+                elif smallest_bin < largest_bin:
+                    matrix_subtract = delayed_arr - row['my_onset']
+                    nxt = np.min(np.where(matrix_subtract > 0, matrix_subtract, np.inf))
+                    try:
+                        nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
+                    except IndexError:
+                        continue
+                    else:
+                        if nxt_nearest != row['my_onset']:
+                            nn_df.at[idx, 'their_onset'] = nxt_nearest
                         else:
-                            if nxt_nearest != row['my_onset']:
-                                nn_df.at[idx, 'their_onset'] = nxt_nearest
-                            else:
-                                nn_df.at[idx, 'their_onset'] = np.nan
-                nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
+                            nn_df.at[idx, 'their_onset'] = np.nan
+            nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
 
-        if self._contamination != 0:
+        if 0 < self._contamination < 0.5:
             ee = EllipticEnvelope(contamination=self._contamination, random_state=1)
             ee.fit(nn_df['asynchrony'].to_numpy().reshape(-1, 1))
             nn_df['outliers'] = ee.predict(nn_df['asynchrony'].to_numpy().reshape(-1, 1))
@@ -259,7 +251,6 @@ class PhaseCorrectionModel:
         nn_df['their_onset'] += (nn_df['latency'] / 1000)
         nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
         nn_df = nn_df.drop(['latency'], axis=1)
-
         return self._format_df_for_model(nn_df)
 
     def _iqr_filter(
@@ -305,7 +296,10 @@ class PhaseCorrectionModel:
     def _create_phase_correction_model(
             self, df: pd.DataFrame
     ):
-        return smf.ols(self._model, data=df.dropna(), missing='drop').fit()
+        if self._robust_model:
+            return smf.rlm(self._model, data=df.dropna(), missing='drop').fit()
+        else:
+            return smf.ols(self._model, data=df.dropna(), missing='drop').fit()
 
     def _create_summary_dictionary(
             self, c, md, nn,
@@ -322,19 +316,23 @@ class PhaseCorrectionModel:
             'raw_beats': [c['midi_bpm']],
             'total_beats': autils.extract_interpolated_beats(c)[0],
             'interpolated_beats': autils.extract_interpolated_beats(c)[1],
-            'tempo_slope': self.tempo_slope.params.iloc[1],
-            'tempo_intercept': self.tempo_slope.params.iloc[0],
+            'tempo_slope': self._extract_tempo_slope().params.loc['my_onset'],
+            'tempo_intercept': self._extract_tempo_slope().params.loc['Intercept'],
             'contamination': self._contamination,
             'asynchrony_na': nn['asynchrony'].isna().sum(),
             # 'ioi_std': std,
             # 'ioi_npvi': npvi,
-            # 'pw_asym': self.pairwise_asynchrony,
-            'intercept': md.params.iloc[0],
-            'correction_self': md.params.iloc[1],
-            'correction_partner': md.params.iloc[2],
+            'pw_asym': self._extract_pairwise_asynchrony(),
+            'my_prev_ioi_diff_mean': nn['my_prev_ioi_diff'].mean(),
+            'my_next_ioi_diff_mean': nn['my_next_ioi_diff'].mean(),
+            'asynchrony_mean': nn['asynchrony'].mean(),
+            'intercept': md.params.loc['Intercept'] if 'Intercept' in md.params.index else 0,
+            'correction_self': md.params.loc['my_prev_ioi_diff'],
+            'correction_partner': md.params.loc['asynchrony'],
             'resid_std': np.std(md.resid),
+            'resid_std_adj': np.std(md.resid) / MAX_SNR,
             'resid_len': len(md.resid),
-            'rsquared': md.rsquared,
+            'rsquared': md.rsquared if not self._robust_model else None,
             'zoom_arr': c['zoom_array'],
             'success': c['success'],
             'interaction': c['interaction'],
@@ -350,57 +348,183 @@ if __name__ == '__main__':
     for z in autils.zip_same_conditions_together(raw_data=raw_data):
         # Iterate through keys and drums performances in a condition together
         for c1, c2 in z:
-            print(c1['trial'], c1['block'], c1['latency'], c1['jitter'])
-            pcm = PhaseCorrectionModel(c1, c2)
-            res.append(pcm.keys_dic)
-            res.append(pcm.drms_dic)
+            if c1['trial'] == 3:
+                print(c1['trial'], c1['block'], c1['latency'], c1['jitter'])
+                pcm = PhaseCorrectionModel(
+                    c1, c2, model='my_next_ioi_diff~my_prev_ioi_diff+asynchrony', centre=False
+                )
 
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-    from src.visualise.phase_correction_graphs import PairGrid
+                ke = pd.DataFrame([pcm.keys_dic])
+                dr = pd.DataFrame([pcm.drms_dic])
+                z = c1['zoom_array']
+
+                sim_orig = Simulation(ke, dr, z, num_simulations=100, parameter='original',)
+                sim_democ = Simulation(ke, dr, z, num_simulations=100, parameter='democracy',)
+                sim_anarc = Simulation(ke, dr, z, num_simulations=100, parameter='anarchy',)
+                sim_leader_k = Simulation(ke, dr, z, num_simulations=100, parameter='leadership', leader='Keys',)
+                sim_leader_d = Simulation(ke, dr, z, num_simulations=100, parameter='leadership', leader='Drums',)
+
+                lp = LinePlotAllParameters(simulations=[sim_orig, sim_democ, sim_anarc, sim_leader_k, sim_leader_d],
+                                           keys_orig=pcm.keys_nn, drms_orig=pcm.drms_nn, params=c1)
+                lp.create_plot()
+
+
     df = pd.DataFrame(res)
-    g = sns.FacetGrid(data=df, col='trial', hue='instrument')
-    g.map(sns.histplot, 'correction_partner')
-    plt.show()
+    df.to_clipboard(sep=',')
 
-    pg = PairGrid(
-        df=df, xvar='correction_partner', output_dir=r"C:\Python Projects\jazz-jitter-analysis\reports\test", xlim=(-0.5, 1.5), xlabel='Coupling constant'
-    )
-    pg.create_plot()
+                # ke = pd.DataFrame([pcm.keys_dic])
+                # dr = pd.DataFrame([pcm.drms_dic])
+                # z = c1['zoom_array']
 
-    coef = []
-    for idx, grp in df.groupby(by=['trial', 'block', 'latency', 'jitter']):
-        ke = grp[grp['instrument'] == 'Keys'].reset_index(drop=False)
-        dr = grp[grp['instrument'] != 'Keys'].reset_index(drop=False)
-        z = grp.reset_index().iloc[0]['zoom_arr']
-        sim = Simulation(ke, dr, z, num_simulations=500)
-        sim.create_all_simulations()
-        ts = sim.get_average_tempo_slope()
-        print(idx, ke['tempo_slope'].iloc[0], ts)
-        coef.append((*idx, ke['tempo_slope'].iloc[0], ts))
+                # sim_orig = Simulation(ke, dr, z, num_simulations=100, parameter='original', debug=False)
+                # sim_democ = Simulation(ke, dr, z, num_simulations=100, parameter='democracy', debug=False)
+                # sim_anarc = Simulation(ke, dr, z, num_simulations=100, parameter='anarchy', debug=False)
+                # sim_leader_k = Simulation(ke, dr, z, num_simulations=100, parameter='leadership', leader='Keys', debug=False)
+                # sim_leader_d = Simulation(ke, dr, z, num_simulations=100, parameter='leadership', leader='Drums', debug=False)
+                #
+                # labels = ['Democracy', 'Anarchy', 'Keys leader', 'Drums leader']
+                # for sim, lab in zip([sim_democ, sim_anarc, sim_leader_k, sim_leader_d], labels):
+                #     sim.create_all_simulations()
+                #     print(sim.parameter)
+                #     print(sim.leader)
+                #     print(sim.keys_params)
+                #     print(sim.drms_params)
+                #     print(sim.get_average_tempo_slope())
+                #     grand_avg = sim.get_grand_average_tempo(
+                #         [sim.get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
+                #     )
+                #     grand_avg = grand_avg[(grand_avg.index.seconds >= 7) & (grand_avg.index.seconds <= 101)]
+                #     plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='4s').mean(), alpha=1,
+                #              label=lab)
+                # plt.legend()
+                # plt.title(f"Duo {c1['trial']}, block {c1['block']}, latency {c1['latency']}, jitter {c1['jitter']}")
+                # plt.ylim(30, 160)
+                # plt.show()
 
-        for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
-            avg = sim._get_grand_average_tempo([keys, drms])
-            avg = avg[(avg.index.seconds > 8) & (avg.index.seconds < 93)]
-            plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='8s').mean(), alpha=0.01,
-                     color=vutils.BLACK)
-        grand_avg = sim._get_grand_average_tempo(
-            [sim._get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
-        )
-        grand_avg = grand_avg[(grand_avg.index.seconds > 8) & (grand_avg.index.seconds < 93)]
-        plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='8s').mean(), alpha=1,
-                 color=vutils.BLACK)
-        plt.title(f'Duo {idx[0]}, block {idx[1]}, latency {idx[2]}, jitter {idx[3]}')
-        plt.ylim(30, 160)
-        plt.show()
+            # sim_debug.create_all_simulations()
+            # grand_avg = sim_debug.get_grand_average_tempo(
+            #     [sim_debug.get_grand_average_tempo([k, d]) for k, d in zip(sim_debug.keys_simulations, sim_debug.drms_simulations)]
+            # )
+            # grand_avg = grand_avg[(grand_avg.index.seconds >= 7) & (grand_avg.index.seconds <= 101)]
+            # plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='4s').mean(), alpha=1,
+            #          color='b', label='Simulation (zero noise)')
 
-    coef_df = pd.DataFrame(coef, columns=['trial', 'block', 'latency', 'jitter', 'actual', 'simulated'])
-    fig, ax = plt.subplots(1, 1)
-    g = sns.scatterplot(data=coef_df, x='simulated', y='actual', hue='latency', palette='tab10')
-    # g = sns.regplot(data=coef_df, x='simulated', y='actual', scatter=False, ci=None)
-    g.set(ylim=(-0.8, 0.8), xlim=(-0.8, 0.8), xlabel='Simulated slope (BPM/s)', ylabel='Actual slope (BPM/s)')
-    g.plot([0, 1], [0, 1], transform=ax.transAxes, c='#000000')
-    plt.show()
+            # grand_avg = sim.get_grand_average_tempo(
+            #     [sim.get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
+            # )
+            # grand_avg = grand_avg[(grand_avg.index.seconds >= 7) & (grand_avg.index.seconds <= 101)]
+            # plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='4s').mean(), alpha=1,
+            #          color='r', label='Simulation (with noise)')
+            #
+            #
+            #
+            # resampled = [resample(data) for data in [pcm.keys_nn, pcm.drms_nn]]
+            # # Concatenate the resampled dataframes together and get the row-wise mean
+            # conc = pd.DataFrame(pd.concat([df['my_next_ioi'] for df in resampled], axis=1).mean(axis=1),
+            #                     columns=['my_next_ioi'])
+            # # Get the elapsed time column as an integer
+            # conc['my_onset'] = conc.index.total_seconds()
+            # plt.plot(conc.my_onset, (60 / conc.my_next_ioi).rolling(window='4s').mean(), alpha=1,
+            #          color=vutils.BLACK, label='Original performance')
+            #
+            # plt.title(f"Duo {c1['trial']}, block {c1['block']}, latency {c1['latency']}, jitter {c1['jitter']}")
+            # plt.ylim(30, 160)
+            # plt.legend()
+            # plt.show()
+
+
+            # sim = Simulation(ke, dr, z, num_simulations=500)
+            # sim.create_all_simulations()
+            # ts = sim.get_average_tempo_slope()
+            # sim_results.append((c1['trial'], c1['block'], c1['latency'], c1['jitter'], pcm.keys_dic['tempo_slope'], ts))
+            #
+            # for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
+            #     avg = sim.get_grand_average_tempo([keys, drms])
+            #     avg = avg[(avg.index.seconds >= 7) & (avg.index.seconds <= 101)]
+            #     plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='4s').mean(), alpha=0.01,
+            #              color='r')
+            #
+            # grand_avg = sim.get_grand_average_tempo(
+            #     [sim.get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
+            # )
+            # grand_avg = grand_avg[(grand_avg.index.seconds >= 7) & (grand_avg.index.seconds <= 101)]
+            # plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='4s').mean(), alpha=1,
+            #          color='r', label='Simulation')
+
+            # ORIGINAL PERFORMANCE
+            # ke_orig = pd.DataFrame(ke.raw_beats[0][0], columns=['my_onset', 'pitch', 'velocity']).sort_values('my_onset')
+            # ke_orig['my_prev_ioi'] = ke_orig['my_onset'].diff().astype(float)
+            # temp = ke_orig.dropna()
+            # temp = temp[temp['my_prev_ioi'] < 0.2]
+            # ke_orig = ke_orig[~ke_orig.index.isin(temp.index)]
+            # ke_orig['my_prev_ioi'] = ke_orig['my_onset'].diff().astype(float)
+            # ke_orig['my_next_ioi'] = ke_orig['my_prev_ioi'].shift(-1)
+            # dr_orig = pd.DataFrame(dr.raw_beats[0][0], columns=['my_onset', 'pitch', 'velocity']).sort_values('my_onset')
+            # dr_orig['my_prev_ioi'] = dr_orig['my_onset'].diff().astype(float)
+            # temp = dr_orig.dropna()
+            # temp = temp[temp['my_prev_ioi'] < 0.2]
+            # dr_orig = dr_orig[~dr_orig.index.isin(temp.index)]
+            # dr_orig['my_prev_ioi'] = dr_orig['my_onset'].diff().astype(float)
+            # dr_orig['my_next_ioi'] = dr_orig['my_prev_ioi'].shift(-1)
+            # Resample both raw dataframes
+    #         resampled = [resample(data) for data in [pcm.keys_nn, pcm.drms_nn]]
+    #         # Concatenate the resampled dataframes together and get the row-wise mean
+    #         conc = pd.DataFrame(pd.concat([df['my_next_ioi'] for df in resampled], axis=1).mean(axis=1),
+    #                             columns=['my_next_ioi'])
+    #         # Get the elapsed time column as an integer
+    #         conc['my_onset'] = conc.index.total_seconds()
+    #         plt.plot(conc.my_onset, (60 / conc.my_next_ioi).rolling(window='4s').mean(), alpha=1,
+    #                  color=vutils.BLACK, label='Original performance')
+    #
+    #         plt.title(f"Duo {c1['trial']}, block {c1['block']}, latency {c1['latency']}, jitter {c1['jitter']}")
+    #         plt.ylim(30, 160)
+    #         plt.legend()
+    #         plt.show()
+    #
+    # df = pd.DataFrame(res)
+    # g = sns.FacetGrid(data=df, col='trial', hue='instrument')
+    # g.map(sns.histplot, 'correction_partner')
+    # plt.show()
+    # pg = PairGrid(
+    #     df=df, xvar='correction_partner', output_dir=r"C:\Python Projects\jazz-jitter-analysis\reports\test", xlim=(-0.5, 1.5), xlabel='Coupling constant'
+    # )
+    # pg.create_plot()
+    #
+    # sim_df = pd.DataFrame(sim_results, columns=['trial', 'block', 'latency', 'jitter', 'actual', 'simulated'])
+    # fig, ax = plt.subplots(1, 1)
+    # g = sns.scatterplot(data=sim_df, x='simulated', y='actual', hue='latency', palette='tab10')
+    # g.set(ylim=(-0.8, 0.8), xlim=(-0.8, 0.8), xlabel='Simulated slope (BPM/s)', ylabel='Actual slope (BPM/s)')
+    # g.plot([0, 1], [0, 1], transform=ax.transAxes, c='#000000')
+    # plt.show()
+
+    #
+    # coef = []
+    # for idx, grp in df.groupby(by=['trial', 'block', 'latency', 'jitter']):
+    #     ke = grp[grp['instrument'] == 'Keys'].reset_index(drop=False)
+    #     dr = grp[grp['instrument'] != 'Keys'].reset_index(drop=False)
+    #     z = grp.reset_index().iloc[0]['zoom_arr']
+    #     sim = Simulation(ke, dr, z, num_simulations=500)
+    #     sim.create_all_simulations()
+    #     ts = sim.get_average_tempo_slope()
+    #     print(idx, ke['tempo_slope'].iloc[0], ts)
+    #     coef.append((*idx, ke['tempo_slope'].iloc[0], ts))
+    #
+    #     for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
+    #         avg = sim._get_grand_average_tempo([keys, drms])
+    #         avg = avg[(avg.index.seconds > 8) & (avg.index.seconds < 93)]
+    #         plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='8s').mean(), alpha=0.01,
+    #                  color=vutils.BLACK)
+    #     grand_avg = sim._get_grand_average_tempo(
+    #         [sim._get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
+    #     )
+    #     grand_avg = grand_avg[(grand_avg.index.seconds > 8) & (grand_avg.index.seconds < 93)]
+    #     plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='8s').mean(), alpha=1,
+    #              color=vutils.BLACK)
+    #     plt.title(f'Duo {idx[0]}, block {idx[1]}, latency {idx[2]}, jitter {idx[3]}')
+    #     plt.ylim(30, 160)
+    #     plt.show()
+    #
+
 
 
     # coef = []
@@ -455,3 +579,135 @@ if __name__ == '__main__':
     # print(df)
     # df.to_clipboard(sep=',')
     # df.to_csv(r'C:\Python Projects\jazz-jitter-analysis\reports\test\df_zeroed.csv', sep=',')
+
+
+# df = pd.read_csv(r'C:\Python Projects\jazz-jitter-analysis\reports\test\df.csv', index_col=0)
+# zero_contam = pd.read_csv(r'C:\Python Projects\jazz-jitter-analysis\reports\test\df_zeroed.csv', index_col=0)
+# df = pd.concat([df, zero_contam]).sort_values(by=['trial', 'block', 'latency', 'jitter', 'contamination']).reset_index(drop=True)
+# res = []
+# tolerance = 0
+# for idx, grp in df.groupby(['trial', 'block', 'latency', 'jitter']):
+#     grp['min_slope'] = abs(grp['actual_slope'] - grp['predicted_slope'])
+#     grp['avg_na'] = grp[['keys_asynchrony_na', 'drms_asynchrony_na']].mean(axis=1)
+#     sliced = grp[grp['min_slope'] <= grp['min_slope'].min() + tolerance]
+#     res.append(df.iloc[sliced['avg_na'].idxmin()])
+# res_df = (pd.concat(res, axis=1).transpose().reset_index())
+# fig, ax = plt.subplots(1, 1)
+# g = sns.scatterplot(data=res_df, x='predicted_slope', y='actual_slope', size='contamination', hue='latency', palette='tab10')
+# # g = sns.regplot(data=coef_df, x='simulated', y='actual', scatter=False, ci=None)
+# g.set(ylim=(-0.8, 0.8), xlim=(-0.8, 0.8), xlabel='Simulated slope (BPM/s)', ylabel='Actual slope (BPM/s)')
+# g.plot([0, 1], [0, 1], transform=ax.transAxes, c='#000000')
+# sns.move_legend(g, "upper left", bbox_to_anchor=(1, 0.85), frameon=False,)
+# plt.tight_layout()
+# plt.show()
+# print(res_df[['trial', 'block', 'latency', 'jitter', 'contamination']].to_dict('records'))
+# import json
+# with open(r'C:\Python Projects\jazz-jitter-analysis\src\analyse\contamination_params.json', 'w') as fout:
+#     json.dump(res_df[['trial', 'block', 'latency', 'jitter', 'contamination']].to_dict('records'), fout)
+
+
+#
+# for idx, grp in df.groupby(by=['trial', 'block', 'latency', 'jitter']):
+#     # ROBUST MODEL
+#     ke = grp[(grp['instrument'] == 'Keys') & (grp['rsquared'].isna())].reset_index(drop=False)
+#     dr = grp[(grp['instrument'] == 'Keys') & (grp['rsquared'].isna())].reset_index(drop=False)
+#     z = ke.reset_index().iloc[0]['zoom_arr']
+#     sim = Simulation(ke, dr, z, include_penalty='stationary', num_simulations=500)
+#     sim.create_all_simulations()
+#     for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
+#         avg = sim.get_grand_average_tempo([keys, drms])
+#         avg = avg[(avg.index.seconds >= 8) & (avg.index.seconds < 100)]
+#         plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='8s').mean(), alpha=0.01,
+#                  color='r')
+#     grand_avg = sim.get_grand_average_tempo(
+#         [sim.get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
+#     )
+#     grand_avg = grand_avg[(grand_avg.index.seconds >= 8) & (grand_avg.index.seconds < 100)]
+#     plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='8s').mean(), alpha=1,
+#              color='r', label='Robust model')
+#
+#     # NORMAL OLS
+#     ke = grp[(grp['instrument'] == 'Keys') & (~grp['rsquared'].isna())].reset_index(drop=False)
+#     dr = grp[(grp['instrument'] == 'Keys') & (~grp['rsquared'].isna())].reset_index(drop=False)
+#     z = ke.reset_index().iloc[0]['zoom_arr']
+#     sim = Simulation(ke, dr, z, include_penalty='stationary', num_simulations=500)
+#     sim.create_all_simulations()
+#     for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
+#         avg = sim.get_grand_average_tempo([keys, drms])
+#         avg = avg[(avg.index.seconds >= 8) & (avg.index.seconds < 100)]
+#         plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='8s').mean(), alpha=0.01,
+#                  color='r')
+#     grand_avg = sim.get_grand_average_tempo(
+#         [sim.get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
+#     )
+#     grand_avg = grand_avg[(grand_avg.index.seconds >= 8) & (grand_avg.index.seconds < 100)]
+#     plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='8s').mean(), alpha=1,
+#              color='b', label='OLS model')
+#
+#
+# #
+# #     # # WITH NON-STATIONARY PENALTY
+# #     ke = grp[(grp['instrument'] == 'Keys') & (grp['penalty_diff'] == 0) & (grp['penalty'] != 0)].reset_index(drop=False)
+# #     dr = grp[(grp['instrument'] != 'Keys') & (grp['penalty_diff'] == 0) & (grp['penalty'] != 0)].reset_index(drop=False)
+# #     z = ke.reset_index().iloc[0]['zoom_arr']
+# #     sim = Simulation(ke, dr, z, include_penalty='nonstationary', num_simulations=500)
+# #     sim.create_all_simulations()
+# #     for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
+# #         avg = sim._get_grand_average_tempo([keys, drms])
+# #         avg = avg[(avg.index.seconds >= 8) & (avg.index.seconds < 100)]
+# #         plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='8s').mean(), alpha=0.01,
+# #                  color='g')
+# #     grand_avg = sim._get_grand_average_tempo(
+# #         [sim._get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
+# #     )
+# #     grand_avg = grand_avg[(grand_avg.index.seconds >= 8) & (grand_avg.index.seconds < 100)]
+# #     plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='8s').mean(), alpha=1,
+# #              color='g', label='With penalty, no differencing')
+# #
+# #     # WITHOUT PENALTY
+# #     ke = grp[(grp['instrument'] == 'Keys') & (grp['penalty_diff'] == 0) & (grp['penalty'] == 0)].reset_index(drop=False)
+# #     dr = grp[(grp['instrument'] != 'Keys') & (grp['penalty_diff'] == 0) & (grp['penalty'] == 0)].reset_index(drop=False)
+# #     z = ke.reset_index().iloc[0]['zoom_arr']
+# #     sim = Simulation(ke, dr, z, num_simulations=500)
+# #     sim.create_all_simulations()
+# #     for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
+# #         avg = sim._get_grand_average_tempo([keys, drms])
+# #         avg = avg[(avg.index.seconds >= 8) & (avg.index.seconds < 100)]
+# #         plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='8s').mean(), alpha=0.01,
+# #                  color='b')
+# #     grand_avg = sim._get_grand_average_tempo(
+# #         [sim._get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
+# #     )
+# #     grand_avg = grand_avg[(grand_avg.index.seconds >= 8) & (grand_avg.index.seconds < 100)]
+# #     plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='8s').mean(), alpha=1,
+# #              color='b', label='No penalty, original model')
+# #
+#     # ORIGINAL PERFORMANCE
+#     ke_orig = pd.DataFrame(ke.raw_beats[0][0], columns=['my_onset', 'pitch', 'velocity']).sort_values('my_onset')
+#     ke_orig['my_prev_ioi'] = ke_orig['my_onset'].diff().astype(float)
+#     temp = ke_orig.dropna()
+#     temp = temp[temp['my_prev_ioi'] < 0.2]
+#     ke_orig = ke_orig[~ke_orig.index.isin(temp.index)]
+#     ke_orig['my_prev_ioi'] = ke_orig['my_onset'].diff().astype(float)
+#     ke_orig['my_next_ioi'] = ke_orig['my_prev_ioi'].shift(-1)
+#     dr_orig = pd.DataFrame(dr.raw_beats[0][0], columns=['my_onset', 'pitch', 'velocity']).sort_values('my_onset')
+#     dr_orig['my_prev_ioi'] = dr_orig['my_onset'].diff().astype(float)
+#     temp = dr_orig.dropna()
+#     temp = temp[temp['my_prev_ioi'] < 0.2]
+#     dr_orig = dr_orig[~dr_orig.index.isin(temp.index)]
+#     dr_orig['my_prev_ioi'] = dr_orig['my_onset'].diff().astype(float)
+#     dr_orig['my_next_ioi'] = dr_orig['my_prev_ioi'].shift(-1)
+#     # Resample both raw dataframes
+#     resampled = [resample(data) for data in [ke_orig, dr_orig]]
+#     # Concatenate the resampled dataframes together and get the row-wise mean
+#     conc = pd.DataFrame(pd.concat([df['my_next_ioi'] for df in resampled], axis=1).mean(axis=1),
+#                         columns=['my_next_ioi'])
+#     # Get the elapsed time column as an integer
+#     conc['my_onset'] = conc.index.total_seconds()
+#     plt.plot(conc.my_onset, (60 / conc.my_next_ioi).rolling(window='8s').mean(), alpha=1,
+#              color=vutils.BLACK, label='Original performance')
+#
+#     plt.title(f'Duo {idx[0]}, block {idx[1]}, latency {idx[2]}, jitter {idx[3]}')
+#     plt.ylim(30, 160)
+#     plt.legend()
+#     plt.show()

@@ -1,15 +1,103 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import numpy as np
 from scipy.stats import stats
 
 import src.visualise.visualise_utils as vutils
+from src.analyse.simulations_ratio import Simulation
 
 
 class LinePlotAllParameters(vutils.BasePlot):
     """
-    Creates a line plot
+    For a single performance, creates two line plots showing tempo and asynchrony change for all simulated parameters
+    (anarchy, democracy etc.)
     """
+    def __init__(
+            self, simulations: list, **kwargs
+    ):
+        super().__init__(**kwargs)
+        # Our list of Simulation classes: we need not have created the simulations yet when passing them in
+        self.simulations: list = simulations
+        # Our original performances
+        self.keys_orig, self.drms_orig = kwargs.get('keys_orig', None), kwargs.get('drms_orig', None)
+        self.params = kwargs.get('params', None)
+        self.fig, self.ax = plt.subplots(2, 1, sharex=True, figsize=(18.8, 10))
+        self.ax[1].set_yscale('log')
+
+    def _plot_all_simulations(
+            self
+    ) -> None:
+        """
+
+        """
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+        for sim, col in zip(self.simulations, colors):
+            if len(sim.keys_simulations) == 0 or len(sim.drms_simulations) == 0:
+                sim.create_all_simulations()
+            sim.plot_simulation(color=col, ax=self.ax[0], var='my_next_ioi')
+            sim.plot_simulation(color=col, ax=self.ax[1], var='asynchrony', bpm=False)
+
+    def _plot_original_performance(
+            self
+    ) -> None:
+        """
+
+        """
+        # Resample our two original performance dataframes
+        resampled = [vutils.resample(data) for data in [self.keys_orig, self.drms_orig]]
+        # Divide ioi by 60 to get bpm
+        for d in resampled:
+            d['my_next_ioi'] = 60 / d['my_next_ioi']
+        for num, s in enumerate(['my_next_ioi', 'asynchrony']):
+            # Concatenate the resampled dataframes together and get the row-wise mean
+            conc = pd.DataFrame(
+                pd.concat([df[s] for df in resampled], axis=1).mean(axis=1), columns=[s]
+            )
+            # Get the elapsed time column as an integer
+            conc['my_onset'] = conc.index.total_seconds()
+            # Plot onto the required axis
+            self.ax[num].plot(
+                conc['my_onset'], conc[s].rolling(window='4s').mean(), alpha=1, color=vutils.BLACK, label='Actual',
+                linewidth=4
+            )
+
+    @vutils.plot_decorator
+    def create_plot(self):
+        """
+
+        """
+        self._plot_all_simulations()
+        if self.keys_orig is not None and self.drms_orig is not None:
+            self._plot_original_performance()
+        self._format_ax()
+        self._format_fig()
+        plt.show()
+
+    def _format_ax(self):
+        self.ax[0].set(ylabel='Tempo (BPM)', xlabel='', ylim=(0, 200))
+        self.ax[0].axhline(y=120, linestyle='--', alpha=vutils.ALPHA, color=vutils.BLACK, linewidth=2)
+        self.ax[1].set(
+            ylabel='Asynchrony (s)', xlabel='Performance duration (s)', yticks=[0.002, 0.02, 0.2, 2, 20],
+            yticklabels=[0.002, 0.02, 0.2, 2, 20], ylim=(0.002, 20)
+        )
+        self.ax[1].axhline(
+            y=self.params['latency'] / 1000, linestyle='--', alpha=vutils.ALPHA, color=vutils.BLACK, linewidth=2
+        )
+        # Iterate through to set tick and axes line widths
+        for num, ax in enumerate(self.ax.flatten()):
+            ax.tick_params(width=3, )
+            plt.setp(ax.spines.values(), linewidth=2)
+
+    def _format_fig(self):
+        self.fig.suptitle(f"Duo {self.params['trial']}, block {self.params['block']}, "
+                          f"latency {self.params['latency']}, jitter {self.params['jitter']}")
+        handles, labels = self.ax[0].get_legend_handles_labels()
+        self.fig.legend(
+            handles[:len(self.simulations) + 1], labels[:len(self.simulations) + 1], ncol=len(self.simulations) + 1,
+            loc='lower center', title=None, frameon=False,
+        )
+        self.fig.subplots_adjust(bottom=0.12, top=0.93, left=0.09, right=0.91)
 
 
 class BarPlotSimulationParameters(vutils.BasePlot):
