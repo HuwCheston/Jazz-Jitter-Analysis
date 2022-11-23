@@ -22,7 +22,7 @@ class LinePlotAllParameters(vutils.BasePlot):
         # Our original performances
         self.keys_orig, self.drms_orig = kwargs.get('keys_orig', None), kwargs.get('drms_orig', None)
         self.params = kwargs.get('params', None)
-        self.fig, self.ax = plt.subplots(2, 1, sharex=True, figsize=(18.8, 10))
+        self.fig, self.ax = plt.subplots(2, 1, sharex=True, figsize=(18.8, 15))
         self.ax[1].set_yscale('log')
 
     def _plot_all_simulations(
@@ -52,14 +52,14 @@ class LinePlotAllParameters(vutils.BasePlot):
         for num, s in enumerate(['my_next_ioi', 'asynchrony']):
             # Concatenate the resampled dataframes together and get the row-wise mean
             conc = pd.DataFrame(
-                pd.concat([df[s] for df in resampled], axis=1).mean(axis=1), columns=[s]
+                pd.concat([df[s] for df in resampled], axis=1).abs().mean(axis=1), columns=[s]
             )
             # Get the elapsed time column as an integer
             conc['my_onset'] = conc.index.total_seconds()
             # Plot onto the required axis
             self.ax[num].plot(
-                conc['my_onset'], conc[s].rolling(window='4s').mean(), alpha=1, color=vutils.BLACK, label='Actual',
-                linewidth=4
+                conc['my_onset'], conc[s].rolling(window='4s').mean(), alpha=1, color=vutils.BLACK,
+                label='Actual performance', linewidth=4
             )
 
     @vutils.plot_decorator
@@ -72,21 +72,44 @@ class LinePlotAllParameters(vutils.BasePlot):
             self._plot_original_performance()
         self._format_ax()
         self._format_fig()
-        plt.show()
+        self.fig.suptitle(f"Duo {self.params['trial']}, block {self.params['block']}, "
+                          f"latency {self.params['latency']}, jitter {self.params['jitter']}")
+        fname = f"{self.output_dir}\\lineplot_all_parameters_{self.params['trial']}_" \
+                f"{self.params['block']}_{self.params['latency']}_{self.params['jitter']}.png"
+        return self.fig, fname
+
+    def _get_min_max_x_val(
+            self, func
+    ) -> float:
+        """
+
+        """
+        res = []
+        # Iterate through each simulation object
+        for s in self.simulations:
+            # Iterate through each simulation
+            for k, d in zip(s.keys_simulations, s.drms_simulations):
+                # Apply our function to keys, drums individually, then together
+                res.append(func([func(k.index.seconds), func(d.index.seconds)]))
+        # Apply function to the results
+        return func(res)
 
     def _format_ax(self):
-        self.ax[0].set(ylabel='Tempo (BPM)', xlabel='', ylim=(0, 200))
+        # Format top axes (BPM)
+        self.ax[0].set(xlabel='', ylim=(0, 200), xlim=(self._get_min_max_x_val(min), self._get_min_max_x_val(max)))
+        self.ax[0].set_ylabel('Tempo (BPM)', fontsize='large')
         self.ax[0].axhline(y=120, linestyle='--', alpha=vutils.ALPHA, color=vutils.BLACK, linewidth=2)
-        self.ax[1].set(
-            ylabel='Asynchrony (s)', xlabel='Performance duration (s)', yticks=[0.002, 0.02, 0.2, 2, 20],
-            yticklabels=[0.002, 0.02, 0.2, 2, 20], ylim=(0.002, 20)
-        )
+        # Format bottom axes (async)
+        ticks = [0.0025, 0.025, 0.25, 2.5, 25]
+        self.ax[1].set(yticks=ticks, yticklabels=ticks, ylim=(0.0025, 25))
+        self.ax[1].set_ylabel('Asynchrony (s)', fontsize='large')
+        self.ax[1].set_xlabel('Performance duration (s)', fontsize='large')
         self.ax[1].axhline(
             y=self.params['latency'] / 1000, linestyle='--', alpha=vutils.ALPHA, color=vutils.BLACK, linewidth=2
         )
         # Iterate through to set tick and axes line widths
         for num, ax in enumerate(self.ax.flatten()):
-            ax.tick_params(width=3, )
+            ax.tick_params(width=3, which='both', labelsize=20)
             plt.setp(ax.spines.values(), linewidth=2)
 
     def _format_fig(self):
@@ -95,9 +118,9 @@ class LinePlotAllParameters(vutils.BasePlot):
         handles, labels = self.ax[0].get_legend_handles_labels()
         self.fig.legend(
             handles[:len(self.simulations) + 1], labels[:len(self.simulations) + 1], ncol=len(self.simulations) + 1,
-            loc='lower center', title=None, frameon=False,
+            loc='lower center', title=None, frameon=False, fontsize='large', columnspacing=1, handletextpad=0.3
         )
-        self.fig.subplots_adjust(bottom=0.12, top=0.93, left=0.09, right=0.91)
+        self.fig.subplots_adjust(bottom=0.09, top=0.95, left=0.09, right=0.91)
 
 
 class BarPlotSimulationParameters(vutils.BasePlot):

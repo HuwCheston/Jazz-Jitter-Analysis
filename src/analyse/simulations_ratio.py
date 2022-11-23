@@ -205,15 +205,24 @@ class Simulation:
             value_type=nb.types.float64[:],
         )
         # Fill the dictionary with arrays (pre-allocated in order to make running the simulation easier)
-        for s in ['my_onset', 'asynchrony', 'my_next_ioi', 'my_next_diff']:
+        for s in ['my_onset', 'asynchrony', 'my_next_ioi', 'my_prev_ioi', 'my_next_ioi_diff', 'my_prev_ioi_diff']:
             nb_dict[s] = np.zeros(shape=self.total_beats)
         # Fill the dictionary arrays with our starting values
+        # My onset
         nb_dict['my_onset'][0] = onset
         nb_dict['my_onset'][1] = onset + iois[0]
+        # My next ioi
         nb_dict['my_next_ioi'][0] = iois[0]
         nb_dict['my_next_ioi'][1] = iois[1]
-        nb_dict['my_next_diff'][0] = np.nan
-        nb_dict['my_next_diff'][1] = 0
+        # My previous ioi
+        nb_dict['my_prev_ioi'][0] = np.nan
+        nb_dict['my_prev_ioi'][1] = iois[0]
+        # My next ioi diff
+        nb_dict['my_next_ioi_diff'][0] = iois[1] - iois[0]
+        nb_dict['my_next_ioi_diff'][1] = 0      # This will be replaced with our first prediction
+        # My previous ioi diff
+        nb_dict['my_next_ioi_diff'][0] = np.nan
+        nb_dict['my_next_ioi_diff'][1] = iois[1] - iois[0]
         return nb_dict
 
     def create_all_simulations(
@@ -269,7 +278,7 @@ class Simulation:
         return df.set_index('td').resample(rule=self._resample_interval, offset=offset).mean()
 
     @staticmethod
-    @nb.njit
+    # @nb.njit
     def _create_one_simulation(
             keys_data: nb.typed.Dict, drms_data: nb.typed.Dict,
             keys_params: nb.typed.Dict, drms_params: nb.typed.Dict,
@@ -315,6 +324,12 @@ class Simulation:
         )
         drms_data['asynchrony'][1] = (
                 (keys_data['my_onset'][1] + get_lat(keys_data['my_onset'][1])) - drms_data['my_onset'][1]
+        )
+        keys_data['my_next_diff'][1] = predict(
+            keys_data['my_next_diff'][0], keys_data['asynchrony'][1], keys_params, keys_noise
+        )
+        drms_data['my_next_diff'][1] = predict(
+            drms_data['my_next_diff'][0], drms_data['asynchrony'][1], drms_params, drms_noise
         )
 
         # We don't use the full range of beats, given that we've already added some in when creating our starter data
@@ -402,7 +417,7 @@ class Simulation:
 
     def plot_simulation(
             self, plot_individual: bool = True, plot_average: bool = True, color: str = 'r', var: str = 'my_next_ioi',
-            timespan: tuple[int] = (7, 101), ax: plt.Axes = None, bpm: bool = True, lw: float = 4.
+            timespan: tuple[int] = (7, 101), ax: plt.Axes = None, bpm: bool = True, lw: float = 4., ls: str = '-'
     ) -> None:
         """
 
@@ -424,7 +439,7 @@ class Simulation:
                 if bpm:
                     avg[var] = 60 / avg[var]
                 ax.plot(
-                    avg.index.seconds, (avg[var]).rolling(window='4s').mean(), alpha=0.01, color=color
+                    avg.index.seconds, (avg[var]).rolling(window='4s').mean(), alpha=0.01, color=color,
                 )
         # If we're plotting our average simulation
         if plot_average:
@@ -440,7 +455,7 @@ class Simulation:
             if bpm:
                 grand_avg[var] = 60 / grand_avg[var]
             ax.plot(
-                grand_avg.index.seconds, (grand_avg[var]).rolling(window='4s').mean(), alpha=1, linewidth=lw,
+                grand_avg.index.seconds, (grand_avg[var]).rolling(window='4s').mean(), alpha=1, linewidth=lw, ls=ls,
                 color=color, label=f'{self.parameter.title()} {self.leader if self.leader is not None else ""}'
             )
 
