@@ -12,15 +12,17 @@ import src.visualise.visualise_utils as vutils
 SIGNAL_NOISE = 4
 
 class Simulation:
-    def __init__(self, keys_params, drms_params, latency_array, num_simulations: int = 1000, **kwargs):
+    def __init__(
+            self, keys_nn, drms_nn, keys_params, drms_params, latency_array, num_simulations: int = 1000, **kwargs
+    ):
         """
 
         """
         # Default parameters
-        self._keys_initial_iois: list[float] = self._get_initial_iois(keys_params)
-        self._drms_initial_iois: list[float] = self._get_initial_iois(drms_params)
-        self._keys_initial_onset: float = self._get_initial_onset(keys_params)
-        self._drms_initial_onset: float = self._get_initial_onset(drms_params)
+        self._keys_initial_iois: list[float] = self._get_initial_iois(keys_nn)
+        self._drms_initial_iois: list[float] = self._get_initial_iois(drms_nn)
+        self._keys_initial_onset: float = self._get_initial_onset(keys_nn)
+        self._drms_initial_onset: float = self._get_initial_onset(drms_nn)
         self._resample_interval: timedelta = timedelta(seconds=1)  # Get mean of IOIs within this window
         self._include_penalty: str = kwargs.get('include_penalty', None)
         self._debug: bool = kwargs.get('debug', False)
@@ -76,39 +78,32 @@ class Simulation:
 
     @staticmethod
     def _get_initial_iois(
-            params: pd.DataFrame,
+            nn
     ) -> tuple[float]:
         try:
-            orig = pd.DataFrame(
-                params['raw_beats'][0][0], columns=['my_onset', 'pitch', 'velocity']
-            ).sort_values('my_onset')
+            iois = nn.iloc[:2]['my_next_ioi'].values.tolist()
         except KeyError:
             return 0.5, 0.5
         else:
-            orig['my_prev_ioi'] = orig['my_onset'].diff().astype(float)
-            orig['my_prev_ioi'] = orig['my_onset'].diff().astype(float)
-            orig['my_next_ioi'] = orig['my_prev_ioi'].shift(-1)
-            # Try and use the original IOIs if we can, but if these are likely incorrect then default to 0.5
-            return tuple(orig['my_next_ioi'].iloc[i] if 0. < orig['my_next_ioi'].iloc[i] < 0.7 else 0.5 for i in range(0, 2))
+            return [ioi if not np.isnan(ioi) else 0.5 for ioi in iois]
 
     @staticmethod
     def _get_initial_onset(
-            params: pd.DataFrame
+            nn: pd.DataFrame
     ) -> float:
         """
 
         """
         try:
-            orig = pd.DataFrame(params['raw_beats'][0][0], columns=['my_onset', 'pitch', 'velocity']).sort_values(
-                'my_onset')
+            onset = nn.iloc[0]['my_onset']
         except KeyError:
             return 8.0
         else:
             # This is used to capture a few cases where one performer didn't come straight in after the count in
-            if orig['my_onset'].iloc[0] > 9:
+            if onset > 9:
                 return 8.0
             else:
-                return orig['my_onset'].iloc[0]
+                return onset
 
     @staticmethod
     def _get_raw_musician_parameters(
@@ -218,11 +213,11 @@ class Simulation:
         nb_dict['my_prev_ioi'][0] = np.nan
         nb_dict['my_prev_ioi'][1] = iois[0]
         # My next ioi diff
-        nb_dict['my_next_ioi_diff'][0] = iois[1] - iois[0]
-        nb_dict['my_next_ioi_diff'][1] = 0      # This will be replaced with our first prediction
-        # My previous ioi diff
         nb_dict['my_next_ioi_diff'][0] = np.nan
         nb_dict['my_next_ioi_diff'][1] = iois[1] - iois[0]
+        # My previous ioi diff
+        nb_dict['my_prev_ioi_diff'][0] = np.nan
+        nb_dict['my_prev_ioi_diff'][1] = np.nan
         return nb_dict
 
     def create_all_simulations(
@@ -278,7 +273,7 @@ class Simulation:
         return df.set_index('td').resample(rule=self._resample_interval, offset=offset).mean()
 
     @staticmethod
-    # @nb.njit
+    @nb.njit
     def _create_one_simulation(
             keys_data: nb.typed.Dict, drms_data: nb.typed.Dict,
             keys_params: nb.typed.Dict, drms_params: nb.typed.Dict,
@@ -325,18 +320,17 @@ class Simulation:
         drms_data['asynchrony'][1] = (
                 (keys_data['my_onset'][1] + get_lat(keys_data['my_onset'][1])) - drms_data['my_onset'][1]
         )
-        keys_data['my_next_diff'][1] = predict(
-            keys_data['my_next_diff'][0], keys_data['asynchrony'][1], keys_params, keys_noise
-        )
-        drms_data['my_next_diff'][1] = predict(
-            drms_data['my_next_diff'][0], drms_data['asynchrony'][1], drms_params, drms_noise
-        )
-
         # We don't use the full range of beats, given that we've already added some in when creating our starter data
         for i in range(2, beats):
+            # Shift difference
+            keys_data['my_prev_ioi_diff'][i] = keys_data['my_next_ioi_diff'][i - 1]
+            drms_data['my_prev_ioi_diff'][i] = drms_data['my_next_ioi_diff'][i - 1]
+            # Shift IOI
+            keys_data['my_prev_ioi'][i] = keys_data['my_next_ioi'][i - 1]
+            drms_data['my_prev_ioi'][i] = drms_data['my_next_ioi'][i - 1]
             # Get next onset by adding previous onset to predicted IOI
-            keys_data['my_onset'][i] = keys_data['my_onset'][i - 1] + keys_data['my_next_ioi'][i - 1]
-            drms_data['my_onset'][i] = drms_data['my_onset'][i - 1] + drms_data['my_next_ioi'][i - 1]
+            keys_data['my_onset'][i] = keys_data['my_onset'][i - 1] + keys_data['my_prev_ioi'][i]
+            drms_data['my_onset'][i] = drms_data['my_onset'][i - 1] + drms_data['my_prev_ioi'][i]
             # Get asynchrony value by subtracting partner's onset (plus latency) from ours
             # noinspection PyBroadException
             try:
@@ -349,17 +343,18 @@ class Simulation:
             except:
                 break
             # Predict difference between previous IOI and next IOI
-            keys_data['my_next_diff'][i] = predict(
-                keys_data['my_next_diff'][i - 1], keys_data['asynchrony'][i], keys_params, keys_noise
+            keys_data['my_next_ioi_diff'][i] = predict(
+                keys_data['my_prev_ioi_diff'][i], keys_data['asynchrony'][i], keys_params, keys_noise
             )
-            drms_data['my_next_diff'][i] = predict(
-                drms_data['my_next_diff'][i - 1], drms_data['asynchrony'][i], drms_params, drms_noise
+            drms_data['my_next_ioi_diff'][i] = predict(
+                drms_data['my_prev_ioi_diff'][i], drms_data['asynchrony'][i], drms_params, drms_noise
             )
             # Use predicted difference between IOIs to get next actual IOI
-            keys_data['my_next_ioi'][i] = keys_data['my_next_diff'][i] + keys_data['my_next_ioi'][i - 1]
-            drms_data['my_next_ioi'][i] = drms_data['my_next_diff'][i] + drms_data['my_next_ioi'][i - 1]
+            keys_data['my_next_ioi'][i] = keys_data['my_next_ioi_diff'][i] + keys_data['my_prev_ioi'][i]
+            drms_data['my_next_ioi'][i] = drms_data['my_next_ioi_diff'][i] + drms_data['my_prev_ioi'][i]
             if keys_data['my_next_ioi'][i] < 0 or drms_data['my_next_ioi'][i] < 0:
                 break
+            # TODO: should be same length as original performance?
             if keys_data['my_onset'][i] > 100 or drms_data['my_onset'][i] > 100:
                 break
         return keys_data, drms_data

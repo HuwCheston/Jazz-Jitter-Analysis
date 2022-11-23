@@ -289,8 +289,8 @@ class PhaseCorrectionModel:
         # Shift to get next IOI
         df['my_next_ioi'] = df['my_prev_ioi'].shift(-1)
         # Extract difference of IOIs
-        df['my_next_ioi_diff'] = df['my_next_ioi'].diff().shift(-1)
-        df['my_prev_ioi_diff'] = df['my_prev_ioi'].diff().shift(-1)
+        df['my_next_ioi_diff'] = df['my_next_ioi'].diff()
+        df['my_prev_ioi_diff'] = df['my_prev_ioi'].diff()
         return df
 
     def _create_phase_correction_model(
@@ -348,23 +348,23 @@ if __name__ == '__main__':
     for z in autils.zip_same_conditions_together(raw_data=raw_data):
         # Iterate through keys and drums performances in a condition together
         for c1, c2 in z:
-            if c1['trial'] == 2 and c1['block'] == 1 and c1['latency'] == 90 and c1['jitter'] == 1:
-                print(c1['trial'], c1['block'], c1['latency'], c1['jitter'])
-                pcm = PhaseCorrectionModel(
-                    c1, c2, model='my_next_ioi_diff~my_prev_ioi_diff+asynchrony', centre=False
-                )
 
-                ke = pd.DataFrame([pcm.keys_dic])
-                dr = pd.DataFrame([pcm.drms_dic])
-                z = c1['zoom_array']
+            print(c1['trial'], c1['block'], c1['latency'], c1['jitter'])
+            pcm = PhaseCorrectionModel(
+                c1, c2, model='my_next_ioi_diff~my_prev_ioi_diff+asynchrony', centre=False
+            )
 
-                output = r"C:\Python Projects\jazz-jitter-analysis\reports\figures\simulations_plots\individual_plots"
-                sim_orig = Simulation(ke, dr, z, num_simulations=100, parameter='original',)
-                sim_democ = Simulation(ke, dr, z, num_simulations=100, parameter='democracy',)
-                sim_anarc = Simulation(ke, dr, z, num_simulations=100, parameter='anarchy',)
-                sim_leader_k = Simulation(ke, dr, z, num_simulations=100, parameter='leadership', leader='Keys',)
-                sim_leader_d = Simulation(ke, dr, z, num_simulations=100, parameter='leadership', leader='Drums',)
+            ke = pd.DataFrame([pcm.keys_dic])
+            dr = pd.DataFrame([pcm.drms_dic])
+            z = c1['zoom_array']
 
-                lp = LinePlotAllParameters(simulations=[sim_orig, sim_democ, sim_anarc, sim_leader_k, sim_leader_d],
-                                           keys_orig=pcm.keys_nn, drms_orig=pcm.drms_nn, params=c1, output_dir=output)
-                lp.create_plot()
+            output = r"C:\Python Projects\jazz-jitter-analysis\reports\figures\simulations_plots\individual_plots"
+            sim_orig = Simulation(keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter='original', keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn)
+            sim_democ = Simulation(keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter='democracy', keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn)
+            sim_anarc = Simulation(keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter='anarchy', keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn)
+            sim_leader_k = Simulation(keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter='leadership', leader='Keys', keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn)
+            sim_leader_d = Simulation(keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter='leadership', leader='Drums', keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn)
+
+            lp = LinePlotAllParameters(simulations=[sim_orig, sim_democ, sim_anarc, sim_leader_k, sim_leader_d],
+                                       keys_orig=pcm.keys_nn, drms_orig=pcm.drms_nn, params=c1, output_dir=output)
+            lp.create_plot()
