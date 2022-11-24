@@ -5,7 +5,6 @@ import numpy as np
 from scipy.stats import stats
 
 import src.visualise.visualise_utils as vutils
-from src.analyse.simulations_ratio import Simulation
 
 
 class LinePlotAllParameters(vutils.BasePlot):
@@ -29,20 +28,37 @@ class LinePlotAllParameters(vutils.BasePlot):
             self
     ) -> None:
         """
-
+        Gets data from all simulation objects and plots individual and average simulations for both BPM and asynchrony
+        variables.
         """
         colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
         for sim, col in zip(self.simulations, colors):
-            if len(sim.keys_simulations) == 0 or len(sim.drms_simulations) == 0:
-                sim.create_all_simulations()
-            sim.plot_simulation(color=col, ax=self.ax[0], var='my_next_ioi')
-            sim.plot_simulation(color=col, ax=self.ax[1], var='asynchrony', bpm=False)
+            # Calling this function will automatically create our simulations if we haven't done so yet
+            ioi_individual, ioi_avg = sim.get_simulation_data_for_plotting(var='my_next_ioi')
+            async_individual, async_avg = sim.get_simulation_data_for_plotting(var='asynchrony')
+            # Plot individual simulations
+            for ioi, async_ in zip(ioi_individual, async_individual):
+                self.ax[0].plot(
+                    ioi.index.seconds, (60 / ioi['my_next_ioi']).rolling(window='4s').mean(), alpha=0.01, color=col,
+                )
+                self.ax[1].plot(
+                    async_.index.seconds, (async_['asynchrony']).rolling(window='4s').mean(), alpha=0.01, color=col,
+                )
+            # Plot average simulations
+            self.ax[0].plot(
+                ioi_avg.index.seconds, (60 / ioi_avg['my_next_ioi']).rolling(window='4s').mean(), alpha=1, linewidth=4,
+                ls='-', color=col, label=f'{sim.parameter.title()} {sim.leader if sim.leader is not None else ""}'
+            )
+            self.ax[1].plot(
+                async_avg.index.seconds, (async_avg['asynchrony']).rolling(window='4s').mean(), alpha=1, linewidth=4,
+                ls='-', color=col, label=f'{sim.parameter.title()} {sim.leader if sim.leader is not None else ""}'
+            )
 
     def _plot_original_performance(
             self
     ) -> None:
         """
-
+        Wrangles data from original performances and plots against simulated data.
         """
         # Resample our two original performance dataframes
         resampled = [vutils.resample(data) for data in [self.keys_orig, self.drms_orig]]
@@ -59,11 +75,13 @@ class LinePlotAllParameters(vutils.BasePlot):
             # Plot onto the required axis
             self.ax[num].plot(
                 conc['my_onset'], conc[s].rolling(window='4s').mean(), alpha=1, color=vutils.BLACK,
-                label='Actual performance', linewidth=4
+                label='Actual', linewidth=4
             )
 
     @vutils.plot_decorator
-    def create_plot(self):
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
         """
 
         """
@@ -95,13 +113,19 @@ class LinePlotAllParameters(vutils.BasePlot):
         return func(res)
 
     def _format_ax(self):
+        """
+
+        """
+        # Calculate xlim
+        xlim = (self._get_min_max_x_val(min), self._get_min_max_x_val(max))
         # Format top axes (BPM)
-        self.ax[0].set(xlabel='', ylim=(0, 200), xlim=(self._get_min_max_x_val(min), self._get_min_max_x_val(max)))
+        ticks_ax0 = np.linspace(0, 200, 6)
+        self.ax[0].set(xlabel='', ylim=(0, 200), xlim=xlim, yticks=ticks_ax0, yticklabels=ticks_ax0)
         self.ax[0].set_ylabel('Tempo (BPM)', fontsize='large')
         self.ax[0].axhline(y=120, linestyle='--', alpha=vutils.ALPHA, color=vutils.BLACK, linewidth=2)
         # Format bottom axes (async)
-        ticks = [0.0025, 0.025, 0.25, 2.5, 25]
-        self.ax[1].set(yticks=ticks, yticklabels=ticks, ylim=(0.0025, 25))
+        ticks_ax1 = [0.0001, 0.001, 0.01, 0.1, 1, 10]
+        self.ax[1].set(yticks=ticks_ax1, yticklabels=ticks_ax1, ylim=(0.0001, 10), xlim=xlim)
         self.ax[1].set_ylabel('Asynchrony (s)', fontsize='large')
         self.ax[1].set_xlabel('Performance duration (s)', fontsize='large')
         self.ax[1].axhline(
@@ -113,14 +137,17 @@ class LinePlotAllParameters(vutils.BasePlot):
             plt.setp(ax.spines.values(), linewidth=2)
 
     def _format_fig(self):
+        """
+
+        """
         self.fig.suptitle(f"Duo {self.params['trial']}, block {self.params['block']}, "
                           f"latency {self.params['latency']}, jitter {self.params['jitter']}")
         handles, labels = self.ax[0].get_legend_handles_labels()
         self.fig.legend(
-            handles[:len(self.simulations) + 1], labels[:len(self.simulations) + 1], ncol=len(self.simulations) + 1,
-            loc='lower center', title=None, frameon=False, fontsize='large', columnspacing=1, handletextpad=0.3
+            handles[:len(self.simulations) + 1], labels[:len(self.simulations) + 1], ncol=1,
+            loc='right', title=None, frameon=False, fontsize='large', columnspacing=1, handletextpad=0.3
         )
-        self.fig.subplots_adjust(bottom=0.09, top=0.95, left=0.09, right=0.91)
+        self.fig.subplots_adjust(bottom=0.07, top=0.93, left=0.09, right=0.78)
 
 
 class BarPlotSimulationParameters(vutils.BasePlot):
@@ -128,175 +155,188 @@ class BarPlotSimulationParameters(vutils.BasePlot):
     Creates a plot showing the simulation results per parameter, designed to look similar to fig 2.(d)
     in Jacoby et al. (2021).
     """
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.res = kwargs.get('res', None)
-        self.df = self._format_df()
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(18.8, 7))
+        self.key: dict = {'Original': 0, 'Democracy': 1, 'Anarchy': 2, 'Leadership': 3}
+        self.df = self._format_df(df=self.df)
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=True, figsize=(18.8, 5))
+        self.ax[1].set_yscale('log')
 
     @staticmethod
-    def _normalise_values(
+    def _format_df(
             df: pd.DataFrame
     ) -> pd.DataFrame:
         """
-        Normalise values around original parameter = 1
+
         """
-        df['norm'] = 1 - df['original']
-        for s in [col for col in df.columns.to_list() if col != 'norm' or 'original']:
-            df[s] += df['norm']
-        df['original'] = 1
+        # Fill our 'None' leader values with empty strings
+        df['leader'] = df['leader'].fillna(value='').str.lower()
+        # Format our parameter column by combining with leader column, replacing values with title case
+        df['parameter'] = df[['parameter', 'leader', ]].astype(str).agg(''.join, axis=1)
+        df['parameter'] = df['parameter'].replace({col: col.title() for col in df['parameter'].unique()})
+        # Remove values from parameter column that we don't need
+        df = df[(df['parameter'] != 'Leadershipkeys')]
+        df = df[(df['parameter'] != 'Actual')]
+        df['parameter'] = df['parameter'].str.replace('Leadershipdrums', 'Leadership')
         return df
 
-    def _format_df(
-            self
-    ) -> pd.DataFrame:
-        """
-        Format model results for plotting by pivoting, normalising original values, then melting into one column
-        """
-        df = pd.DataFrame(self.res).pivot_table(values='tempo_slope', index='trial', columns='type')
-        df = self._normalise_values(df)
-        df.to_clipboard(sep=',')
-        return (
-            df.reset_index(drop=False)
-              .drop(columns='norm')
-              .rename(columns={'dictatorshipkeys': 'Leadership - Keys', 'dictatorshipdrums': 'Leadership - Drums'})
-              .rename(columns={col: col.title() for col in df.columns.to_list()})
-              .melt(id_vars='trial',
-                    value_vars=['Original', 'Leadership - Keys', 'Leadership - Drums', 'Democracy', 'Anarchy'])
-        )
-
     @vutils.plot_decorator
-    def create_plot(self):
-        """
-        Called from outside the class to generate and save the image.
-        """
-        self.g = self._create_plot()
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        self._create_plot()
+        self._add_parameter_graphics()
         self._format_ax()
         self._format_fig()
         fname = f'{self.output_dir}\\barplot_simulation_by_parameter.png'
         return self.fig, fname
 
-    def _create_plot(self):
-        """
-        Creates the barplot in seaborn
-        """
-        return sns.barplot(
-            data=self.df, x='type', y='value', color=vutils.LINE_CMAP[0], ax=self.ax, errcolor=vutils.BLACK,
-            errwidth=2, edgecolor=vutils.BLACK, lw=2, capsize=0.03
-        )
-
-    def _add_parameter_graphic(
-            self
-    ) -> None:
-        """
-        Adds graphics below each parameter in the barplot, showing the directionality of the coupling
-        """
-        # Define initial x starting point
-        x = 0.26
-        for i in range(1, 5):
-            # Add silver, transparent background
-            self.g.add_patch(
-                plt.Rectangle((x, -0.26), width=0.1, height=0.12, facecolor='silver', clip_on=False, linewidth=0,
-                              transform=self.ax.transAxes, alpha=vutils.ALPHA)
-            )
-            # Add coloured rectangles for either keys/drums
-            self.g.add_patch(
-                plt.Rectangle((x + 0.005, -0.24), width=0.023, height=0.08, clip_on=False, linewidth=0,
-                              transform=self.ax.transAxes, facecolor=vutils.INSTR_CMAP[0])
-            )
-            self.g.add_patch(
-                plt.Rectangle((x + 0.07, -0.24), width=0.023, height=0.08, clip_on=False, linewidth=0,
-                              transform=self.ax.transAxes, facecolor=vutils.INSTR_CMAP[1])
-            )
-            # Add text to coloured rectangles
-            self.g.text(s='K', x=x + 0.007, y=-0.225, transform=self.ax.transAxes, fontsize=24)
-            self.g.text(s='D', x=x + 0.072, y=-0.225, transform=self.ax.transAxes, fontsize=24)
-            # Add arrows according to parameter number
-            if i == 2 or i == 3:
-                self.ax.arrow(x=x + 0.033, y=-0.18, dx=0.025, dy=0, clip_on=False, transform=self.ax.transAxes,
-                              linewidth=5, color=vutils.INSTR_CMAP[0], head_width=0.015, head_length=0.005)
-            if i == 1 or i == 3:
-                self.ax.arrow(x=x + 0.063, y=-0.22, dx=-0.025, dy=0, clip_on=False, transform=self.ax.transAxes,
-                              linewidth=5, color=vutils.INSTR_CMAP[1], head_width=0.015, head_length=0.005)
-            # Increase x statistic for next patch
-            x += 0.19
-
     @staticmethod
     def _get_significance_asterisks(
-            p: float, t: float = None
+            p: float
     ) -> str:
         """
-        Converts a raw p-value into asterisks, showing significance boundaries. Can also provide raw test statistics
-        by setting optional t argument
+        Converts a raw p-value into asterisks, showing significance boundaries.
         """
-        # Define function to combine raw test statistic with asterisks
-        fn = lambda a: str(round(t, 2)) + a if t is not None else a
+        # We have to iterate through in order from smallest to largest, or else we'll match incorrectly
         if p < 0.001:
-            return fn('***')
+            return '***'
         elif p < 0.01:
-            return fn('**')
+            return '**'
         elif p < 0.05:
-            return fn('*')
+            return '*'
+        # Our p-value will equal 1 only if we've compared a group against itself
+        if p == 1:
+            return ''
         else:
-            return fn('')
+            return ''
 
-    def _add_significance_asterisks_to_plot(
+    def _ttest_group_against_original(
+            self, var: str
+    ) -> pd.DataFrame:
+        """
+
+        """
+        ttest = []
+        # Iterate through every trial in our dataframe
+        for idx, grp in self.df.groupby('trial'):
+            # Get the original coupling parameter -- we compare the other parameters to this
+            a = grp[grp['parameter'] == 'Original'][var].values
+            # Iterate through all parameters in our group
+            for param, small_g in grp.groupby('parameter'):
+                # Get the target parameter
+                b = small_g[var].values
+                # Carry out the t-test and store the p-value
+                _, p = stats.ttest_ind(a, b)
+                # Convert our p-values into asterisks and append to the list
+                ttest.append((idx, param, self._get_significance_asterisks(p)))
+        # Return our t test results as a dataframe, in the correct order to enable us to plot them properly
+        return (
+            pd.DataFrame(ttest, columns=['trial', 'parameter', 'sig'])
+            .sort_values(by=['trial', 'parameter'], key=lambda x: x.map(self.key))
+            .reset_index(drop=True)
+        )
+
+    def _create_plot(
             self
     ) -> None:
         """
-        Adds asterisks and arrows to each column in the plot showing the significance of an independent sample,
-        two-tailed t-test compared to the original simulation results
+
         """
-        # Pivot our dataframe in order to more easily conduct the t-test
-        df = self.df.pivot_table(values='value', index='trial', columns='type')
-        # Zip each bar on the plot (other than the first) together with its column label in the dataframe
-        z = zip(self.ax.patches[1:], ['Leadership - Keys', 'Leadership - Drums', 'Democracy', 'Anarchy'])
-        # Gets the positioning of the 'original' bar patch
-        orig_x = self.ax.patches[0].xy[0] + (self.ax.patches[0].get_width() / 2)
-        # Iterate through all of our patches/column labels
-        for n, (p, s) in enumerate(z):
-            # Conduct the t-test and get the p-value
-            r, sig = stats.ttest_ind(df['Original'], df[s], nan_policy='omit')
-            # Get the position to stretch the arrow out until
-            x = p.xy[0] + p.get_width() - (self.ax.patches[0].get_width() / 2)
-            # Add the significance asterisk text
-            self.ax.text(s=self._get_significance_asterisks(sig), x=x / 2, y=1.27 + n / 14, fontsize=24)
-            # Add the arrow connecting the original bar to the column bar
-            self.ax.arrow(x=orig_x, y=1.29 + n / 14, dx=x, dy=0, )
+        # Iterate through both variables which we wish to plot
+        for num, var in enumerate(['tempo_slope', 'asynchrony']):
+            # Add the scatter plot, showing each individual performance
+            sns.stripplot(
+                data=self.df, ax=self.ax[num], x='parameter', y=var, hue='trial', dodge=True, s=4, marker='.',
+                jitter=1, color=vutils.BLACK,
+            )
+            # Add the bar plot, showing the median values
+            sns.barplot(
+                data=self.df, x='parameter', y=var, hue='trial', ax=self.ax[num], ci=25, errcolor=vutils.BLACK,
+                errwidth=2, estimator=np.median, edgecolor=vutils.BLACK, capsize=0.03,
+            )
+            # Get the t test results, comparing all parameters across all trials for this variable
+            ttest = self._ttest_group_against_original(var)
+            # Apply our formatted t test asterisks to the bar plot in the correct places
+            for (i, trial), con in zip(ttest.groupby('trial'), self.ax[num].containers):
+                self.ax[num].bar_label(con, labels=trial['sig'].to_list(), padding=20 if num == 0 else 30, fontsize=12)
 
     def _format_ax(
             self
     ) -> None:
         """
-        Formats axes object
+
         """
-        # Add a horizontal line at y=1
-        self.ax.axhline(y=1, linestyle='--', alpha=vutils.ALPHA, color=vutils.BLACK, linewidth=2)
-        # Set axes limits, titles, and replace '-' with a line break in x tick labels
-        self.g.set(xlabel='', ylabel='', ylim=(0, 1.6),
-                   xticklabels=[col.replace(' - ', '\n') for col in self.df['type'].unique()])
-        # Set axes and tick width
-        self.ax.tick_params(width=3, )
-        plt.setp(self.ax.spines.values(), linewidth=2)
-        # Set the width of the bars in the plot - must do this before adding asterisks/parameter graphics!
-        new_value = 0.3
-        for patch in self.ax.patches:
-            diff = patch.get_width() - new_value
-            patch.set_width(new_value)
-            patch.set_x(patch.get_x() + diff * .5)
-        # Add significance asterisks and parameter graphics
-        self._add_significance_asterisks_to_plot()
-        self._add_parameter_graphic()
+        # Apply formatting to tempo slope ax
+        self.ax[0].set(ylabel='Tempo slope (BPM/s)', xlabel='', ylim=(-1, 1))
+        self.ax[0].axhline(y=0, linestyle='--', alpha=vutils.ALPHA, color=vutils.BLACK, linewidth=2)
+        # Apply formatting to async ax
+        t = [1, 10, 100, 1000, 10000]
+        self.ax[1].set(ylabel='RMS of asynchrony (ms)', xlabel='', ylim=(1, 10000), yticks=t, yticklabels=t)
+        # Apply joint formatting to both axes
+        for ax in self.ax:
+            # Set the label, with padding so it doesn't get in the way of our parameter graphics
+            ax.set_xlabel('Parameter', y=0.5, labelpad=35)
+            # Adjust the width of the ticks and ax border
+            ax.tick_params(width=3, which='major')
+            ax.tick_params(width=0, which='minor')
+            plt.setp(ax.spines.values(), linewidth=2)
+
+    def _add_parameter_graphics(
+            self, ypad: float = -0.03
+    ) -> None:
+        """
+
+        """
+        # Iterate through both axes on the figure
+        # We use an axes transform when placing the graphics, so we don't have to set values individually
+        for ax in self.ax:
+            # Define initial x starting point
+            x = 0.305
+            for i in range(1, 4):
+                # Add silver, transparent background
+                ax.add_patch(
+                    plt.Rectangle((x, -0.18 + ypad), width=0.14, height=0.1, facecolor='silver', clip_on=False,
+                                  linewidth=0, transform=ax.transAxes, alpha=vutils.ALPHA)
+                )
+                # Add coloured rectangles for either keys/drums
+                col_rect = lambda pad, num: plt.Rectangle(
+                    (x + pad, -0.17 + ypad), width=0.03, height=0.08, clip_on=False, linewidth=0,
+                    transform=ax.transAxes, facecolor=vutils.INSTR_CMAP[num]
+                )
+                ax.add_patch(col_rect(0.005, 0))
+                ax.add_patch(col_rect(0.105, 1))
+                # Add text to coloured rectangles
+                ax.text(s='K', x=x + 0.007, y=-0.155 + ypad, transform=ax.transAxes, fontsize=18)
+                ax.text(s='D', x=x + 0.107, y=-0.155 + ypad, transform=ax.transAxes, fontsize=18)
+                # Add arrows according to parameter number
+                arw = lambda padx, dx, y, num: ax.arrow(
+                    x=x + padx, y=y + ypad, dx=dx, dy=0, clip_on=False, transform=ax.transAxes, linewidth=5,
+                    color=vutils.INSTR_CMAP[num], head_width=0.015, head_length=0.005
+                )
+                if i == 1:  # For democracy, we need two arrows
+                    arw(0.045, 0.04, -0.11, 0)
+                    arw(0.09, -0.04, -0.15, 1)
+                elif i == 3:    # For leadership, we just need one
+                    arw(0.045, 0.04, -0.11, 0)
+                # Increase x value for next patch
+                x += 0.24
 
     def _format_fig(
             self
     ) -> None:
         """
-        Formats figure object
+
         """
-        # Set figure-wise axes labels
-        self.fig.supylabel('Normalised tempo slope\n(BPM/s, 1 = original slope)', y=0.6, x=0.01)
-        self.fig.supxlabel('Parameter', y=0.03)
-        # Adjust plot spacing a bit
-        self.fig.subplots_adjust(bottom=0.27, top=0.95, left=0.08, right=0.97)
+        # Empty variables to hold our legend handles and labels
+        hand, lab = None, None
+        # Iterate through both our axes
+        for ax in self.ax:
+            # Store our handles and labels
+            hand, lab = ax.get_legend_handles_labels()
+            # Remove the legend
+            ax.get_legend().remove()
+        # Add the legend back in, but only keep the values which relate to the bar plot (also add a title, adjust place)
+        self.fig.legend(hand[5:], lab[5:], title='Duo', frameon=False, ncol=1, loc='center right')
+        # Adjust subplots positioning a bit to fit in the legend we've just created
+        self.fig.subplots_adjust(bottom=0.25, top=0.95, left=0.07, right=0.93, wspace=0.2)

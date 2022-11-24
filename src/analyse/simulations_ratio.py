@@ -3,14 +3,9 @@ import pandas as pd
 import numba as nb
 from datetime import timedelta
 import statsmodels.formula.api as smf
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pickle
 
-import src.visualise.visualise_utils as vutils
 
-SIGNAL_NOISE = 4
-
+# noinspection PyBroadException
 class Simulation:
     def __init__(
             self, keys_nn, drms_nn, keys_params, drms_params, latency_array, num_simulations: int = 1000, **kwargs
@@ -28,7 +23,6 @@ class Simulation:
         self._debug: bool = kwargs.get('debug', False)
 
         # Check and generate our input data
-        # self.total_beats: int = self._get_number_of_beats_for_simulation(keys_params, drms_params)
         self.total_beats: int = 1000
         self.latency: np.array = self._append_timestamps_to_latency_array(latency_array)
         self.num_simulations: int = num_simulations
@@ -36,6 +30,7 @@ class Simulation:
         # Simulation parameters, in the form of numba dictionaries to be used inside a numba function
         self.parameter: str = kwargs.get('parameter', 'original')
         self.leader: str = kwargs.get('leader', None)
+        self.noise: float = kwargs.get('noise', 0.005)
 
         # Musician parameters
         self.keys_params_raw: dict = self._get_raw_musician_parameters(init=keys_params)
@@ -78,30 +73,36 @@ class Simulation:
 
     @staticmethod
     def _get_initial_iois(
-            nn
+            nn, default: float = 0.5
     ) -> tuple[float]:
+        """
+        Gets the first two IOI values from a performance dataset. If any are invalid, return our default of (0.5, 0.5)
+        """
         try:
             iois = nn.iloc[:2]['my_next_ioi'].values.tolist()
         except KeyError:
-            return 0.5, 0.5
+            return default, default
         else:
-            return [ioi if not np.isnan(ioi) else 0.5 for ioi in iois]
+            if any(np.isnan(iois)):
+                return default, default
+            else:
+                return iois
 
     @staticmethod
     def _get_initial_onset(
-            nn: pd.DataFrame
+            nn: pd.DataFrame, default: float = 8, threshold: float = 9
     ) -> float:
         """
-
+        Gets the first onset time from a performance dataset. If this is invalid, returns our default of 8
         """
         try:
             onset = nn.iloc[0]['my_onset']
         except KeyError:
-            return 8.0
+            return default
         else:
             # This is used to capture a few cases where one performer didn't come straight in after the count in
-            if onset > 9:
-                return 8.0
+            if onset > threshold:
+                return default
             else:
                 return onset
 
@@ -169,9 +170,9 @@ class Simulation:
                 'correction_partner': 0,
                 'intercept': 0,
             }
+        # Update our dictionary with the required amount of noise
         output_data.update({
-            # 'resid_std': input_data['resid_std'],
-            'resid_std': 0.005
+            'resid_std': input_data['resid_std']
         })
         return output_data
 
@@ -182,8 +183,11 @@ class Simulation:
         """
         Converts a Python dictionary into a type that can be utilised by Numba
         """
+        # Create the empty dictionary
         nb_dict = nb.typed.Dict.empty(key_type=nb.types.unicode_type, value_type=nb.types.float64,)
+        # Iterate through our dictionary
         for k, v in python_dict.items():
+            # If the type is compatible with numba floats, set it in the numba dictionary
             if type(v) != str:
                 nb_dict[k] = v
         return nb_dict
@@ -214,7 +218,7 @@ class Simulation:
         nb_dict['my_prev_ioi'][1] = iois[0]
         # My next ioi diff
         nb_dict['my_next_ioi_diff'][0] = np.nan
-        nb_dict['my_next_ioi_diff'][1] = iois[1] - iois[0]
+        nb_dict['my_next_ioi_diff'][1] = iois[1] - iois[0]  # This will always be 0
         # My previous ioi diff
         nb_dict['my_prev_ioi_diff'][0] = np.nan
         nb_dict['my_prev_ioi_diff'][1] = np.nan
@@ -241,14 +245,13 @@ class Simulation:
             else:
                 keys, drms = self._create_one_simulation(
                     # Initialise empty data to store in
-                    self._initialise_empty_data(iois=self._keys_initial_iois, onset=self._keys_initial_onset),
-                    self._initialise_empty_data(iois=self._drms_initial_iois, onset=self._drms_initial_onset),
+                    self._initialise_empty_data(), self._initialise_empty_data(),
                     self.keys_params, self.drms_params,     # Parameters for the simulation, e.g. coefficients
                     np.random.normal(0, self.keys_params['resid_std'], 10000),
                     np.random.normal(0, self.drms_params['resid_std'], 10000),
                     self.latency, self.total_beats  # Latency array and total number of beats
                 )
-            # Append unformatted data for debugging
+            # Append raw data for debugging
             self._keys_simulations_raw.append(dict(keys))
             self._drms_simulations_raw.append(dict(drms))
             # Format the simulated data and append to our list
@@ -284,19 +287,28 @@ class Simulation:
         Create data for one simulation, using numba optimisations
         """
 
-        def get_lat(
-                partner_onset: float
+        def get_latency_at_onset(
+                my_onset: float
         ) -> float:
             """
-            Get the current amount of latency applied when our partner played their onset
+            Get the current amount of latency applied to our partner when we played our onset
             """
-            try:
-                return lat[lat[:, 1] == lat[:, 1][lat[:, 1] <= partner_onset].max()][:, 0][0]
-            # If their first onset was before the 8 second count-in, return the first amount of delay applied
-            except:
+            # If our first onset was before the 8 second count-in, return the first amount of delay applied
+            if my_onset < lat[0, :][1]:
                 return lat[:, 0][0]
+            # Else, return the correct amount of latency
+            else:
+                return lat[lat[:, 1] == lat[:, 1][lat[:, 1] <= my_onset].max()][:, 0][0]
 
-        def predict(
+        def calculate_async(
+                my_onset: float, their_onset: float
+        ) -> float:
+            """
+            Calculates the current asynchrony with our partner at our onset. Note the order of positional arguments!!
+            """
+            return (their_onset + get_latency_at_onset(my_onset)) - my_onset
+
+        def predict_next_ioi_diff(
                 prev_diff: float, asynchrony: float, params: nb.typed.Dict, noise: np.ndarray
         ) -> float:
             """
@@ -308,19 +320,12 @@ class Simulation:
             n = np.random.choice(noise)
             return a + b + c + n
 
-        keys_data['asynchrony'][0] = (
-                (drms_data['my_onset'][0] + get_lat(drms_data['my_onset'][0])) - keys_data['my_onset'][0]
-        )
-        drms_data['asynchrony'][0] = (
-                (keys_data['my_onset'][0] + get_lat(keys_data['my_onset'][0])) - drms_data['my_onset'][0]
-        )
-        keys_data['asynchrony'][1] = (
-                (drms_data['my_onset'][1] + get_lat(drms_data['my_onset'][1])) - keys_data['my_onset'][1]
-        )
-        drms_data['asynchrony'][1] = (
-                (keys_data['my_onset'][1] + get_lat(keys_data['my_onset'][1])) - drms_data['my_onset'][1]
-        )
-        # We don't use the full range of beats, given that we've already added some in when creating our starter data
+        # Calculate our first two async values. We don't do this when initialising the empty data, because it
+        # both requires the get_latency_at_onset function and access to both keys and drums data.
+        for i in range(0, 2):
+            keys_data['asynchrony'][i] = calculate_async(keys_data['my_onset'][i], drms_data['my_onset'][i])
+            drms_data['asynchrony'][i] = calculate_async(drms_data['my_onset'][i], keys_data['my_onset'][i])
+        # We don't use the full range of beats, given that we've already added some in when initialising our data
         for i in range(2, beats):
             # Shift difference
             keys_data['my_prev_ioi_diff'][i] = keys_data['my_next_ioi_diff'][i - 1]
@@ -331,30 +336,28 @@ class Simulation:
             # Get next onset by adding previous onset to predicted IOI
             keys_data['my_onset'][i] = keys_data['my_onset'][i - 1] + keys_data['my_prev_ioi'][i]
             drms_data['my_onset'][i] = drms_data['my_onset'][i - 1] + drms_data['my_prev_ioi'][i]
-            # Get asynchrony value by subtracting partner's onset (plus latency) from ours
-            # noinspection PyBroadException
+            # Get async value by subtracting partner's onset (plus latency) from ours
             try:
-                keys_data['asynchrony'][i] = (
-                        (drms_data['my_onset'][i] + get_lat(drms_data['my_onset'][i])) - keys_data['my_onset'][i]
-                )
-                drms_data['asynchrony'][i] = (
-                        (keys_data['my_onset'][i] + get_lat(keys_data['my_onset'][i])) - drms_data['my_onset'][i]
-                )
+                keys_data['asynchrony'][i] = calculate_async(keys_data['my_onset'][i], drms_data['my_onset'][i])
+                drms_data['asynchrony'][i] = calculate_async(drms_data['my_onset'][i], keys_data['my_onset'][i])
+            # If there's an issue here, break out of the simulation
             except:
                 break
             # Predict difference between previous IOI and next IOI
-            keys_data['my_next_ioi_diff'][i] = predict(
+            keys_data['my_next_ioi_diff'][i] = predict_next_ioi_diff(
                 keys_data['my_prev_ioi_diff'][i], keys_data['asynchrony'][i], keys_params, keys_noise
             )
-            drms_data['my_next_ioi_diff'][i] = predict(
+            drms_data['my_next_ioi_diff'][i] = predict_next_ioi_diff(
                 drms_data['my_prev_ioi_diff'][i], drms_data['asynchrony'][i], drms_params, drms_noise
             )
             # Use predicted difference between IOIs to get next actual IOI
             keys_data['my_next_ioi'][i] = keys_data['my_next_ioi_diff'][i] + keys_data['my_prev_ioi'][i]
             drms_data['my_next_ioi'][i] = drms_data['my_next_ioi_diff'][i] + drms_data['my_prev_ioi'][i]
+            # If we've accelerated to a ridiculous extent (due to noise), we need to break.
             if keys_data['my_next_ioi'][i] < 0 or drms_data['my_next_ioi'][i] < 0:
                 break
-            # TODO: should be same length as original performance?
+            # TODO: should be the same length as original performance?
+            # If we've exceeded our endpoint, break
             if keys_data['my_onset'][i] > 100 or drms_data['my_onset'][i] > 100:
                 break
         return keys_data, drms_data
@@ -366,6 +369,9 @@ class Simulation:
         """
         Concatenate all simulations together and get the row-wise average (i.e. avg IOI every second)
         """
+        # We use absolute values here, as this makes most sense when getting mean async across performers
+        # For example, if keys-drums async = -0.5 and drums-keys async = 0.5, mean without absolute values == 0
+        # Instead, this should be 0.5.
         return pd.DataFrame(
             pd.concat([df_[var] for df_ in all_perf], axis=1).abs().mean(axis=1), columns=[var]
         )
@@ -405,24 +411,27 @@ class Simulation:
             self
     ) -> float:
         """
-
+        Gets the average pairwise asynchrony (in milliseconds!) across all simulated performances
         """
+        # Define the function for calculating pairwise async
+        # This is the root mean square of the standard deviation of the async
         pw_async = lambda k_, d_: np.sqrt(np.mean(np.square([k_['asynchrony'].std(), d_['asynchrony'].std()]))) * 1000
+        # Calculate the mean pairwise async across all performances
         return np.mean([pw_async(k__, d__) for k__, d__ in zip(self.keys_simulations, self.drms_simulations)])
 
-    def plot_simulation(
-            self, plot_individual: bool = True, plot_average: bool = True, color: str = 'r', var: str = 'my_next_ioi',
-            timespan: tuple[int] = (7, 101), ax: plt.Axes = None, bpm: bool = True, lw: float = 4., ls: str = '-'
-    ) -> None:
+    def get_simulation_data_for_plotting(
+            self, plot_individual: bool = True, plot_average: bool = True, var: str = 'my_next_ioi',
+            timespan: tuple[int] = (7, 101),
+    ) -> tuple[list[pd.DataFrame], pd.DataFrame | None]:
         """
-
+        Wrangles simulation data into a format that can be plotted. Does not carry out any actual plotting!
         """
         # Create simulations if we haven't already done so
         if len(self.keys_simulations) < 1 or len(self.drms_simulations) < 1:
             self.create_all_simulations()
-        if ax is None:
-            _, ax = plt.subplots(1, 1)
         # If we're plotting individual simulations
+        individual_sims = []
+        grand_avg = None
         if plot_individual:
             # Iterate through individual keys and drums simulations
             for k_, d_ in zip(self.keys_simulations, self.drms_simulations):
@@ -430,98 +439,14 @@ class Simulation:
                 avg = self._get_average_var_for_one_simulation([k_, d_], var=var)
                 # Subset for required timespan
                 avg = avg[(avg.index.seconds >= timespan[0]) & (avg.index.seconds <= timespan[1])]
-                # Plot rolling BPM for individual simulation
-                if bpm:
-                    avg[var] = 60 / avg[var]
-                ax.plot(
-                    avg.index.seconds, (avg[var]).rolling(window='4s').mean(), alpha=0.01, color=color,
-                )
+                individual_sims.append(avg)
         # If we're plotting our average simulation
         if plot_average:
-            # Get average simulation by averaging our average simulations
+            # Get grand average simulation by averaging our average simulations
             zi = zip(self.keys_simulations, self.drms_simulations)
             grand_avg = self._get_average_var_for_one_simulation(
-                [self._get_average_var_for_one_simulation([k_, d_], var=var) for k_, d_ in zi],
-                var=var
+                [self._get_average_var_for_one_simulation([k_, d_], var=var) for k_, d_ in zi], var=var
             )
             # Subset for required timespan
             grand_avg = grand_avg[(grand_avg.index.seconds >= timespan[0]) & (grand_avg.index.seconds <= timespan[1])]
-            # Plot the average simulation, including the legend label
-            if bpm:
-                grand_avg[var] = 60 / grand_avg[var]
-            ax.plot(
-                grand_avg.index.seconds, (grand_avg[var]).rolling(window='4s').mean(), alpha=1, linewidth=lw, ls=ls,
-                color=color, label=f'{self.parameter.title()} {self.leader if self.leader is not None else ""}'
-            )
-
-
-if __name__ == '__main__':
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.max_rows', 500)
-    plt.close('all')
-
-    mds = pickle.load(open(r"C:\Python Projects\jazz-jitter-analysis\src\analyse\mds_for_simulations.p", "rb"))
-    cond = mds[(mds['latency'] == 45) & (mds['jitter'] == 1)].reset_index()
-    z = cond['zoom_arr'].iloc[0]
-    res = []
-    for i in np.array(np.meshgrid(np.linspace(0, 1., 101), np.linspace(0, 1., 101))).T.reshape(-1, 2):
-        coeff1 = round(i[0], 2)
-        coeff2 = round(i[1], 2)
-        ke = pd.DataFrame(
-            [{
-                'correction_self': cond[cond['instrument'] == 'Keys']['correction_self'].mean(),
-                'correction_partner': coeff1,
-                'intercept': cond['intercept'].mean(),
-                'resid_std': 0.01,
-                'instrument': 'Keys'
-            }]
-        )
-        dr = pd.DataFrame(
-            [{
-                'correction_self': cond[cond['instrument'] != 'Keys']['correction_self'].mean(),
-                'correction_partner': coeff2,
-                'intercept': cond['intercept'].mean(),
-                'resid_std': 0.01,
-                'instrument': 'Drums'
-            }]
-        )
-        sim = Simulation(ke, dr, z, num_simulations=10, debug=False)
-        sim.create_all_simulations()
-        #
-        # for keys, drms in zip(sim.keys_simulations, sim.drms_simulations):
-        #     avg = sim.get_grand_average_tempo([keys, drms])
-        #     avg = avg[(avg.index.seconds >= 7) & (avg.index.seconds <= 101)]
-        #     plt.plot(avg.index.seconds, (60 / avg.my_next_ioi).rolling(window='4s').mean(), alpha=0.01,
-        #              color='r')
-        # grand_avg = sim.get_grand_average_tempo(
-        #     [sim.get_grand_average_tempo([k, d]) for k, d in zip(sim.keys_simulations, sim.drms_simulations)]
-        # )
-        # grand_avg = grand_avg[(grand_avg.index.seconds >= 7) & (grand_avg.index.seconds <= 101)]
-        # plt.plot(grand_avg.index.seconds, (60 / grand_avg.my_next_ioi).rolling(window='4s').mean(), alpha=1,
-        #          color='r', label='Simulation')
-        #
-        #
-        # plt.title(f'{coeff1}, {coeff2}')
-        # plt.ylim(30, 160)
-        # plt.show()
-    #     ts = sim.get_average_tempo_slope()
-    #     res.append((coeff1, coeff2, ts))
-    #     print(coeff1, coeff2, ts)
-    #
-    # df = pd.DataFrame(res, columns=['Keys -> Drums correction', 'Drums -> Keys correction', 'tempo_slope'])
-    # df = df.pivot('Keys -> Drums correction', 'Drums -> Keys correction', 'tempo_slope').sort_index(ascending=False)
-    # fig, ax = plt.subplots(1, 1)
-    # g = sns.heatmap(df, vmin=-1, vmax=0, cmap='rocket', ax=ax)
-    # means = [
-    #     tuple(grp.groupby('instrument').mean()['correction_partner'].values) for _, grp in
-    #     mds[(mds['latency'] == 45) & (mds['jitter'] == 1)].groupby('trial')
-    # ]
-    # drms_means = np.interp([m[0] for m in means], np.linspace(0., 1., 21), g.get_xticks())
-    # keys_means = np.interp([m[1] for m in means], np.linspace(0., 1., 21), np.flip(g.get_yticks()))
-    # for d, k, mark, label in zip(drms_means, keys_means, ['o', 's', 'p', '*', 'X'], ['Duo 1', 'Duo 2', 'Duo 3', 'Duo 4', 'Duo 5']):
-    #     ax.scatter(d, k, marker=mark, label=label, s=50, )
-    # ax.set_xticks(ticks=[t - 0.5 for t in ax.get_xticks()], labels=ax.get_xticklabels(), ha='right')
-    # ax.set_yticks(ticks=[t + 0.5 for t in ax.get_yticks()][:-1], labels=ax.get_yticklabels()[:-1], ha='center')
-    # plt.legend()
-    # plt.tight_layout()
-    # plt.show()
+        return individual_sims, grand_avg

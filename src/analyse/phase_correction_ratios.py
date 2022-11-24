@@ -1,17 +1,15 @@
 import pandas as pd
 import numpy as np
+import numba as nb
 import json
 import os
 import statsmodels.formula.api as smf
 from sklearn.covariance import EllipticEnvelope
-import matplotlib.pyplot as plt
 
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
 from src.visualise.simulations_graphs import LinePlotAllParameters
 from src.analyse.simulations_ratio import Simulation
-
-MAX_SNR = 36.36539158019338
 
 
 class PhaseCorrectionModel:
@@ -35,12 +33,14 @@ class PhaseCorrectionModel:
         self.drms_df: pd.DataFrame = self._generate_df(c2_drms)
         # The nearest neighbour models, matching live and delayed onsets together
         self._contamination = self._get_contamination_value_from_json(default=kwargs.get('contamination', None))
-        self.keys_nn: pd.DataFrame = self._nearest_neighbour(
-             live_arr=self.keys_df['my_onset'].to_numpy(), delayed_arr=self.drms_df['my_onset'].to_numpy(),
-             zoom_arr=self.keys_raw['zoom_array'], instr='Keys'
+        self.keys_nn: pd.DataFrame = self._match_onsets(
+            live_arr=self.keys_df['my_onset'].to_numpy(dtype=np.float64),
+            delayed_arr=self.drms_df['my_onset'].to_numpy(dtype=np.float64),
+            zoom_arr=self.keys_raw['zoom_array'], instr='Keys'
         )
-        self.drms_nn: pd.DataFrame = self._nearest_neighbour(
-            live_arr=self.drms_df['my_onset'].to_numpy(), delayed_arr=self.keys_df['my_onset'].to_numpy(),
+        self.drms_nn: pd.DataFrame = self._match_onsets(
+            live_arr=self.drms_df['my_onset'].to_numpy(dtype=np.float64),
+            delayed_arr=self.keys_df['my_onset'].to_numpy(dtype=np.float64),
             zoom_arr=self.drms_raw['zoom_array'], instr='Drums'
         )
         # The phase correction models
@@ -153,7 +153,7 @@ class PhaseCorrectionModel:
         """
         return np.sqrt(np.mean(np.square([self.keys_nn['asynchrony'].std(), self.drms_nn['asynchrony'].std()]))) * 1000
 
-    def _nearest_neighbour(
+    def _match_onsets(
             self, live_arr: np.ndarray, delayed_arr: np.ndarray, zoom_arr: np.ndarray, instr: str
     ) -> pd.DataFrame:
         """
@@ -163,99 +163,157 @@ class PhaseCorrectionModel:
         ---
         NB. 'our' refers to the live performer, 'partner' refers to the delayed performer in the following description.
 
-        - For every onset we played:
-        - First, subtract this from the entire array of onsets our partner played
-        - The smallest *positive* value in this matrix is the closest onset *ahead* of where we currently are
-        - The largest *negative* value in this matrix is the closest onset *behind* where we currently are
-        - In general, we assume that, with latency, our partner will be playing *ahead* of us
-        - As such, if the next onset ahead of where we are is closer to us than the one behind, match our onset with it
-        - However, if the onset behind where we are is closer, but the difference between the two onsets is less than
-         our tolerance threshold, we should still match with the onset ahead of us.
-        - Finally, if the onset behind where we are is closer, and the difference is greater than our tolerance
-        threshold, only then should we match with the onset behind us.
-        - If match_duplicates is true, try and match and duplicated partner onsets with another partner onset that
-        wasn't matched to anything, if this is reasonable.
-        - For any of our onsets where we matched with the same partner onset twice, set the duplicate appearance to NaN
         """
-
-        results = []
-        for i in range(live_arr.shape[0]):
-            # Matrix subtraction
-            temp_result = abs(delayed_arr - live_arr[i])
-            # Get the closest onset without latency
-            match = np.min(temp_result)
-            closest_element = delayed_arr[np.where(temp_result == match)][0]
-            results.append((live_arr[i], closest_element))
-
+        # Carry out the nearest neighbour matching
+        empty_arr = np.zeros(shape=(live_arr.shape[0], 2), dtype=np.float64)
+        results = self._nearest_neighbour(live_arr=live_arr, delayed_arr=delayed_arr, empty_arr=empty_arr)
+        # Convert nearest neighbour matching to a dataframe and calculate async column
         nn_df = pd.DataFrame(results, columns=['my_onset', 'their_onset'])
         nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
-
-        no_180_cleaning = [(3, 2, 0.0)]
-        # 180ms CLEANING ONLY
+        # Apply specialised cleaning if 180ms of latency has been applied
         if self.keys_raw['latency'] == 180:
-            # TRIALS 1/5 -- HISTOGRAM CLEANING
-            cut = pd.cut(nn_df['asynchrony'], bins=2)
-            smallest_bin = cut.value_counts().reset_index().iloc[1].rename({'index': 'bound'}).bound.mid
-            largest_bin = cut.value_counts().reset_index().iloc[0].rename({'index': 'bound'}).bound.mid
-            nn_df['category'] = cut
-            for idx, row in nn_df.iterrows():
-                if smallest_bin > largest_bin:
-                    matrix_subtract = delayed_arr - row['my_onset']
-                    nxt = np.max(np.where(matrix_subtract < 0, matrix_subtract, -np.inf))
-                    try:
-                        nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
-                    except IndexError:
-                        continue
-                    else:
-                        if nxt_nearest != row['my_onset']:
-                            nn_df.at[idx, 'their_onset'] = nxt_nearest
-                        else:
-                            nn_df.at[idx, 'their_onset'] = np.nan
-                elif smallest_bin < largest_bin:
-                    matrix_subtract = delayed_arr - row['my_onset']
-                    nxt = np.min(np.where(matrix_subtract > 0, matrix_subtract, np.inf))
-                    try:
-                        nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
-                    except IndexError:
-                        continue
-                    else:
-                        if nxt_nearest != row['my_onset']:
-                            nn_df.at[idx, 'their_onset'] = nxt_nearest
-                        else:
-                            nn_df.at[idx, 'their_onset'] = np.nan
-            nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
-
+            nn_df = self._cleaning_for_180ms(delayed_arr, nn_df)
+        # If we're using elliptic envelope cleaning, apply this now
         if 0 < self._contamination < 0.5:
-            ee = EllipticEnvelope(contamination=self._contamination, random_state=1)
-            ee.fit(nn_df['asynchrony'].to_numpy().reshape(-1, 1))
-            nn_df['outliers'] = ee.predict(nn_df['asynchrony'].to_numpy().reshape(-1, 1))
-
-            for idx, row in nn_df[nn_df['outliers'] == -1].iterrows():
-                matrix_subtract = abs(delayed_arr - row['my_onset'])
-                i = np.where(matrix_subtract == np.partition(matrix_subtract, 2)[2])
-                next_nearest = delayed_arr[i]
-                predicted_async = next_nearest - row['my_onset']
-                if ee.predict(np.float64(predicted_async).reshape(-1, 1))[0] == 1:
-                    nn_df.at[idx, 'their_onset'] = next_nearest.astype(np.float64)
-                else:
-                    nn_df.at[idx, 'their_onset'] = np.nan
-
+            nn_df = self._apply_elliptic_envelope(delayed_arr, nn_df)
+        # Remove duplicate matches from the nearest neighbour output
+        nn_df = pd.DataFrame(
+            self._remove_duplicate_matches(nn_df[['my_onset', 'their_onset', 'asynchrony']].to_numpy(dtype=np.float64)),
+            columns=['my_onset', 'their_onset', 'asynchrony']
+        )
         nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
-        median = nn_df['asynchrony'].median()
-        for idx, grp in nn_df.groupby('their_onset'):
-            if len(grp) > 1:
-                idxmax = abs(grp['asynchrony'] - median).idxmax()
-                nn_df.at[idxmax, 'their_onset'] = np.nan
-
+        # Append the zoom array onto our dataframe
         nn_df = self._append_zoom_array(nn_df, zoom_arr=zoom_arr)
+        # Add the correct amount of latency onto our partner's onset time
         nn_df['their_onset'] += (nn_df['latency'] / 1000)
+        # Recalculate our asynchrony column with the now delayed partner onsets
         nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
+        # Drop the latency column
         nn_df = nn_df.drop(['latency'], axis=1)
+        # Format the now matched dataframe and return
         return self._format_df_for_model(nn_df)
 
-    def _iqr_filter(
-            self, df: pd.DataFrame, col: str, filter: tuple = (0.25, 0.75)
+    @staticmethod
+    @nb.jit
+    def _nearest_neighbour(
+            live_arr, delayed_arr, empty_arr
     ):
+        """
+        Carry out the nearest-neighbour matching (with numba optimizations)
+        """
+        # Iterate through every value played by our live performer
+        for i in range(live_arr.shape[0]):
+            # Matrix subtraction
+            temp_result = np.absolute(delayed_arr - live_arr[i])
+            # Get the closest match
+            match = np.min(temp_result)
+            # Get the onset time for this closest match
+            closest_element = delayed_arr[np.where(temp_result == match)][0]
+            # Append the results to our list
+            empty_arr[i][0] = live_arr[i]
+            empty_arr[i][1] = closest_element
+        return empty_arr
+
+    @staticmethod
+    def _cleaning_for_180ms(
+            delayed_arr: np.ndarray, nn: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Applies specialised cleaning using bins to performances with 180ms of latency.
+        """
+        # TODO: integrate this with numba
+        # Cut async column into two bins
+        cut = pd.cut(nn['asynchrony'], bins=2)
+        # Extract the midpoint of our smallest and largest bin
+        smallest_bin = cut.value_counts().reset_index().iloc[1].rename({'index': 'bound'}).bound.mid
+        largest_bin = cut.value_counts().reset_index().iloc[0].rename({'index': 'bound'}).bound.mid
+        # Set the category column
+        nn['category'] = cut
+        # Iterate through all rows in the dataframe
+        for idx, row in nn.iterrows():
+            # Get the subtracted matrix
+            matrix_subtract = delayed_arr - row['my_onset']
+            # If the midpoint of our smaller bin is above the midpoint of our larger bin
+            if smallest_bin > largest_bin:
+                # Find the next closest onset that occurred before this match
+                nxt = np.max(np.where(matrix_subtract < 0, matrix_subtract, -np.inf))
+            # If the midpoint of our smaller bin is above the midpoint of our larger bin
+            else:
+                # Find the next closest onset that occurred after this match
+                nxt = np.min(np.where(matrix_subtract > 0, matrix_subtract, np.inf))
+            # Try and set the value
+            try:
+                nxt_nearest = delayed_arr[np.where(matrix_subtract == nxt)][0]
+            except IndexError:
+                continue
+            else:
+                # If we've matched with the same onset again, set the value as missing
+                if nxt_nearest == row['my_onset']:
+                    nn.at[idx, 'their_onset'] = np.nan
+                # Else, match with our new onset
+                else:
+                    nn.at[idx, 'their_onset'] = nxt_nearest
+        # Reset the async column before returning
+        nn['asynchrony'] = nn['their_onset'] - nn['my_onset']
+        return nn
+
+    def _apply_elliptic_envelope(
+            self, delayed_arr: np.ndarray, nn: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+
+        """
+        # Create the elliptic envelope with required contamination parameter
+        ee = EllipticEnvelope(contamination=self._contamination, random_state=1)
+        # Fit the elliptic envelope to our async column
+        ee.fit(nn['asynchrony'].to_numpy().reshape(-1, 1))
+        # Extract outliers (-1) and inliers (1) from our async column
+        nn['outliers'] = ee.predict(nn['asynchrony'].to_numpy().reshape(-1, 1))
+        # Iterate through our outliers
+        for idx, row in nn[nn['outliers'] == -1].iterrows():
+            # Get our absolute subtracted matrix
+            matrix_subtract = abs(delayed_arr - row['my_onset'])
+            # Get the second closest value from the subtracted matrix
+            i = np.where(matrix_subtract == np.partition(matrix_subtract, 2)[2])
+            # Get the onset corresponding with this
+            next_nearest = delayed_arr[i]
+            # Calculate the actual async, not in absolute terms
+            predicted_async = next_nearest - row['my_onset']
+            # If our predicted async is not an outlier, we can use this as our match
+            if ee.predict(np.float64(predicted_async).reshape(-1, 1))[0] == 1:
+                nn.at[idx, 'their_onset'] = next_nearest.astype(np.float64)
+            # Else, set the onset to missing
+            else:
+                nn.at[idx, 'their_onset'] = np.nan
+        # Reset the async column before returning
+        nn['asynchrony'] = nn['their_onset'] - nn['my_onset']
+        return nn
+
+    @staticmethod
+    def _remove_duplicate_matches(
+            nn_np
+    ) -> pd.DataFrame:
+        """
+
+        """
+        median = np.median(nn_np[:, 2])
+        unique, counts = np.unique(nn_np[:, 1], return_counts=True)
+        duplicates = nn_np[np.isin(nn_np[:, 1], unique[counts > 1])]
+        split = np.split(duplicates, np.where(np.diff(duplicates[:, 1]))[0] + 1)
+        if split[0].shape[0] == 0:
+            pass
+        else:
+            for arr in split:
+                idx = np.argmax(np.absolute(arr[:, 2] - median))
+                row = arr[idx]
+                idx_orig = np.where((nn_np[:, 0] == row[0]) & (nn_np[:, 1] == row[1]) & (nn_np[:, 2] == row[2]))[0]
+                nn_np[idx_orig, 1] = np.nan
+        return nn_np
+
+    @staticmethod
+    def _iqr_filter(
+            df: pd.DataFrame, col: str, filter: tuple = (0.25, 0.75)
+    ) -> pd.DataFrame:
         """
 
         """
@@ -296,6 +354,9 @@ class PhaseCorrectionModel:
     def _create_phase_correction_model(
             self, df: pd.DataFrame
     ):
+        """
+
+        """
         if self._robust_model:
             return smf.rlm(self._model, data=df.dropna(), missing='drop').fit()
         else:
@@ -330,7 +391,6 @@ class PhaseCorrectionModel:
             'correction_self': md.params.loc['my_prev_ioi_diff'],
             'correction_partner': md.params.loc['asynchrony'],
             'resid_std': np.std(md.resid),
-            'resid_std_adj': np.std(md.resid) / MAX_SNR,
             'resid_len': len(md.resid),
             'rsquared': md.rsquared if not self._robust_model else None,
             'zoom_arr': c['zoom_array'],
@@ -348,23 +408,33 @@ if __name__ == '__main__':
     for z in autils.zip_same_conditions_together(raw_data=raw_data):
         # Iterate through keys and drums performances in a condition together
         for c1, c2 in z:
-
             print(c1['trial'], c1['block'], c1['latency'], c1['jitter'])
-            pcm = PhaseCorrectionModel(
-                c1, c2, model='my_next_ioi_diff~my_prev_ioi_diff+asynchrony', centre=False
-            )
-
+            pcm = PhaseCorrectionModel(c1, c2, model='my_next_ioi_diff~my_prev_ioi_diff+asynchrony', centre=False)
             ke = pd.DataFrame([pcm.keys_dic])
             dr = pd.DataFrame([pcm.drms_dic])
             z = c1['zoom_array']
-
             output = r"C:\Python Projects\jazz-jitter-analysis\reports\figures\simulations_plots\individual_plots"
-            sim_orig = Simulation(keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter='original', keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn)
-            sim_democ = Simulation(keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter='democracy', keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn)
-            sim_anarc = Simulation(keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter='anarchy', keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn)
-            sim_leader_k = Simulation(keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter='leadership', leader='Keys', keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn)
-            sim_leader_d = Simulation(keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter='leadership', leader='Drums', keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn)
-
-            lp = LinePlotAllParameters(simulations=[sim_orig, sim_democ, sim_anarc, sim_leader_k, sim_leader_d],
-                                       keys_orig=pcm.keys_nn, drms_orig=pcm.drms_nn, params=c1, output_dir=output)
-            lp.create_plot()
+            params = [
+                ('original', None), ('democracy', None), ('anarchy', None),
+                ('leadership', 'Keys'), ('leadership', 'Drums'),
+            ]
+            # sims = []
+            for param, leader in params:
+                sim = Simulation(
+                    keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter=param,
+                    keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn, leader=leader
+                )
+                sim.create_all_simulations()
+                ts = sim.get_average_tempo_slope()
+                pw = sim.get_average_pairwise_asynchrony()
+                res.append(
+                    (c1['trial'], c1['block'], c1['latency'], c1['jitter'], sim.parameter, sim.leader, ts, pw)
+                )
+            #     sims.append(sim)
+            #
+            # lp = LinePlotAllParameters(
+            #     simulations=sims, keys_orig=pcm.keys_nn, drms_orig=pcm.drms_nn, params=c1, output_dir=output
+            # )
+            # lp.create_plot()
+    df = pd.DataFrame(res)
+    pass
