@@ -172,7 +172,7 @@ class Simulation:
             }
         # Update our dictionary with the required amount of noise
         output_data.update({
-            'resid_std': input_data['resid_std']
+            'resid_std': self.noise
         })
         return output_data
 
@@ -424,7 +424,7 @@ class Simulation:
             timespan: tuple[int] = (7, 101),
     ) -> tuple[list[pd.DataFrame], pd.DataFrame | None]:
         """
-        Wrangles simulation data into a format that can be plotted. Does not carry out any actual plotting!
+        Wrangles simulation data into a format that can be plotted and returns.
         """
         # Create simulations if we haven't already done so
         if len(self.keys_simulations) < 1 or len(self.drms_simulations) < 1:

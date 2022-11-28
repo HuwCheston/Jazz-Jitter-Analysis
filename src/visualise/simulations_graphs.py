@@ -83,7 +83,7 @@ class LinePlotAllParameters(vutils.BasePlot):
             self
     ) -> tuple[plt.Figure, str]:
         """
-
+        Called from outside the class; creates plot and returns to vutils.plot_decorator for saving.
         """
         self._plot_all_simulations()
         if self.keys_orig is not None and self.drms_orig is not None:
@@ -100,7 +100,7 @@ class LinePlotAllParameters(vutils.BasePlot):
             self, func
     ) -> float:
         """
-
+        Get the minimum and maximum seconds across all simulations and parameters for use in x axes.
         """
         res = []
         # Iterate through each simulation object
@@ -114,7 +114,7 @@ class LinePlotAllParameters(vutils.BasePlot):
 
     def _format_ax(self):
         """
-
+        Formats axes, setting ticks, labels etc.
         """
         # Calculate xlim
         xlim = (self._get_min_max_x_val(min), self._get_min_max_x_val(max))
@@ -138,7 +138,7 @@ class LinePlotAllParameters(vutils.BasePlot):
 
     def _format_fig(self):
         """
-
+        Formats figure, setting title, legend etc.
         """
         self.fig.suptitle(f"Duo {self.params['trial']}, block {self.params['block']}, "
                           f"latency {self.params['latency']}, jitter {self.params['jitter']}")
@@ -167,7 +167,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
             df: pd.DataFrame
     ) -> pd.DataFrame:
         """
-
+        Wrangles dataframe into form required for plotting.
         """
         # Fill our 'None' leader values with empty strings
         df['leader'] = df['leader'].fillna(value='').str.lower()
@@ -184,6 +184,9 @@ class BarPlotSimulationParameters(vutils.BasePlot):
     def create_plot(
             self
     ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class; creates plot and returns to vutils.plot_decorator for saving.
+        """
         self._create_plot()
         self._add_parameter_graphics()
         self._format_ax()
@@ -215,7 +218,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
             self, var: str
     ) -> pd.DataFrame:
         """
-
+        Calculates the result of a independent sample t-test for each parameter/trial combo to original coupling results
         """
         ttest = []
         # Iterate through every trial in our dataframe
@@ -241,7 +244,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
             self
     ) -> None:
         """
-
+        Creates the stripplot and barplot for both variables, then carries out t-test and adds in asterisks
         """
         # Iterate through both variables which we wish to plot
         for num, var in enumerate(['tempo_slope', 'asynchrony']):
@@ -265,7 +268,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
             self
     ) -> None:
         """
-
+        Formats axes objects, setting ticks, labels etc.
         """
         # Apply formatting to tempo slope ax
         self.ax[0].set(ylabel='Tempo slope (BPM/s)', xlabel='', ylim=(-1, 1))
@@ -277,7 +280,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         for ax in self.ax:
             # Set the label, with padding so it doesn't get in the way of our parameter graphics
             ax.set_xlabel('Parameter', y=0.5, labelpad=35)
-            # Adjust the width of the ticks and ax border
+            # Adjust the width of the major and minor ticks and ax border
             ax.tick_params(width=3, which='major')
             ax.tick_params(width=0, which='minor')
             plt.setp(ax.spines.values(), linewidth=2)
@@ -286,7 +289,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
             self, ypad: float = -0.03
     ) -> None:
         """
-
+        Adds graphics below each parameter showing the simulated performer couplings.
         """
         # Iterate through both axes on the figure
         # We use an axes transform when placing the graphics, so we don't have to set values individually
@@ -326,7 +329,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
             self
     ) -> None:
         """
-
+        Formats figure object, setting legend and padding etc.
         """
         # Empty variables to hold our legend handles and labels
         hand, lab = None, None
