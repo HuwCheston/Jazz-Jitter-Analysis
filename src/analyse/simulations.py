@@ -1,644 +1,520 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import numba as nb
+import pickle
 from datetime import timedelta
 import statsmodels.formula.api as smf
-import warnings
 
-import src.visualise.visualise_utils as vutils
 import src.analyse.analysis_utils as autils
 
 
+# noinspection PyBroadException
 class Simulation:
-    """
-    Creates a series of simulated musical performances according to the parameters of two provided regression models,
-    one for the pianist and one for the drummer.
-
-    Available parameter:
-    - original
-    - original_variable
-    - anarchy
-    - democracy
-    - dictatorship
-    """
-
     def __init__(
-            self, keys_data, drms_data, parameter, latency, **kwargs
+            self, keys_nn, drms_nn, keys_params, drms_params, latency_array, num_simulations: int = 1000, **kwargs
     ):
+        """
+
+        """
         # Default parameters
-        self._initial_onset: float = 8.0  # The initial onset of a performance, after 8 second count-in
-        self._initial_ioi: float = 0.5  # The presumed initial length of the first IOI = crotchet at 120BPM
-        self._end: float = 101.5  # Stop generating data after we exceed this onset value
-        self._max_iter: int = 500  # If we generate more than this number of IOIs, we're probably stuck in a loop
-        self._num_broken: int = 0   # The number of simulations that failed to complete
+        self._keys_initial_iois: list[float] = self._get_initial_iois(keys_nn)
+        self._drms_initial_iois: list[float] = self._get_initial_iois(drms_nn)
+        self._keys_initial_onset: float = self._get_initial_onset(keys_nn)
+        self._drms_initial_onset: float = self._get_initial_onset(drms_nn)
         self._resample_interval: timedelta = timedelta(seconds=1)  # Get mean of IOIs within this window
-        self._rolling_period: timedelta = timedelta(seconds=4)  # Apply a rolling window of this size to the data
-        self._debug_params: dict = {  # Used when debugging: will generate the same simulation every time
-            'correction_self': 0.5,
-            'correction_partner': 0.5,
-            'intercept': 0.5,
-            'noise': np.array([0.02])
-        }
 
         # Check and generate our input data
-        self.keys_data: pd.DataFrame = self._check_input_data(keys_data)
-        self.drms_data: pd.DataFrame = self._check_input_data(drms_data)
+        self.total_beats: int = 1000
+        self.latency: np.array = self._append_timestamps_to_latency_array(latency_array)
+        self.num_simulations: int = num_simulations
+
+        # Simulation parameters, in the form of numba dictionaries to be used inside a numba function
+        self.parameter: str = kwargs.get('parameter', 'original')
         self.leader: str = kwargs.get('leader', None)
-        self.parameter: str = self._check_simulation_parameter(parameter)
-        self.latency: np.array = self._append_timestamps_to_latency_array(latency)
-        self.num_simulations: int = kwargs.get('num_simulations', 500)
+        self.noise: float = kwargs.get('noise', 0.005)
+        self._keys_pcm: pd.DataFrame = keys_params
+        self._drms_pcm: pd.DataFrame = drms_params
 
-        self.keys_params: dict = self._get_simulation_params(input_data=self.keys_data)
-        self.drms_params: dict = self._get_simulation_params(input_data=self.drms_data)
+        # Musician parameters
+        self.keys_params_raw: dict = self._get_raw_musician_parameters(init=self._keys_pcm)
+        self.drms_params_raw: dict = self._get_raw_musician_parameters(init=self._drms_pcm)
+        self.keys_params: nb.typed.Dict = self._convert_musician_parameters_dict_to_numba(
+            self._modify_musician_parameters_by_simulation_type(self.keys_params_raw)
+        )
+        self.drms_params: nb.typed.Dict = self._convert_musician_parameters_dict_to_numba(
+            self._modify_musician_parameters_by_simulation_type(self.drms_params_raw)
+        )
 
+        # Empty lists to store our keys and drums simulations in
+        self._keys_simulations_raw: list[dict] = []
+        self._drms_simulations_raw: list[dict] = []
         self.keys_simulations: list[pd.DataFrame] = []
         self.drms_simulations: list[pd.DataFrame] = []
 
-    @staticmethod
-    def _check_input_data(
-            input_data: pd.DataFrame
-    ) -> pd.DataFrame | None:
-        """
-        Checks to make sure that input dataframe is in correct format and has all necessary columns.
-        Raises ValueError if any checks are failed
-        """
-        required_cols: list[str] = [
-            'instrument',
-            'total_beats',
-            'raw_beats',
-            'correction_self',
-            'correction_self_stderr',
-            'correction_partner',
-            'correction_partner_stderr',
-            'intercept',
-            'intercept_stderr',
-            'resid_std',
-            'resid_len',
-        ]
-        # If we didn't pass a dataframe
-        if not isinstance(input_data, pd.DataFrame):
-            raise ValueError('Data input was either not provided or is of invalid type')
-        # If we don't have all the necessary columns to create the simulation
-        if len([col for col in required_cols if col not in input_data.columns]) != 0:
-            raise ValueError(
-                f'Some required columns in data input were missing '
-                f'(missing: {", ".join(str(x) for x in required_cols if x not in input_data.columns)})')
-        # If we passed data from multiple performances
-        if len(input_data) != 1:
-            raise ValueError(
-                f'Input data should be from one performance only (passed data: {len(input_data)} performances)')
-        # If all checks passed, return data
-        else:
-            return input_data[required_cols]
+        # Simulations results dictionary
+        self.results_dic = self._create_summary_dictionary(include_simulations=True)
 
-    def _check_simulation_parameter(
-            self, input_parameter: str
-    ) -> str | None:
+    @staticmethod
+    def _get_number_of_beats_for_simulation(
+            kp, dp
+    ) -> int:
         """
-        Checks if the simulation parameter given by the user is acceptable , and raises value error if not
+        Averages the total number of beats across both keys and drums, then gets the upper ceiling.
         """
-        acceptable_parameters: list[str] = [
-            'original',  # Use the original coefficients we've passed in
-            'original_variable',  # Use the original coefficients, but add random noise according to std err
-            'democracy',  # Coefficients for both performers set to the mean
-            'dictatorship',
-            'anarchy',
-            'debug'
-        ]
-        # If we haven't passed an acceptable parameter
-        if input_parameter not in acceptable_parameters:
-            raise ValueError(
-                f'{input_parameter} not in acceptable simulation parameters '
-                f'(options: {", ".join(str(x) for x in acceptable_parameters)})')
-        # Additional checks if we're setting the leadership parameter
-        if input_parameter == 'leadership':
-            # We haven't passed a leadership parameter, or it's an incorrect type
-            if not isinstance(self.leader, str):
-                raise ValueError(
-                    'If setting leadership simulation parameter, must also pass leader keyword argument as string')
-            # We've passed an incompatible leadership parameter
-            elif self.leader.lower() not in ['keys', 'drums']:
-                raise ValueError(f'Leader keyword argument {self.leader} is invalid: must be either keys or drums')
-        # If all checks passed, return the input parameter
-        return input_parameter
+        return int(np.ceil(np.mean([kp['total_beats'].iloc[0], dp['total_beats'].iloc[0]])))
 
     @staticmethod
     def _append_timestamps_to_latency_array(
             latency_array, offset: int = 8, resample_rate: float = 0.75
     ) -> np.array:
         """
-        Appends timestampts showing the onset time for each value in the latency array applied to a performance
+        Appends timestamps showing the onset time for each value in the latency array applied to a performance
         """
-        # Define the start and endpoint for the linear space
-        start = offset
+        # Define the endpoint for the linear space
         end = offset + (len(latency_array) * resample_rate)
         # Create the linear space
-        lin = np.linspace(start, end, num=len(latency_array), endpoint=False)
+        lin = np.linspace(offset, end, num=len(latency_array), endpoint=False)
         # Append the two arrays together
         return np.c_[latency_array / 1000, lin]
 
-    def _get_simulation_params(
-            self, input_data: pd.DataFrame
+    @staticmethod
+    def _get_initial_iois(
+            nn, default: float = 0.5
+    ) -> tuple[float]:
+        """
+        Gets the first two IOI values from a performance dataset. If any are invalid, return our default of (0.5, 0.5)
+        """
+        try:
+            iois = nn.iloc[:2]['my_next_ioi'].values.tolist()
+        except KeyError:
+            return default, default
+        else:
+            if any(np.isnan(iois)):
+                return default, default
+            else:
+                return iois
+
+    @staticmethod
+    def _get_initial_onset(
+            nn: pd.DataFrame, default: float = 8, threshold: float = 9
+    ) -> float:
+        """
+        Gets the first onset time from a performance dataset. If this is invalid, returns our default of 8
+        """
+        try:
+            onset = nn.iloc[0]['my_onset']
+        except KeyError:
+            return default
+        else:
+            # This is used to capture a few cases where one performer didn't come straight in after the count in
+            if onset > threshold:
+                return default
+            else:
+                return onset
+
+    @staticmethod
+    def _get_raw_musician_parameters(
+            init: pd.DataFrame
     ) -> dict:
         """
-        Returns the simulation parameters from the given input parameter.
+        Gets necessary simulation parameters from pandas dataframe and converts to a dictionary
         """
-        # Averaging function: returns average of keys and drums value for a given variable
-        mean = lambda s: np.mean([self.keys_data[s], self.drms_data[s]])
-        rand = lambda s: np.random.normal(loc=input_data[s], scale=input_data[f'{s}_stderr'],
-                                          size=int(input_data['total_beats']))
-        # Define the initial dictionary, with the noise term and the latency array (with timestamps)
-        d: dict = {
-            'noise': np.random.normal(loc=0, scale=input_data['resid_std'], size=int(input_data['resid_len'])),
-            'latency': self.latency,
-        }
+        # Need to reset our index so we can use 0 indexing
+        init = init.reset_index(drop=True)
+        # Variables we need from our input
+        cols = [
+            'correction_self', 'correction_partner', 'intercept', 'resid_std',
+        ]
+        # Create the dictionary and return
+        dic = {s: init[s].iloc[0].astype(np.float64) for s in cols}
+        dic.update({'instrument': init['instrument'].iloc[0]})
+        return dic
+
+    def _modify_musician_parameters_by_simulation_type(
+            self, input_data
+    ):
+        """
+        Modifies a simulated musician's parameters according to the given simulation type
+        """
+        # Used to get the mean of a particular coefficient across both musicians
+        mean = lambda s: np.mean([self.keys_params_raw[s], self.drms_params_raw[s]])
+        output_data = {}
         # Original coupling: uses coefficients, intercept from the model itself
         if self.parameter == 'original':
-            d.update({
-                'correction_self': input_data['correction_self'].iloc[0],
-                'correction_partner': input_data['correction_partner'].iloc[0],
-                'intercept': input_data['intercept'].iloc[0],
-            })
-        elif self.parameter == 'original_variable':
-            d.update({
-                'correction_self': rand('correction_self'),
-                'correction_partner': rand('correction_partner'),
-                'intercept': rand('intercept'),
-            })
+            output_data = {
+                'correction_self': input_data['correction_self'],
+                'correction_partner': input_data['correction_partner'],
+                'intercept': input_data['intercept'],
+            }
         # Democracy: uses mean coefficients and intercepts from across the duo
         elif self.parameter == 'democracy':
-            d.update({
+            output_data = {
                 'correction_self': mean('correction_self'),
                 'correction_partner': mean('correction_partner'),
-                'intercept': mean('intercept'),
-            })
-        # Leadership:
-        elif self.parameter == 'dictatorship':
-            # The instrument we're passing is the leader
-            if input_data['instrument'].iloc[0].lower() == self.leader.lower():
-                d.update({
+                'intercept': 0,
+            }
+        # Leadership: simulation specification differs according to whether instrument is leading or following
+        elif self.parameter == 'leadership':
+            # Leader: no correction to follower, all other parameters set to means
+            if input_data['instrument'].lower() == self.leader.lower():
+                output_data = {
                     'correction_self': -abs(mean('correction_self')),
                     'correction_partner': 0,
-                    'intercept': np.mean(mean('intercept'))
-                })
-            # The instrument we're passing is the follower
+                    'intercept': 0
+                }
+            # Follower: corrects to leader by mean correction across duo, all other parameters set to 0
             else:
-                d.update({
+                output_data = {
                     'correction_self': -abs(mean('correction_self')),
                     'correction_partner': mean('correction_partner'),
-                    'intercept': mean('intercept')
-                })
-        # No coupling: all coefficients and intercepts set to 0, with only random noise effecting the data
+                    'intercept': 0,
+                }
+        # Anarchy: neither musician corrects to each other, all other coefficients set to their mean
         elif self.parameter == 'anarchy':
-            d.update({
-                'correction_self': mean('correction_self'),
+            output_data = {
+                'correction_self': -abs(mean('correction_self')),
                 'correction_partner': 0,
-                'intercept': mean('intercept'),
-            })
-        # Debugging: all terms are made constant by setting to those defined in the debug_params.
-        # The noise term is no longer chosen randomly, resulting in the same output for every simulation.
-        elif self.parameter == 'debugging':
-            d = self._debug_params
-        return d
+                'intercept': 0,
+            }
+        # Update our dictionary with the required amount of noise
+        output_data.update({
+            'resid_std': self.noise
+        })
+        return output_data
+
+    @staticmethod
+    def _convert_musician_parameters_dict_to_numba(
+            python_dict: dict
+    ) -> nb.typed.Dict:
+        """
+        Converts a Python dictionary into a type that can be utilised by Numba
+        """
+        # Create the empty dictionary
+        nb_dict = nb.typed.Dict.empty(key_type=nb.types.unicode_type, value_type=nb.types.float64,)
+        # Iterate through our dictionary
+        for k, v in python_dict.items():
+            # If the type is compatible with numba floats, set it in the numba dictionary
+            if type(v) != str:
+                nb_dict[k] = v
+        return nb_dict
 
     def _initialise_empty_data(
-            self, first_latency_value: float = 0
-    ) -> dict:
+            self, iois: tuple[float] = (0.5, 0.5), onset: float = 8
+    ) -> nb.typed.Dict:
         """
-        Initialises an empty dictionary that we will fill with data as the simulation runs
+        Initialise an empty numba dictionary of string-array pairs, for storing data from one simulation in.
         """
-        return {
-            'my_actual_onset': [self._initial_onset],
-            'their_actual_onset': [self._initial_onset],
-            'their_heard_onset': [self._initial_onset + first_latency_value],
-            'latency_now': [first_latency_value],
-            'my_next_ioi': [self._initial_ioi],
-            'my_prev_ioi': [np.nan],
-            'asynchrony': [first_latency_value]
-        }
+        # Make dictionary with strings as keys and arrays as values
+        nb_dict = nb.typed.Dict.empty(
+            key_type=nb.types.unicode_type,
+            value_type=nb.types.float64[:],
+        )
+        # Fill the dictionary with arrays (pre-allocated in order to make running the simulation easier)
+        for s in ['my_onset', 'asynchrony', 'my_next_ioi', 'my_prev_ioi', 'my_next_ioi_diff', 'my_prev_ioi_diff']:
+            nb_dict[s] = np.zeros(shape=self.total_beats)
+        # Fill the dictionary arrays with our starting values
+        # My onset
+        nb_dict['my_onset'][0] = onset
+        nb_dict['my_onset'][1] = onset + iois[0]
+        # My next ioi
+        nb_dict['my_next_ioi'][0] = iois[0]
+        nb_dict['my_next_ioi'][1] = iois[1]
+        # My previous ioi
+        nb_dict['my_prev_ioi'][0] = np.nan
+        nb_dict['my_prev_ioi'][1] = iois[0]
+        # My next ioi diff
+        nb_dict['my_next_ioi_diff'][0] = np.nan
+        nb_dict['my_next_ioi_diff'][1] = iois[1] - iois[0]  # This will always be 0
+        # My previous ioi diff
+        nb_dict['my_prev_ioi_diff'][0] = np.nan
+        nb_dict['my_prev_ioi_diff'][1] = np.nan
+        return nb_dict
 
-    def run_simulations(
+    def create_all_simulations(
             self
-    ) -> None:
+    ):
         """
         Run the simulations and create a list of dataframes for each individual performer
         """
-        # Clear both lists
-        self.keys_simulations.clear()
-        self.drms_simulations.clear()
-        # Run the number of simulations which we provided
-        for _ in range(0, self.num_simulations):
-            # Generate the data and append to the required lists
-            keys, drms = self._generate_data()
-            self.keys_simulations.append(keys)
-            self.drms_simulations.append(drms)
-            # Remove simulations that failed to complete
-            self._remove_broken_simulations()
-
-    def _remove_broken_simulations(
-            self
-    ) -> None:
-        """
-        Remove simulations from our dataset that have failed to complete
-        """
-        cleaned_keys = []
-        cleaned_drms = []
-        # Iterate through keys and drums performances TOGETHER
-        for keys, drms in zip(self.keys_simulations, self.drms_simulations):
-            # If we broke out of our loop while creating the simulation, remove:
-            if keys is None or drms is None:
-                self._num_broken += 1
-                continue
-            # If the performance exceeds the maximum length (plus a bit of tolerance), remove:
-            elif keys.index.seconds.max() >= self._end + 1 or drms.index.seconds.max() >= self._end + 1:
-                self._num_broken += 1
-                continue
-            # If the performance exceeds the maximum number of beats, remove:
-            elif len(keys) >= self._max_iter or len(drms) >= self._max_iter:
-                self._num_broken += 1
-                continue
-            # Else, performance is ok and can be used.
-            else:
-                cleaned_keys.append(keys)
-                cleaned_drms.append(drms)
-        self.keys_simulations = cleaned_keys
-        self.drms_simulations = cleaned_drms
-
-    def _generate_data(
-            self
-    ) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
-        """
-        Generates data for one simulation
-        """
-
-        def predict_next_ioi(
-                sim_data: dict, sim_params: dict
-        ) -> float:
-            """
-            Predict the next inter-onset interval from the provided data
-            """
-            # Define the function for either getting a random term from a distribution or a constant, depending on type
-            get = lambda s: np.random.choice(sim_params[s]) if isinstance(sim_params[s], np.ndarray) else sim_params[s]
-            # Multiply previous IOI by coupling to self coefficient
-            correction_self: float = sim_data['my_prev_ioi'][-1] * get('correction_self')
-            # Multiply async by coupling to partner coefficient
-            correction_partner: float = sim_data['asynchrony'][-1] * get('correction_partner')
-            # Get the intercept (this is a constant)
-            intercept: float = get('intercept')
-            # Take a random sample from the noise array
-            noise: float = get('noise')
-            # Add all the terms together and return as our predicted next IOI
-            return correction_self + correction_partner + intercept + noise
-
-        def get_latency_at_onset(
-                sim_data: dict, sim_params: dict
-        ) -> float | None:
-            """
-            Get the amount of latency applied to our simulated partner's feed at the particular point in the performance
-            """
-            # Subset our latency array for just the onset times times
-            latency_onsets: np.array = sim_params['latency'][:, 1]
-            # Get the last onset our partner played
-            partner_onset: float = sim_data['their_actual_onset'][-1]
-            try:
-                # Get the closest minimum latency onset time to our partner's onset
-                matched_latency_onset = latency_onsets[latency_onsets < partner_onset].max()
-                # Get the latency value associated with that latency onset time and return
-                latency_value: float = float(sim_params['latency'][latency_onsets == matched_latency_onset][:, 0])
-            except ValueError:
-                return None
-            else:
-                return latency_value
-
-        # Generate our starter data
-        keys_data = self._initialise_empty_data(self.latency[0][0])
-        drms_data = self._initialise_empty_data(self.latency[0][0])
-        # Start the simulation
-        iter_count: int = 0
-        while keys_data['my_actual_onset'][-1] < self._end or drms_data['my_actual_onset'][-1] < self._end:
-            # Shift the predicted IOI by one beat
-            keys_data['my_prev_ioi'].append(keys_data['my_next_ioi'][-1])
-            drms_data['my_prev_ioi'].append(drms_data['my_next_ioi'][-1])
-            # Get our next onset time by adding our predicted next IOI to our last onset
-            keys_data['my_actual_onset'].append(keys_data['my_actual_onset'][-1] + keys_data['my_next_ioi'][-1])
-            drms_data['my_actual_onset'].append(drms_data['my_actual_onset'][-1] + drms_data['my_next_ioi'][-1])
-            # Get our partners last actual onset time (from their dataframe)
-            keys_data['their_actual_onset'].append(drms_data['my_actual_onset'][-1])
-            drms_data['their_actual_onset'].append(keys_data['my_actual_onset'][-1])
-            # Calculate the amount of latency applied when our partner played their last onset
-            keys_latency_now = get_latency_at_onset(keys_data, self.keys_params)
-            drms_latency_now = get_latency_at_onset(drms_data, self.drms_params)
-            # If we've received a ValueError at the previous stage, break: we'll discard this failed simulation later
-            if keys_latency_now is None or drms_latency_now is None:
-                return None, None
-            # Else continue
-            else:
-                keys_data['latency_now'].append(get_latency_at_onset(keys_data, self.keys_params))
-                drms_data['latency_now'].append(get_latency_at_onset(drms_data, self.drms_params))
-            # Add on the latency time to our partner's onset, to find out when we actually heard them
-            keys_data['their_heard_onset'].append(keys_data['latency_now'][-1] + keys_data['their_actual_onset'][-1])
-            drms_data['their_heard_onset'].append(drms_data['latency_now'][-1] + drms_data['their_actual_onset'][-1])
-            # Calculates the async between our partner's delayed onset and our actual onset
-            keys_data['asynchrony'].append(keys_data['their_heard_onset'][-1] - keys_data['my_actual_onset'][-1])
-            drms_data['asynchrony'].append(drms_data['their_heard_onset'][-1] - drms_data['my_actual_onset'][-1])
-            # Predict our next IOI
-            keys_data['my_next_ioi'].append(predict_next_ioi(keys_data, self.keys_params))
-            drms_data['my_next_ioi'].append(predict_next_ioi(drms_data, self.drms_params))
-            # Increase the iteration counter by one
-            iter_count += 1
-            # Raise a warning if we've exceeded the maximum number of iterations and return None to discard broken data
-            if iter_count >= self._max_iter:
-                warnings.warn(f'Maximum number of iterations {self._max_iter} exceeded')
-                return None, None
-        # Once the simulation has finished, return the data as a tuple = keys simulated data, drums simulated data
-        return self._format_simulated_data(keys_data), self._format_simulated_data(drms_data)
+        for i in range(0, self.num_simulations):
+            keys, drms = self._create_one_simulation(
+                # Initialise empty data to store in
+                self._initialise_empty_data(), self._initialise_empty_data(),
+                self.keys_params, self.drms_params,     # Parameters for the simulation, e.g. coefficients
+                np.random.normal(0, self.keys_params['resid_std'], 10000),
+                np.random.normal(0, self.drms_params['resid_std'], 10000),
+                self.latency, self.total_beats  # Latency array and total number of beats
+            )
+            # Append raw data for debugging
+            self._keys_simulations_raw.append(dict(keys))
+            self._drms_simulations_raw.append(dict(drms))
+            # Format the simulated data and append to our list
+            self.keys_simulations.append(self._format_simulated_data(data=keys))
+            self.drms_simulations.append(self._format_simulated_data(data=drms))
 
     def _format_simulated_data(
-            self, data: dict
+            self, data: nb.typed.Dict
     ) -> pd.DataFrame:
         """
         Formats data from one simulation by creating a dataframe, adding in the timedelta column, and resampling
         to get the mean IOI (defaults to every second)
         """
-        # Create the dataframe from the dictionary
-        df = pd.DataFrame(data)
+        # Create dataframe from the numba dictionary by first converting it to a python dictionary then to a dataframe
+        df = pd.DataFrame(dict(data))
+        # Drop rows with all zeros in
+        df = df.loc[~(df == 0).all(axis=1)]
         # Convert my onset column to a timedelta
-        df['td'] = pd.to_timedelta([timedelta(seconds=val) for val in df['my_actual_onset']])
+        df['td'] = pd.to_timedelta([timedelta(seconds=val) for val in df['my_onset']])
+        offset = timedelta(seconds=8 - df.iloc[0]['my_onset'])
         # Set the index to our timedelta column, resample (default every second), and get mean
-        return df.set_index('td').resample(rule=self._resample_interval).mean()
+        return df.set_index('td').resample(rule=self._resample_interval, offset=offset).mean()
 
     @staticmethod
-    def _get_grand_average_tempo(
-            all_perf: list[pd.DataFrame]
+    @nb.njit
+    def _create_one_simulation(
+            keys_data: nb.typed.Dict, drms_data: nb.typed.Dict,
+            keys_params: nb.typed.Dict, drms_params: nb.typed.Dict,
+            keys_noise, drms_noise,
+            lat: np.ndarray, beats: int
+    ) -> tuple:
+        """
+        Create data for one simulation, using numba optimisations
+        """
+
+        def get_latency_at_onset(
+                my_onset: float
+        ) -> float:
+            """
+            Get the current amount of latency applied to our partner when we played our onset
+            """
+            # If our first onset was before the 8 second count-in, return the first amount of delay applied
+            if my_onset < lat[0, :][1]:
+                return lat[:, 0][0]
+            # Else, return the correct amount of latency
+            else:
+                return lat[lat[:, 1] == lat[:, 1][lat[:, 1] <= my_onset].max()][:, 0][0]
+
+        def calculate_async(
+                my_onset: float, their_onset: float
+        ) -> float:
+            """
+            Calculates the current asynchrony with our partner at our onset. Note the order of positional arguments!!
+            """
+            return (their_onset + get_latency_at_onset(my_onset)) - my_onset
+
+        def predict_next_ioi_diff(
+                prev_diff: float, asynchrony: float, params: nb.typed.Dict, noise: np.ndarray
+        ) -> float:
+            """
+            Predict the difference between previous and next IOIs using inputted data and model parameters
+            """
+            a = prev_diff * params['correction_self']
+            b = asynchrony * params['correction_partner']
+            c = params['intercept']
+            n = np.random.choice(noise)
+            return a + b + c + n
+
+        # Calculate our first two async values. We don't do this when initialising the empty data, because it
+        # both requires the get_latency_at_onset function and access to both keys and drums data.
+        for i in range(0, 2):
+            keys_data['asynchrony'][i] = calculate_async(keys_data['my_onset'][i], drms_data['my_onset'][i])
+            drms_data['asynchrony'][i] = calculate_async(drms_data['my_onset'][i], keys_data['my_onset'][i])
+        # We don't use the full range of beats, given that we've already added some in when initialising our data
+        for i in range(2, beats):
+            # Shift difference
+            keys_data['my_prev_ioi_diff'][i] = keys_data['my_next_ioi_diff'][i - 1]
+            drms_data['my_prev_ioi_diff'][i] = drms_data['my_next_ioi_diff'][i - 1]
+            # Shift IOI
+            keys_data['my_prev_ioi'][i] = keys_data['my_next_ioi'][i - 1]
+            drms_data['my_prev_ioi'][i] = drms_data['my_next_ioi'][i - 1]
+            # Get next onset by adding previous onset to predicted IOI
+            keys_data['my_onset'][i] = keys_data['my_onset'][i - 1] + keys_data['my_prev_ioi'][i]
+            drms_data['my_onset'][i] = drms_data['my_onset'][i - 1] + drms_data['my_prev_ioi'][i]
+            # Get async value by subtracting partner's onset (plus latency) from ours
+            try:
+                keys_data['asynchrony'][i] = calculate_async(keys_data['my_onset'][i], drms_data['my_onset'][i])
+                drms_data['asynchrony'][i] = calculate_async(drms_data['my_onset'][i], keys_data['my_onset'][i])
+            # If there's an issue here, break out of the simulation
+            except:
+                break
+            # Predict difference between previous IOI and next IOI
+            keys_data['my_next_ioi_diff'][i] = predict_next_ioi_diff(
+                keys_data['my_prev_ioi_diff'][i], keys_data['asynchrony'][i], keys_params, keys_noise
+            )
+            drms_data['my_next_ioi_diff'][i] = predict_next_ioi_diff(
+                drms_data['my_prev_ioi_diff'][i], drms_data['asynchrony'][i], drms_params, drms_noise
+            )
+            # Use predicted difference between IOIs to get next actual IOI
+            keys_data['my_next_ioi'][i] = keys_data['my_next_ioi_diff'][i] + keys_data['my_prev_ioi'][i]
+            drms_data['my_next_ioi'][i] = drms_data['my_next_ioi_diff'][i] + drms_data['my_prev_ioi'][i]
+            # If we've accelerated to a ridiculous extent (due to noise), we need to break.
+            if keys_data['my_next_ioi'][i] < 0 or drms_data['my_next_ioi'][i] < 0:
+                break
+            # TODO: should be the same length as original performance?
+            # If we've exceeded our endpoint, break
+            if keys_data['my_onset'][i] > 100 or drms_data['my_onset'][i] > 100:
+                break
+        return keys_data, drms_data
+
+    @staticmethod
+    def _get_average_var_for_one_simulation(
+            all_perf: list[pd.DataFrame], var: str = 'my_next_ioi'
     ) -> pd.DataFrame:
         """
         Concatenate all simulations together and get the row-wise average (i.e. avg IOI every second)
         """
+        # We use absolute values here, as this makes most sense when getting mean async across performers
+        # For example, if keys-drums async = -0.5 and drums-keys async = 0.5, mean without absolute values == 0
+        # Instead, this should be 0.5.
         return pd.DataFrame(
-            pd.concat([df['my_prev_ioi'] for df in all_perf], axis=1).mean(axis=1), columns=['my_prev_ioi']
+            pd.concat([df_[var] for df_ in all_perf], axis=1).abs().mean(axis=1), columns=[var]
         )
 
-    @staticmethod
-    def _get_grand_average_stdev(
-            all_perf: list[pd.DataFrame]
-    ) -> pd.DataFrame:
-        """
-        Concatenate all simulations together and get the standard deviation of every second across all simulations
-        """
-        return pd.DataFrame(
-            pd.concat([df['my_prev_ioi'] for df in all_perf], axis=1).std(axis=1), columns=['my_prev_ioi']
-        )
-
-    def get_avg_tempo_slope(
+    def get_average_tempo_slope(
             self
-    ) -> float:
+    ) -> float | None:
         """
+        Returns the average tempo slope for all simulations.
 
+        Method:
+        ---
+        - For every simulation, zip the corresponding keys and drums performance together.
+        - Then, get the average IOI for every second across both keys and drums.
+            - This is straightforward, because we resampled to average IOI per second in _format_simulated_data
+        - Convert average IOI to average BPM by dividing by 60, then regress against elapsed seconds
+        - Extract the slope coefficient, take the median across all simulations, and return
         """
-        # TODO: this is gross
-        # Raise an error if we haven't generated our simulations
-        if len(self.keys_simulations) == 0 or len(self.drms_simulations) == 0:
-            raise ValueError('Generate simulations first!')
-        res = []
+        coeffs = []
+        # Iterate through every simulation individually
         for keys, drms in zip(self.keys_simulations, self.drms_simulations):
-            ga = self._get_grand_average_tempo([keys, drms])
-            ga['bpm'] = (60 / ga['my_prev_ioi']).rolling(self._rolling_period, min_periods=1).mean().astype(float)
-            ga['my_actual_onset'] = ga.index.total_seconds()
-            reg = smf.ols('bpm~my_actual_onset', data=ga.dropna()).fit().params.iloc[1:].values[0]
-            res.append(reg)
-        return np.mean(res)
+            # Concatenate keyboard and drums performance and get average IOI every second
+            avg = self._get_average_var_for_one_simulation([keys, drms])
+            # Get elapsed number of seconds
+            avg['elapsed_seconds'] = avg.index.seconds
+            # Convert IOIs to BPM for tempo slope regression
+            avg['my_next_bpm'] = 60 / avg['my_next_ioi']
+            avg = avg.dropna()
+            # Conduct and fit the regression model
+            md = smf.ols('my_next_bpm~elapsed_seconds', data=avg.dropna()).fit()
+            # Extract the tempo slope coefficient and append to list
+            coeffs.append(md.params[1])
+        # Calculate the median tempo slope coefficient (robust to outliers!) from all simulations and return
+        return np.nanmedian(pd.Series(coeffs).replace(-np.Inf, np.nan))
 
-    def get_avg_pairwise_async(
+    def get_average_pairwise_asynchrony(
             self
     ) -> float:
         """
-        Extract average pairwise asynchrony for all simulations
+        Gets the average pairwise asynchrony (in milliseconds!) across all simulated performances
         """
-        z = zip(self.keys_simulations, self.drms_simulations)
-        return np.mean([autils.extract_pairwise_asynchrony(k, n) for k, n in z])
+        # Define the function for calculating pairwise async
+        # This is the root mean square of the standard deviation of the async
+        pw_async = lambda k_, d_: np.sqrt(np.mean(np.square([k_['asynchrony'].std(), d_['asynchrony'].std()]))) * 1000
+        # Calculate the mean pairwise async across all performances
+        return np.mean([pw_async(k__, d__) for k__, d__ in zip(self.keys_simulations, self.drms_simulations)])
 
-    def _plot_original_performance(
-            self
-    ) -> None:
-        # TODO: gross
-        for num, (k, d) in enumerate(zip([self.keys_data['raw_beats_1'][0], self.keys_data['raw_beats_2'][0]],
-                                         [self.drms_data['raw_beats_1'][0], self.drms_data['raw_beats_2'][0]])):
-            avg = autils.average_bpms(autils.generate_df(k), autils.generate_df(d), window_size=16)
-            plt.plot(
-                avg.elapsed, avg.bpm_rolling, alpha=0.5, lw=2, color=vutils.LINE_CMAP[num], label=f'Repeat {num+1}'
+    def get_simulation_data_for_plotting(
+            self, plot_individual: bool = True, plot_average: bool = True, var: str = 'my_next_ioi',
+            timespan: tuple[int] = (7, 101),
+    ) -> tuple[list[pd.DataFrame], pd.DataFrame | None]:
+        """
+        Wrangles simulation data into a format that can be plotted and returns.
+        """
+        # Create simulations if we haven't already done so
+        if len(self.keys_simulations) < 1 or len(self.drms_simulations) < 1:
+            self.create_all_simulations()
+        # If we're plotting individual simulations
+        individual_sims = []
+        grand_avg = None
+        if plot_individual:
+            # Iterate through individual keys and drums simulations
+            for k_, d_ in zip(self.keys_simulations, self.drms_simulations):
+                # Average individual simulation
+                avg = self._get_average_var_for_one_simulation([k_, d_], var=var)
+                # Subset for required timespan
+                avg = avg[(avg.index.seconds >= timespan[0]) & (avg.index.seconds <= timespan[1])]
+                individual_sims.append(avg)
+        # If we're plotting our average simulation
+        if plot_average:
+            # Get grand average simulation by averaging our average simulations
+            zi = zip(self.keys_simulations, self.drms_simulations)
+            grand_avg = self._get_average_var_for_one_simulation(
+                [self._get_average_var_for_one_simulation([k_, d_], var=var) for k_, d_ in zi], var=var
             )
+            # Subset for required timespan
+            grand_avg = grand_avg[(grand_avg.index.seconds >= timespan[0]) & (grand_avg.index.seconds <= timespan[1])]
+        return individual_sims, grand_avg
 
-    def _roll_bpm(
-            self, s: pd.Series
-    ) -> pd.Series:
-        return (60 / s).rolling(window=self._rolling_period, min_periods=1).mean()
-
-    def plot_simulations(
-            self
-    ) -> None:
-        """
-        Plot all simulations and add in the grand average tempo
-        """
-        # Raise an error if we haven't generated our simulations
-        if len(self.keys_simulations) == 0 or len(self.drms_simulations) == 0:
-            raise ValueError('Generate simulations first!')
-        # Define the roller function for converting IOIs to BPM and rolling
-        # Iterate through keys and drums simulations and plot rolled BPM
-        for keys, drms in zip(self.keys_simulations, self.drms_simulations):
-            avg = self._get_grand_average_tempo([keys, drms])
-            plt.plot(avg.index.seconds, self._roll_bpm(avg['my_prev_ioi']), alpha=0.05, lw=1, color=vutils.BLACK)
-        # Get our grand average tempo for keys and drums simulations
-        keys_avg = self._get_grand_average_tempo(self.keys_simulations)
-        drms_avg = self._get_grand_average_tempo(self.drms_simulations)
-        # Plot the rolled BPM of our grand average dataframe
-        grand_average = self._get_grand_average_tempo([keys_avg, drms_avg])
-        plt.plot(
-            grand_average.index.seconds, self._roll_bpm(grand_average['my_prev_ioi']),
-            alpha=1, lw=2, color=vutils.BLACK, label='Simulation'
-        )
-        sd_plus1 = self._get_grand_average_tempo([keys_avg + self._get_grand_average_stdev(self.keys_simulations),
-                                                  drms_avg + self._get_grand_average_stdev(self.drms_simulations)])
-        sd_neg1 = self._get_grand_average_tempo([keys_avg - self._get_grand_average_stdev(self.keys_simulations),
-                                                 drms_avg - self._get_grand_average_stdev(self.drms_simulations)])
-        plt.fill_between(
-            grand_average.index.seconds, self._roll_bpm(sd_neg1['my_prev_ioi']),
-            self._roll_bpm(sd_plus1['my_prev_ioi']), alpha=0.05, color=vutils.BLACK
-        )
-        self._plot_original_performance()
-        # Set y limit
-        plt.ylim((30, 160))
-        plt.legend()
-        plt.show()
-
-
-class SimulationsByParameter:
-    """
-    Create simulations for every condition and parameter combination. E.g. create original/democracy/leadership-keys/
-    leadership-drums/anarchy simulations for Duo 2 permance with 23ms of latency, 1.0x jitter...
-
-    Only required argument is mds, which should be a dataframe with every row containing model data extracted from an
-    actual performance. This will be iterated over and simulations created when the .create_simulations method
-    is called. The results from the simulations can then be accessed from the .res parameter.
-    """
-    def __init__(self, mds: pd.DataFrame, **kwargs):
-        self.mds: pd.DataFrame = mds
-        self.res: list = []
-        self._num_simulations: int = kwargs.get('num_simulations', 100)
-        self.parameters: list[str] = ['original', 'democracy', 'dictatorship', 'anarchy']
-
-    @staticmethod
-    def _dic_create(
-            md: Simulation, i: tuple
+    def _create_summary_dictionary(
+            self, include_simulations: bool = True
     ) -> dict:
         """
-        Used to format the data from a simulation into the required format
+        Creates a summary dictionary with important simulation parameters
         """
         dic = {
-            'trial': i,
-            'type': md.parameter + md.leader if md.leader is not None else md.parameter,
-            'keys_correction_partner': md.keys_params['correction_partner'],
-            'drms_correction_partner': md.drms_params['correction_partner'],
-            'keys_correction_self': md.keys_params['correction_self'],
-            'drms_correction_self': md.drms_params['correction_self'],
-            'keys_intercept': md.keys_params['intercept'],
-            'drms_intercept': md.drms_params['intercept'],
+            'trial': self._keys_pcm["trial"].iloc[0],
+            'block': self._keys_pcm["block"].iloc[0],
+            'latency': self._keys_pcm["latency"].iloc[0],
+            'jitter': self._keys_pcm["jitter"].iloc[0],
+            'parameter': self.parameter,
+            'leader': self.leader,
+            'ts': self.get_average_tempo_slope(),
+            'asynchrony': self.get_average_pairwise_asynchrony(),
         }
-        try:
-            md.run_simulations()
-            dic.update({'tempo_slope': md.get_avg_tempo_slope(), 'pw_async': md.get_avg_pairwise_async()})
-        except ValueError:
-            dic.update({'tempo_slope': np.nan, 'pw_async': np.nan})
+        if include_simulations:
+            dic.update({
+                'keys_sim': self.keys_simulations,
+                'drms_sim': self.drms_simulations,
+            })
         return dic
 
-    def create_simulations(
-            self, logger=None
-    ):
-        """
-        Called from outside the class, used to create simulations for each condition and parameter
-        """
-        # Iterate through every condition individually
-        for idx, grp in self.mds.groupby(by=['trial', 'block', 'latency', 'jitter']):
-            # If we've passed a logger in, indicate where we are in the analysis
+
+def generate_phase_correction_simulations(
+        mds: pd.DataFrame, output_dir: str, logger=None, force_rebuild: bool = False, num_simulations: int = 100
+) -> list[dict]:
+    """
+    Create simulated performances across a range of artificial coupling parameters for every phase correction model
+    """
+    # Try and load the models from the disk to save time, unless we're forcing them to rebuild anyway
+    if not force_rebuild:
+        mds = autils.load_from_disc(output_dir, filename='phase_correction_sims.p')
+        # If we've successfully loaded models, return these straight away
+        if mds is not None:
+            return mds
+    # Define the parameters and leader combinations we want to create simulations for
+    params = [('original', None), ('democracy', None), ('anarchy', None), ('leadership', 'Drums')]
+    # Create an empty list to hold simulations in
+    all_sims = []
+    for pcm in mds:
+        # Get the raw data from our phase correction model
+        ke = pd.DataFrame([pcm.keys_dic])
+        dr = pd.DataFrame([pcm.drms_dic])
+        # Get the zoom array used in the performance
+        z = ke['zoom_arr'].iloc[0]
+        # Iterate through each parameter and leader combo
+        for param, leader in params:
             if logger is not None:
-                logger.info(f'Creating {self._num_simulations} simulations for {len(self.parameters) + 1} parameters '
-                            f'for performance {idx}...')
-            # Get the zoom array applied to the performance
-            zoom_arr = grp.iloc[0]['zoom_arr']
-            # Subset for the keys and drums model data
-            k = pd.DataFrame(grp[grp['instrument'] == 'Keys'])
-            d = pd.DataFrame(grp[grp['instrument'] != 'Keys'])
-            # Iterate through all the parameters and create simulations for each
-            for param in self.parameters:
-                # If we're creating leader-follower models, need to create these for both combinations of leader
-                if param == 'dictatorship':
-                    for ins in ['keys', 'drums']:
-                        md = Simulation(
-                            k, d, parameter=param, latency=zoom_arr, num_simulations=self._num_simulations, leader=ins
-                        )
-                        self.res.append(self._dic_create(md, idx))
-                else:
-                    md = Simulation(
-                        k, d, parameter=param, latency=zoom_arr, num_simulations=self._num_simulations,
-                    )
-                    self.res.append(self._dic_create(md, idx))
-        if logger is not None:
-            logger.info(f'Created simulations!')
+                logger.info(f'... trial {ke["trial"].iloc[0]}, block {ke["block"].iloc[0]}, '
+                            f'latency {ke["latency"].iloc[0]}, jitter {ke["jitter"].iloc[0]}, '
+                            f'parameter {param}, leader {leader}')
+            # Initialise the simulation class
+            sim = Simulation(
+                keys_params=ke, drms_params=dr, latency_array=z, num_simulations=num_simulations,
+                parameter=param, leader=leader, keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn,
+            )
+            # Create all simulations for this parameter/leader combination
+            sim.create_all_simulations()
+            # Append the results dictionary (including the raw simulations)
+            all_sims.append(sim.results_dic)
+    # Pickle the result -- this will be quite large, depending on the number of simulations!
+    pickle.dump(all_sims, open(f"{output_dir}\\phase_correction_sims.p", "wb"))
+    return all_sims
 
 
-def _get_weighted_average(
-        grped_df: pd.DataFrame
-) -> pd.DataFrame:
-    """
-
-    """
-    cols = [
-        'correction_self',
-        'correction_self_stderr',
-        'correction_partner',
-        'correction_partner_stderr',
-        'intercept',
-        'intercept_stderr',
-        'resid_std',
-        'resid_len',
-        'total_beats'
-    ]
-    dic = {'instrument': grped_df['instrument'].iloc[0]}
-    for st in cols:
-        dic[st] = np.average(grped_df[st], weights=grped_df['weights'])
-    return pd.DataFrame(pd.Series(dic)).transpose()
-
-
-def _apply_weighted_average_columns(
-        grp: pd.DataFrame, latency: int, jitter: float, weights: tuple = (3, 2, 2, 1)
-) -> np.array:
-    """
-
-    """
-    # Create weighted average conditions
-    conditions = [
-        (grp['latency'].eq(latency) & (grp['jitter'].eq(jitter))),  # Matches latency and jitter = 3
-        (grp['latency'].eq(latency) & (grp['jitter'].ne(jitter))),  # Matches latency, not jitter = 2
-        (grp['latency'].ne(latency) & (grp['jitter'].eq(jitter))),  # Matches jitter, not latency = 2
-        (grp['latency'].ne(latency) & (grp['jitter'].ne(jitter))),  # Matches neither jitter or latency = 1
-    ]
-    # Apply weights and conditions and create array
-    return np.select(conditions, weights)
-
-
-def create_simulations_by_condition(
-        md_df: pd.DataFrame, latency: int, jitter: float, parameter: str = 'original'
-) -> None:
-    """
-
-    """
-    # TODO: make this a function that does not rely on getting from the model data: this should allow for any
-    #  arbitrary latency and jitter value to be provided!
-
-    # Index to get our Zoom array
-    zoom_arr = md_df[(md_df['latency'] == latency) & (md_df['jitter'] == jitter)]['zoom_arr'].iloc[0].copy()
-    # Iterate through each trial
-    for idx, grp in md_df.groupby('trial'):
-        # Apply the weighted average column
-        grp['weights'] = _apply_weighted_average_columns(grp, latency, jitter)
-        # Get the weighted average and create a new dataframe
-        keys = _get_weighted_average(grp[grp['instrument'] == 'Keys'])
-        drms = _get_weighted_average(grp[grp['instrument'] == 'Drums'])
-        # Create the simulation class
-        md = Simulation(keys, drms, parameter, latency=zoom_arr, num_simulations=100)
-        # Run the simulations and plot
-        md.run_simulations()
-        md.plot_simulations()
-
-## RATIOED
-# def dic_create(c, md,):
-#     dic = {
-#         'trial': c['trial'],
-#         'block': c['block'],
-#         'latency': c['latency'],
-#         'jitter': c['jitter'],
-#         'instrument': c['instrument'],
-#         'intercept': md.params.iloc[0],
-#         'correction_self': md.params.iloc[1],
-#         'correction_partner': md.params.iloc[2],
-#         'resid_std': np.std(md.resid),
-#         'resid_len': len(md.resid),
-#         'zoom_arr': c['zoom_array'],
-#     }
-#     return dic
-
-# res = []
-# for z in autils.zip_same_conditions_together(raw_data=raw_data):
-#     # Iterate through keys and drums performances in a condition together
-#     for c1, c2 in z:
-#         keys, drms, keys_nn, drms_nn, tempo_slope, pw_asym = phase_correction_pre_processing(c1, c2)
-#         keys_nn['my_next_ioi_r'] = keys_nn['my_next_ioi'] / keys_nn['my_next_ioi'].shift(1)
-#         drms_nn['my_next_ioi_r'] = drms_nn['my_next_ioi'] / drms_nn['my_next_ioi'].shift(1)
-#         keys_nn['my_prev_ioi_r'] = keys_nn['my_prev_ioi'] / keys_nn['my_prev_ioi'].shift(1)
-#         drms_nn['my_prev_ioi_r'] = drms_nn['my_prev_ioi'] / drms_nn['my_prev_ioi'].shift(1)
-#         keys_nn['asynchrony_r'] = keys_nn['asynchrony'] / keys_nn['my_prev_ioi']
-#         drms_nn['asynchrony_r'] = drms_nn['asynchrony'] / drms_nn['my_prev_ioi']
-#
-#         keys_md = smf.ols('my_next_ioi_r~my_prev_ioi_r+asynchrony_r', data=keys_nn).fit()
-#         drms_md = smf.ols('my_next_ioi_r~my_prev_ioi_r+asynchrony_r', data=drms_nn).fit()
-#         res.append(dic_create(c1, keys_md))
-#         res.append(dic_create(c2, drms_md))
+if __name__ == '__main__':
+    # Default location for phase correction models
+    raw = autils.load_data(r"C:\Python Projects\jazz-jitter-analysis\models\phase_correction_mds.p")
+    # Default location to save output simulations
+    output = r"C:\Python Projects\jazz-jitter-analysis\models"
+    # Generate simulations and pickle
+    mds = generate_phase_correction_simulations(mds=raw, output_dir=output)

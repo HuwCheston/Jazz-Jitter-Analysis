@@ -629,7 +629,7 @@ class NumberLine(vutils.BasePlot):
         self._format_plot()
         fname = f'{self.output_dir}\\numberline_pairwise_asynchrony.png'
         # TODO: Is this necessary?
-        plt.savefig(fname)
+        # plt.savefig(fname)
         return self.g.figure, fname
 
     def _format_df(self, corpus_filepath) -> pd.DataFrame:
@@ -667,8 +667,12 @@ class NumberLine(vutils.BasePlot):
         Add the annotations onto the plot
         """
         for k, v in self.df.iterrows():
+            x = v['pw_asym']
+            if v['this_study']:
+                x += 0.1
             self.g.annotate(
-                text=v['style'] + '\n' + v['source'], xy=(v['pw_asym'], 0), xytext=(v['pw_asym'], -0.3), rotation=45
+                text=v['style'] + '\n' + v['source'], xy=(v['pw_asym'], 0), xytext=(x, -0.3),
+                rotation=45
             )
 
     def _format_plot(self):
@@ -678,7 +682,7 @@ class NumberLine(vutils.BasePlot):
         # Add the horizontal line
         self.g.axhline(y=0, alpha=1, linestyle='-', color=vutils.BLACK, linewidth=3)
         # Format the plot
-        self.g.set(xlim=(15, 41), xticks=np.arange(15, 41, 5, ), xlabel='', ylabel='')
+        self.g.set(xlim=(17, 41), xticks=np.arange(15, 41, 5, ), xlabel='', ylabel='')
         self.g.figure.supxlabel('Pairwise asynchrony (ms)', y=0.05)
         sns.despine(left=True, bottom=True)
         plt.subplots_adjust(top=0.34, bottom=0.25, left=0.05, right=0.93)
@@ -731,7 +735,7 @@ class BarPlot(vutils.BasePlot):
         """
         # Set ax formatting
         self.g.tick_params(width=3, )
-        self.g.set(ylabel='', xlabel='')
+        self.g.set(ylabel='', xlabel='', ylim=(0, 1.5))
         plt.setp(self.g.spines.values(), linewidth=2)
         # Plot a horizontal line at x=0
         self.g.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK, linewidth=2)
@@ -1198,3 +1202,58 @@ class BarPlotQuestionnairePercentAgreement(vutils.BasePlot):
         self.g.set(ylim=(0, 100), ylabel='', xlabel='')
         self.ax.tick_params(width=3)
         plt.setp(self.ax.spines.values(), linewidth=2)
+
+
+def generate_phase_correction_plots(
+    mds: list, output_dir: str,
+):
+    """
+
+    """
+    df = []
+    for pcm in mds:
+        df.append(pcm.keys_dic)
+        df.append(pcm.drms_dic)
+    df = pd.DataFrame(df)
+
+    figures_output_dir = output_dir + '\\figures\\phase_correction_plots'
+    # Create regression table
+    vutils.output_regression_table(
+        mds=autils.create_model_list(df=df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
+                                     avg_groupers=['latency', 'jitter', 'instrument']),
+        output_dir=figures_output_dir, verbose_footer=False
+    )
+    # Create boxplots
+    bp = BoxPlot(df=df, output_dir=figures_output_dir, yvar='correction_partner', ylim=(-0.2, 1.5))
+    bp.create_plot()
+    # Create pairgrid
+    pg = PairGrid(
+        df=df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(-0.5, 1.5), xlabel='Coupling constant'
+    )
+    pg.create_plot()
+    # Create regplots
+    rp1 = RegPlotDuo(df=df, output_dir=figures_output_dir)
+    rp1.create_plot()
+    rp2 = RegPlotDuo(df=df, output_dir=figures_output_dir, yvar='pw_asym', ylabel='Pairwise asynchrony (ms)',
+                     ylim=(20, 180), xlim=(0, 0.8))
+    rp2.create_plot()
+    # rp3 = RegPlotSingle(df=df, output_dir=figures_output_dir, xvar='ioi_std', yvar='rsquared', ylabel='R-Squared (%)',
+    #                     xlabel='Median IOI standard deviation, 8-second window (ms)')
+    # rp3.create_plot()
+    # Create pointplot
+    # pp = PointPlotLaggedLatency(df=df, output_dir=figures_output_dir, lag_var_name='correction_partner_lag')
+    # pp.create_plot()
+    # pp = PointPlotLaggedLatency(df=df, output_dir=figures_output_dir, lag_var_name='ioi_std_lag')
+    # pp.create_plot()
+    # TODO: corpus should be saved in the root//references directory!
+    nl = NumberLine(df=df, output_dir=figures_output_dir, corpus_filepath=f'{output_dir}\\pw_asymmetry_corpus.xlsx')
+    nl.create_plot()
+    bar = BarPlot(df=df, output_dir=figures_output_dir)
+    bar.create_plot()
+    # TODO: this should probably be saved somewhere else
+    stacked_bp = BarPlotInterpolatedIOIs(df=df, output_dir=figures_output_dir)
+    stacked_bp.create_plot()
+
+
+if __name__ == '__main__':
+    pass

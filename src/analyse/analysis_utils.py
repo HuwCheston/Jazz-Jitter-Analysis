@@ -2,6 +2,7 @@ import os
 import pickle
 import pandas as pd
 import numpy as np
+from datetime import timedelta
 import statsmodels.api as sm
 from statsmodels.formula import api as smf
 from statsmodels.tsa.stattools import adfuller
@@ -10,7 +11,6 @@ import collections
 import warnings
 
 WINDOW_SIZE = 6
-
 
 
 def test_stationary(
@@ -300,3 +300,33 @@ def extract_npvi(
     s = sum([abs((k - k1) / ((k + k1) / 2)) for (k, k1) in zip(li, li[1:])])
     # Return nPVI
     return s * m
+
+
+def resample(
+        perf: pd.DataFrame, col: str = 'my_onset', resample_window: str = '1s'
+) -> pd.DataFrame:
+    """
+    Resamples an individual performance dataframe to get mean of every second.
+    """
+    # Create the timedelta index
+    idx = pd.to_timedelta([timedelta(seconds=val) for val in perf[col]])
+    # Create the offset: 8 - first onset time
+    offset = timedelta(seconds=8 - perf.iloc[0][col])
+    # Set the index, resample to every second, and take the mean
+    return perf.set_index(idx).resample(resample_window, offset=offset).mean()
+
+
+def load_from_disc(
+        output_dir: str, filename: str = 'phase_correction_mds.p'
+) -> list:
+    """
+    Try and load models from disc
+    """
+    try:
+        mds = pickle.load(open(f"{output_dir}\\{filename}", "rb"))
+    # If we haven't generated the models in the first place, return None
+    except FileNotFoundError:
+        return None
+    # Else, return the models
+    else:
+        return mds

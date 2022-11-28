@@ -4,16 +4,18 @@ import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
-from src.analyse.analysis_utils import load_data
-from src.visualise.tempo_slope_graphs import gen_tempo_slope_graph, gen_tempo_stability_hist
+import src.analyse.analysis_utils as autils
+
+from src.visualise.phase_correction_graphs import generate_phase_correction_plots
 
 
 @click.command()
 @click.argument('input_filepath', type=click.Path(exists=True))
 @click.argument('output_filepath', type=click.Path(exists=True))
 def main(input_filepath, output_filepath):
-    """ Runs data processing scripts to turn raw data from (../raw) into
-        cleaned data ready to be analyzed (saved in ../processed).
+    """
+    Runs data processing scripts to turn raw data from (../raw) into
+    cleaned data ready to be analyzed (saved in ../processed).
     """
     logger = logging.getLogger(__name__)
     logger.info(f'running analysis scripts on processed data in {input_filepath}')
@@ -21,10 +23,15 @@ def main(input_filepath, output_filepath):
     # LOAD DATA AND PREPARE #
     # Load the data in as list of lists of dictionaries (one list per trial, one dictionary per condition)
     logger.info(f'loading data...')
-    data = load_data(input_filepath)
+    mds = autils.load_from_disc(input_filepath, filename='phase_correction_mds.p')
+    sims = autils.load_from_disc(input_filepath, filename='phase_correction_sims.p')
 
-    logger.info(f'generating tempo slope graphs...')
-    gen_tempo_slope_graph(raw_data=data, output_dir=output_filepath + '\\figures\\tempo_slopes_plots\\grouped')
+    # GENERATE PHASE CORRECTION PLOTS #
+    generate_phase_correction_plots(mds, output_dir=output_filepath)
+
+    # GENERATE SIMULATION PLOTS #
+
+
 
 if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

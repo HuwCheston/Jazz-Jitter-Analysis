@@ -8,9 +8,6 @@ import statsmodels.formula.api as smf
 from sklearn.covariance import EllipticEnvelope
 
 import src.analyse.analysis_utils as autils
-import src.visualise.visualise_utils as vutils
-from src.visualise.simulations_graphs import LinePlotAllParameters
-from src.analyse.simulations_ratio import Simulation
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', 500)
@@ -26,11 +23,8 @@ class PhaseCorrectionModel:
 
         """
         # Parameters
-        self._nn_tolerance: float = 0.1  # The amount of tolerance to use when matching onsets
         self._iqr_filter_range: tuple[float] = kwargs.get('iqr_filter', (0.1, 0.9))  # Filter IOIs above and below
-        self._robust_model: bool = kwargs.get('robust', False)  # Whether to use a robust linear model
         self._model: str = kwargs.get('model', 'my_next_ioi_diff~my_prev_ioi_diff+asynchrony')  # regression model
-        self._centre: bool = kwargs.get('centre', False)
         # The cleaned data, before dataframe conversion
         self.keys_raw: dict = c1_keys
         self.drms_raw: dict = c2_drms
@@ -128,7 +122,7 @@ class PhaseCorrectionModel:
         - Compute a regression of this mean BPM against the overall elapsed time and extract the coefficient
         """
         # Resample both raw dataframes
-        resampled = [vutils.resample(data) for data in [self.keys_df.copy(), self.drms_df.copy()]]
+        resampled = [autils.resample(data) for data in [self.keys_df.copy(), self.drms_df.copy()]]
         # Create the BPM column
         for d in resampled:
             d['bpm'] = 60 / d['my_prev_ioi']
@@ -392,10 +386,7 @@ class PhaseCorrectionModel:
         """
 
         """
-        if self._robust_model:
-            return smf.rlm(self._model, data=df.dropna(), missing='drop').fit()
-        else:
-            return smf.ols(self._model, data=df.dropna(), missing='drop').fit()
+        return smf.ols(self._model, data=df.dropna(), missing='drop').fit()
 
     def _create_summary_dictionary(
             self, c, md, nn,
@@ -427,7 +418,7 @@ class PhaseCorrectionModel:
             'correction_partner': md.params.loc['asynchrony'],
             'resid_std': np.std(md.resid),
             'resid_len': len(md.resid),
-            'rsquared': md.rsquared if not self._robust_model else None,
+            'rsquared': md.rsquared,
             'zoom_arr': c['zoom_array'],
             'success': c['success'],
             'interaction': c['interaction'],
@@ -435,35 +426,19 @@ class PhaseCorrectionModel:
         }
 
 
-def _load_models_from_disc(
-        output_dir: str,
-) -> pd.DataFrame:
-    """
-    Try and load models from disc
-    """
-    try:
-        mds = pickle.load(open(f"{output_dir}\\output_mds.p", "rb"))
-    # If we haven't generated the models in the first place, return None
-    except FileNotFoundError:
-        return None
-    # Else, return the models
-    else:
-        return mds
-
-
-def generate_models(
+def generate_phase_correction_models(
         raw_data: list, output_dir: str, logger=None, force_rebuild: bool = False
-) -> pd.DataFrame:
+) -> list[PhaseCorrectionModel]:
     """
-
+    Generates all phase correction models
     """
     # Try and load the models from the disk to save time, unless we're forcing them to rebuild anyway
     if not force_rebuild:
-        mds = _load_models_from_disc(output_dir)
+        mds = autils.load_from_disc(output_dir, filename='phase_correction_mds.p')
         # If we've successfully loaded models, return these straight away
         if mds is not None:
             return mds
-    # Create an empty list to store our results
+    # Create an empty list to store our models
     res = []
     # Iterate through each conditions
     for z in autils.zip_same_conditions_together(raw_data=raw_data):
@@ -471,49 +446,21 @@ def generate_models(
         for c1, c2 in z:
             # If we've passed a logger, start logging information to keep track of the analysis
             if logger is not None:
-                logger.info(f'Analysing: trial {c1["trial"]}, block {c1["block"]}, condition {c1["condition"]}')
+                logger.info(f'... trial {c1["trial"]}, block {c1["block"]}, '
+                            f'latency {c1["latency"]}, jitter {c1["jitter"]}')
+            # Create the model
             pcm = PhaseCorrectionModel(c1, c2, model='my_next_ioi_diff~my_prev_ioi_diff+asynchrony', centre=False)
-            res.append(pcm.keys_dic)
-            res.append(pcm.drms_dic)
-    # Convert our list of dictionaries into a dataframe
-    df = pd.DataFrame(res)
+            # Append the raw phase correction model to our list
+            res.append(pcm)
     # Pickle the results so we don't need to create them again
-    pickle.dump(df, open(f"{output_dir}\\output_mds.p", "wb"))
-    # Return the dataframe
-    return df
+    pickle.dump(res, open(f"{output_dir}\\phase_correction_mds.p", "wb"))
+    return res
 
 
 if __name__ == '__main__':
+    # Default location for processed raw data
     raw = autils.load_data(r"C:\Python Projects\jazz-jitter-analysis\data\processed")
-    output = r"C:\Python Projects\jazz-jitter-analysis\reports\figures\phase_correction_plots"
-    generate_models(raw_data=raw, output_dir=output)
-
-    # ke = pd.DataFrame([pcm.keys_dic])
-    # dr = pd.DataFrame([pcm.drms_dic])
-    # z = c1['zoom_array']
-    # output = r"C:\Python Projects\jazz-jitter-analysis\reports\figures\simulations_plots\individual_plots"
-    # params = [
-    #     ('original', None), ('democracy', None), ('anarchy', None),
-    #     ('leadership', 'Keys'), ('leadership', 'Drums'),
-    # ]
-    # sims = []
-    # for param, leader in params:
-    #     sim = Simulation(
-    #         keys_params=ke, drms_params=dr, latency_array=z, num_simulations=100, parameter=param,
-    #         keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn, leader=leader
-    #     )
-    #     sim.create_all_simulations()
-    #     ts = sim.get_average_tempo_slope()
-    #     pw = sim.get_average_pairwise_asynchrony()
-    #     res.append(
-    #         (c1['trial'], c1['block'], c1['latency'], c1['jitter'], sim.parameter, sim.leader, ts, pw)
-    #     )
-    #     sims.append(sim)
-    #
-    # lp = LinePlotAllParameters(
-    #     simulations=sims, keys_orig=pcm.keys_nn, drms_orig=pcm.drms_nn, params=c1, output_dir=output
-    # )
-    # lp.create_plot()
-
-    # col = ['trial', 'block', 'latency', 'jitter', 'parameter', 'leader', 'tempo_slope', 'asynchrony']
-    # output_dir = r"C:\Python Projects\jazz-jitter-analysis\reports\figures\phase_correction_plots"
+    # Default location to save output models
+    output = r"C:\Python Projects\jazz-jitter-analysis\models"
+    # Generate models and pickle
+    mds = generate_phase_correction_models(raw_data=raw, output_dir=output)

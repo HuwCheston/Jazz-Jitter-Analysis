@@ -6,7 +6,8 @@ from dotenv import find_dotenv, load_dotenv
 
 # TODO: fix imports here to use __all__ instead, so that we don't import packages like numpy, pandas etc
 import src.analyse.analysis_utils as autils
-from src.analyse.phase_correction_ratios import generate_models
+from src.analyse.phase_correction_models import generate_phase_correction_models
+from src.analyse.simulations import generate_phase_correction_simulations
 
 
 @click.command()
@@ -30,26 +31,14 @@ def main(
     logger.info(f'loaded data from {len(data)} trials!')
 
     # CREATE MODELS #
-    logger.info(f'Creating models...')
-    mds = generate_models(data, logger=logger, output_dir=output_filepath, force_rebuild=True)
-    print(mds)
+    logger.info(f'Generating phase correction models...')
+    mds = generate_phase_correction_models(data, logger=logger, output_dir=output_filepath, force_rebuild=False)
+    logger.info(f'... models generated!')
 
-
-    #
-    # # VISUALISE OUTPUTS
-    # logger.info(f'Creating tempo slope outputs...')
-    # avg_tempos = gen_avg_tempo(data)
-    # gen_avg_tempo_outputs(avg_tempos, output_dir=output_filepath + '\\figures\\tempo_slopes_plots')
-    # gen_tempo_slope_outputs(df=df, output_dir=output_filepath)
-    #
-    # logger.info(f'Creating tempo stability outputs...')
-    # gen_tempo_stability_outputs(df, output_dir=output_filepath)
-    #
-    # logger.info(f'Creating phase correction outputs...')
-    # gen_phase_correction_model_outputs(df, output_dir=output_filepath)
-    #
-    # logger.info(f'Creating questionnaire outputs...')
-    # gen_questionnaire_outputs(df, output_dir=output_filepath)
+    # CREATE SIMULATIONS #
+    logger.info(f'Generating phase correction simulations...')
+    sims = generate_phase_correction_simulations(mds, output_dir=output_filepath, logger=logger, force_rebuild=False)
+    logger.info(f'... simulations generated!')
 
 
 if __name__ == '__main__':

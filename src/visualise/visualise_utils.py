@@ -204,6 +204,7 @@ class BasePlot:
         # Create an empty attribute to store our plot in later
         self.g = None
 
+
 def resample(
         perf: pd.DataFrame, col: str = 'my_onset', resample_window: str = '1s'
 ) -> pd.DataFrame:
