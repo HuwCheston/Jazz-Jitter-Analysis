@@ -5,6 +5,7 @@ import numpy as np
 from scipy.stats import stats
 
 import src.visualise.visualise_utils as vutils
+import src.analyse.analysis_utils as autils
 
 
 class LinePlotAllParameters(vutils.BasePlot):
@@ -194,26 +195,6 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         fname = f'{self.output_dir}\\barplot_simulation_by_parameter.png'
         return self.fig, fname
 
-    @staticmethod
-    def _get_significance_asterisks(
-            p: float
-    ) -> str:
-        """
-        Converts a raw p-value into asterisks, showing significance boundaries.
-        """
-        # We have to iterate through in order from smallest to largest, or else we'll match incorrectly
-        if p < 0.001:
-            return '***'
-        elif p < 0.01:
-            return '**'
-        elif p < 0.05:
-            return '*'
-        # Our p-value will equal 1 only if we've compared a group against itself
-        if p == 1:
-            return ''
-        else:
-            return ''
-
     def _ttest_group_against_original(
             self, var: str
     ) -> pd.DataFrame:
@@ -232,7 +213,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
                 # Carry out the t-test and store the p-value
                 _, p = stats.ttest_ind(a, b)
                 # Convert our p-values into asterisks and append to the list
-                ttest.append((idx, param, self._get_significance_asterisks(p)))
+                ttest.append((idx, param, vutils.get_significance_asterisks(p)))
         # Return our t test results as a dataframe, in the correct order to enable us to plot them properly
         return (
             pd.DataFrame(ttest, columns=['trial', 'parameter', 'sig'])
@@ -343,3 +324,47 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         self.fig.legend(hand[5:], lab[5:], title='Duo', frameon=False, ncol=1, loc='center right')
         # Adjust subplots positioning a bit to fit in the legend we've just created
         self.fig.subplots_adjust(bottom=0.25, top=0.95, left=0.07, right=0.93, wspace=0.2)
+
+
+class RegPlotSimulationComparisons(vutils.BasePlot):
+    def __init__(self, df, **kwargs):
+        super().__init__(**kwargs)
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=False, figsize=(18.8, 9))
+        self.df = df[df['parameter'] == 'original']
+
+    @vutils.plot_decorator
+    def create_plot(self):
+        self._create_plot()
+        plt.tight_layout()
+        plt.show()
+
+    def _create_plot(self):
+        for num, var in enumerate(['tempo_slope', 'pairwise_asynchrony']):
+            sim_var = var + '_sim'
+            g = sns.scatterplot(data=self.df, x=sim_var, y=var, ax=self.ax[num], hue='trial', )
+            g.set(
+                xlim=(min([self.df[sim_var].min(), self.df[var].min()]) * 1.1,
+                      max([self.df[sim_var].max(), self.df[var].max()]) * 1.1),
+                ylim=(min([self.df[sim_var].min(), self.df[var].min()]) * 1.1,
+                      max([self.df[sim_var].max(), self.df[var].max()]) * 1.1),
+                xlabel='Simulated', ylabel='Actual'
+            )
+            self.ax[num].axline(xy1=(0, 0), xy2=(1, 1), transform=self.ax[num].transAxes,
+                                color=vutils.BLACK, alpha=vutils.ALPHA)
+
+    def _format_ax(self):
+        pass
+
+    def _format_fig(self):
+        pass
+
+
+def generate_simulations_plots(
+
+) -> None:
+    pass
+
+
+if __name__ == '__main__':
+    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", "phase_correction_sims.p")
+    pass

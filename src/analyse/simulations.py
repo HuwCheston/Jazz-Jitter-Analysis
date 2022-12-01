@@ -8,7 +8,6 @@ import statsmodels.formula.api as smf
 import src.analyse.analysis_utils as autils
 
 
-# noinspection PyBroadException
 class Simulation:
     def __init__(
             self, keys_nn, drms_nn, keys_params, drms_params, latency_array, num_simulations: int = 1000, **kwargs
@@ -50,9 +49,6 @@ class Simulation:
         self._drms_simulations_raw: list[dict] = []
         self.keys_simulations: list[pd.DataFrame] = []
         self.drms_simulations: list[pd.DataFrame] = []
-
-        # Simulations results dictionary
-        self.results_dic = self._create_summary_dictionary(include_simulations=True)
 
     @staticmethod
     def _get_number_of_beats_for_simulation(
@@ -237,7 +233,7 @@ class Simulation:
         Run the simulations and create a list of dataframes for each individual performer
         """
         for i in range(0, self.num_simulations):
-            keys, drms = self._create_one_simulation(
+            keys, drms = _create_one_simulation(
                 # Initialise empty data to store in
                 self._initialise_empty_data(), self._initialise_empty_data(),
                 self.keys_params, self.drms_params,     # Parameters for the simulation, e.g. coefficients
@@ -251,6 +247,10 @@ class Simulation:
             # Format the simulated data and append to our list
             self.keys_simulations.append(self._format_simulated_data(data=keys))
             self.drms_simulations.append(self._format_simulated_data(data=drms))
+        # After running simulations, clean up by converting parameters from numba to python dictionary
+        # This will allow us to pickle instances of the Simulation class without errors
+        self.keys_params = dict(self.keys_params)
+        self.drms_params = dict(self.drms_params)
 
     def _format_simulated_data(
             self, data: nb.typed.Dict
@@ -268,93 +268,6 @@ class Simulation:
         offset = timedelta(seconds=8 - df.iloc[0]['my_onset'])
         # Set the index to our timedelta column, resample (default every second), and get mean
         return df.set_index('td').resample(rule=self._resample_interval, offset=offset).mean()
-
-    @staticmethod
-    @nb.njit
-    def _create_one_simulation(
-            keys_data: nb.typed.Dict, drms_data: nb.typed.Dict,
-            keys_params: nb.typed.Dict, drms_params: nb.typed.Dict,
-            keys_noise, drms_noise,
-            lat: np.ndarray, beats: int
-    ) -> tuple:
-        """
-        Create data for one simulation, using numba optimisations
-        """
-
-        def get_latency_at_onset(
-                my_onset: float
-        ) -> float:
-            """
-            Get the current amount of latency applied to our partner when we played our onset
-            """
-            # If our first onset was before the 8 second count-in, return the first amount of delay applied
-            if my_onset < lat[0, :][1]:
-                return lat[:, 0][0]
-            # Else, return the correct amount of latency
-            else:
-                return lat[lat[:, 1] == lat[:, 1][lat[:, 1] <= my_onset].max()][:, 0][0]
-
-        def calculate_async(
-                my_onset: float, their_onset: float
-        ) -> float:
-            """
-            Calculates the current asynchrony with our partner at our onset. Note the order of positional arguments!!
-            """
-            return (their_onset + get_latency_at_onset(my_onset)) - my_onset
-
-        def predict_next_ioi_diff(
-                prev_diff: float, asynchrony: float, params: nb.typed.Dict, noise: np.ndarray
-        ) -> float:
-            """
-            Predict the difference between previous and next IOIs using inputted data and model parameters
-            """
-            a = prev_diff * params['correction_self']
-            b = asynchrony * params['correction_partner']
-            c = params['intercept']
-            n = np.random.choice(noise)
-            return a + b + c + n
-
-        # Calculate our first two async values. We don't do this when initialising the empty data, because it
-        # both requires the get_latency_at_onset function and access to both keys and drums data.
-        for i in range(0, 2):
-            keys_data['asynchrony'][i] = calculate_async(keys_data['my_onset'][i], drms_data['my_onset'][i])
-            drms_data['asynchrony'][i] = calculate_async(drms_data['my_onset'][i], keys_data['my_onset'][i])
-        # We don't use the full range of beats, given that we've already added some in when initialising our data
-        for i in range(2, beats):
-            # Shift difference
-            keys_data['my_prev_ioi_diff'][i] = keys_data['my_next_ioi_diff'][i - 1]
-            drms_data['my_prev_ioi_diff'][i] = drms_data['my_next_ioi_diff'][i - 1]
-            # Shift IOI
-            keys_data['my_prev_ioi'][i] = keys_data['my_next_ioi'][i - 1]
-            drms_data['my_prev_ioi'][i] = drms_data['my_next_ioi'][i - 1]
-            # Get next onset by adding previous onset to predicted IOI
-            keys_data['my_onset'][i] = keys_data['my_onset'][i - 1] + keys_data['my_prev_ioi'][i]
-            drms_data['my_onset'][i] = drms_data['my_onset'][i - 1] + drms_data['my_prev_ioi'][i]
-            # Get async value by subtracting partner's onset (plus latency) from ours
-            try:
-                keys_data['asynchrony'][i] = calculate_async(keys_data['my_onset'][i], drms_data['my_onset'][i])
-                drms_data['asynchrony'][i] = calculate_async(drms_data['my_onset'][i], keys_data['my_onset'][i])
-            # If there's an issue here, break out of the simulation
-            except:
-                break
-            # Predict difference between previous IOI and next IOI
-            keys_data['my_next_ioi_diff'][i] = predict_next_ioi_diff(
-                keys_data['my_prev_ioi_diff'][i], keys_data['asynchrony'][i], keys_params, keys_noise
-            )
-            drms_data['my_next_ioi_diff'][i] = predict_next_ioi_diff(
-                drms_data['my_prev_ioi_diff'][i], drms_data['asynchrony'][i], drms_params, drms_noise
-            )
-            # Use predicted difference between IOIs to get next actual IOI
-            keys_data['my_next_ioi'][i] = keys_data['my_next_ioi_diff'][i] + keys_data['my_prev_ioi'][i]
-            drms_data['my_next_ioi'][i] = drms_data['my_next_ioi_diff'][i] + drms_data['my_prev_ioi'][i]
-            # If we've accelerated to a ridiculous extent (due to noise), we need to break.
-            if keys_data['my_next_ioi'][i] < 0 or drms_data['my_next_ioi'][i] < 0:
-                break
-            # TODO: should be the same length as original performance?
-            # If we've exceeded our endpoint, break
-            if keys_data['my_onset'][i] > 100 or drms_data['my_onset'][i] > 100:
-                break
-        return keys_data, drms_data
 
     @staticmethod
     def _get_average_var_for_one_simulation(
@@ -469,6 +382,95 @@ class Simulation:
         return dic
 
 
+# noinspection PyBroadException
+@nb.njit
+def _create_one_simulation(
+        keys_data: nb.typed.Dict, drms_data: nb.typed.Dict,
+        keys_params: nb.typed.Dict, drms_params: nb.typed.Dict,
+        keys_noise, drms_noise,
+        lat: np.ndarray, beats: int
+) -> tuple:
+    """
+    Create data for one simulation, using numba optimisations. This function is defined outside of the Simulation
+    class to enable instances of the Simulation class to be pickled.
+    """
+
+    def get_latency_at_onset(
+            my_onset: float
+    ) -> float:
+        """
+        Get the current amount of latency applied to our partner when we played our onset
+        """
+        # If our first onset was before the 8 second count-in, return the first amount of delay applied
+        if my_onset < lat[0, :][1]:
+            return lat[:, 0][0]
+        # Else, return the correct amount of latency
+        else:
+            return lat[lat[:, 1] == lat[:, 1][lat[:, 1] <= my_onset].max()][:, 0][0]
+
+    def calculate_async(
+            my_onset: float, their_onset: float
+    ) -> float:
+        """
+        Calculates the current asynchrony with our partner at our onset. Note the order of positional arguments!!
+        """
+        return (their_onset + get_latency_at_onset(my_onset)) - my_onset
+
+    def predict_next_ioi_diff(
+            prev_diff: float, asynchrony: float, params: nb.typed.Dict, noise: np.ndarray
+    ) -> float:
+        """
+        Predict the difference between previous and next IOIs using inputted data and model parameters
+        """
+        a = prev_diff * params['correction_self']
+        b = asynchrony * params['correction_partner']
+        c = params['intercept']
+        n = np.random.choice(noise)
+        return a + b + c + n
+
+    # Calculate our first two async values. We don't do this when initialising the empty data, because it
+    # both requires the get_latency_at_onset function and access to both keys and drums data.
+    for i in range(0, 2):
+        keys_data['asynchrony'][i] = calculate_async(keys_data['my_onset'][i], drms_data['my_onset'][i])
+        drms_data['asynchrony'][i] = calculate_async(drms_data['my_onset'][i], keys_data['my_onset'][i])
+    # We don't use the full range of beats, given that we've already added some in when initialising our data
+    for i in range(2, beats):
+        # Shift difference
+        keys_data['my_prev_ioi_diff'][i] = keys_data['my_next_ioi_diff'][i - 1]
+        drms_data['my_prev_ioi_diff'][i] = drms_data['my_next_ioi_diff'][i - 1]
+        # Shift IOI
+        keys_data['my_prev_ioi'][i] = keys_data['my_next_ioi'][i - 1]
+        drms_data['my_prev_ioi'][i] = drms_data['my_next_ioi'][i - 1]
+        # Get next onset by adding previous onset to predicted IOI
+        keys_data['my_onset'][i] = keys_data['my_onset'][i - 1] + keys_data['my_prev_ioi'][i]
+        drms_data['my_onset'][i] = drms_data['my_onset'][i - 1] + drms_data['my_prev_ioi'][i]
+        # Get async value by subtracting partner's onset (plus latency) from ours
+        try:
+            keys_data['asynchrony'][i] = calculate_async(keys_data['my_onset'][i], drms_data['my_onset'][i])
+            drms_data['asynchrony'][i] = calculate_async(drms_data['my_onset'][i], keys_data['my_onset'][i])
+        # If there's an issue here, break out of the simulation
+        except:
+            break
+        # Predict difference between previous IOI and next IOI
+        keys_data['my_next_ioi_diff'][i] = predict_next_ioi_diff(
+            keys_data['my_prev_ioi_diff'][i], keys_data['asynchrony'][i], keys_params, keys_noise
+        )
+        drms_data['my_next_ioi_diff'][i] = predict_next_ioi_diff(
+            drms_data['my_prev_ioi_diff'][i], drms_data['asynchrony'][i], drms_params, drms_noise
+        )
+        # Use predicted difference between IOIs to get next actual IOI
+        keys_data['my_next_ioi'][i] = keys_data['my_next_ioi_diff'][i] + keys_data['my_prev_ioi'][i]
+        drms_data['my_next_ioi'][i] = drms_data['my_next_ioi_diff'][i] + drms_data['my_prev_ioi'][i]
+        # If we've accelerated to a ridiculous extent (due to noise), we need to break.
+        if keys_data['my_next_ioi'][i] < 0 or drms_data['my_next_ioi'][i] < 0:
+            break
+        # TODO: should be the same length as original performance?
+        # If we've exceeded our endpoint, break
+        if keys_data['my_onset'][i] > 100 or drms_data['my_onset'][i] > 100:
+            break
+    return keys_data, drms_data
+
+
 def generate_phase_correction_simulations(
         mds: pd.DataFrame, output_dir: str, logger=None, force_rebuild: bool = False, num_simulations: int = 100
 ) -> list[dict]:
@@ -477,10 +479,10 @@ def generate_phase_correction_simulations(
     """
     # Try and load the models from the disk to save time, unless we're forcing them to rebuild anyway
     if not force_rebuild:
-        mds = autils.load_from_disc(output_dir, filename='phase_correction_sims.p')
+        all_sims = autils.load_from_disc(output_dir, filename='phase_correction_sims.p')
         # If we've successfully loaded models, return these straight away
-        if mds is not None:
-            return mds
+        if all_sims is not None:
+            return all_sims
     # Define the parameters and leader combinations we want to create simulations for
     params = [('original', None), ('democracy', None), ('anarchy', None), ('leadership', 'Drums')]
     # Create an empty list to hold simulations in
@@ -504,8 +506,8 @@ def generate_phase_correction_simulations(
             )
             # Create all simulations for this parameter/leader combination
             sim.create_all_simulations()
-            # Append the results dictionary (including the raw simulations)
-            all_sims.append(sim.results_dic)
+            # Append the simulation to our list
+            all_sims.append(sim)
     # Pickle the result -- this will be quite large, depending on the number of simulations!
     pickle.dump(all_sims, open(f"{output_dir}\\phase_correction_sims.p", "wb"))
     return all_sims
@@ -513,8 +515,9 @@ def generate_phase_correction_simulations(
 
 if __name__ == '__main__':
     # Default location for phase correction models
-    raw = autils.load_data(r"C:\Python Projects\jazz-jitter-analysis\models\phase_correction_mds.p")
+    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename="phase_correction_mds.p")
     # Default location to save output simulations
     output = r"C:\Python Projects\jazz-jitter-analysis\models"
     # Generate simulations and pickle
-    mds = generate_phase_correction_simulations(mds=raw, output_dir=output)
+    sims = generate_phase_correction_simulations(mds=raw, output_dir=output, force_rebuild=True)
+    pass

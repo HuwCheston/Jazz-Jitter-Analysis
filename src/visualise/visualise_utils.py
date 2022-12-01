@@ -217,3 +217,20 @@ def resample(
     offset = timedelta(seconds=8 - perf.iloc[0][col])
     # Set the index, resample to every second, and take the mean
     return perf.set_index(idx).resample(resample_window, offset=offset).mean()
+
+
+def get_significance_asterisks(
+        p: float
+) -> str:
+    """
+    Converts a raw p-value into asterisks, showing significance boundaries.
+    """
+    # We have to iterate through in order from smallest to largest, or else we'll match incorrectly
+    if p < 0.001:
+        return '***'
+    elif p < 0.01:
+        return '**'
+    elif p < 0.05:
+        return '*'
+    else:
+        return ''

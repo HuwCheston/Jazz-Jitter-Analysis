@@ -6,6 +6,7 @@ import os
 import pickle
 import statsmodels.formula.api as smf
 from sklearn.covariance import EllipticEnvelope
+from datetime import timedelta
 
 import src.analyse.analysis_utils as autils
 
@@ -16,15 +17,17 @@ np.set_printoptions(suppress=True)
 
 # noinspection PyBroadException
 class PhaseCorrectionModel:
+    """
+    A linear phase correction model for a single performance (keys and drums).
+    """
     def __init__(
             self, c1_keys: list, c2_drms: list, **kwargs
     ):
-        """
-
-        """
         # Parameters
         self._iqr_filter_range: tuple[float] = kwargs.get('iqr_filter', (0.1, 0.9))  # Filter IOIs above and below
         self._model: str = kwargs.get('model', 'my_next_ioi_diff~my_prev_ioi_diff+asynchrony')  # regression model
+        self._rolling_window_size: int = kwargs.get('rolling_window_size', 8)
+        self._maximum_lag: int = kwargs.get('maximum_lag', 8)
         # The cleaned data, before dataframe conversion
         self.keys_raw: dict = c1_keys
         self.drms_raw: dict = c2_drms
@@ -58,6 +61,7 @@ class PhaseCorrectionModel:
         """
         if default is not None:
             return default
+        # TODO: investigate proper pathing here
         cwd = os.path.dirname(os.path.abspath(__file__)) + r'\contamination_params.json'
         js = json.load(open(cwd))
         return [
@@ -96,17 +100,18 @@ class PhaseCorrectionModel:
         df = self._append_zoom_array(df,  data['zoom_array'])
         # Drop pitch and velocity columns if not needed (default)
         df['my_prev_ioi'] = df['my_onset'].diff().astype(float)
-        # Remove iois below threshold
-        temp = df.dropna()
-        temp = temp[temp['my_prev_ioi'] < threshold]
-        df = df[~df.index.isin(temp.index)]
+
+        # Remove ioi values below threshold
+        # temp = df.dropna()
+        # temp = temp[temp['my_prev_ioi'] < threshold]
+        # df = df[~df.index.isin(temp.index)]
         # Recalculate IOI column after removing those below threshold
-        df['my_prev_ioi'] = df['my_onset'].diff().astype(float)
+        # df['my_prev_ioi'] = df['my_onset'].diff().astype(float)
+
         # Fill na in latency column with next/previous valid observation
         df['latency'] = df['latency'].bfill().ffill()
         # Add the latency column (divided by 1000 to convert from ms to sec) to the onset column
         df['my_onset_delayed'] = (df['my_onset'] + (df['latency'] / 1000))
-
         return df
 
     def _extract_tempo_slope(
@@ -196,7 +201,7 @@ class PhaseCorrectionModel:
             live_arr, delayed_arr, empty_arr
     ):
         """
-        Carry out the nearest-neighbour matching (with numba optimizations)
+        Carry out the nearest-neighbour matching. Optimised with numba.
         """
         # Iterate through every value played by our live performer
         for i in range(live_arr.shape[0]):
@@ -217,7 +222,7 @@ class PhaseCorrectionModel:
             delayed_arr: np.ndarray, nn_np: np.ndarray
     ) -> np.ndarray:
         """
-        Applies specialised cleaning using bins to performances with 180ms of latency.
+        Applies specialised cleaning using bins to performances with 180ms of latency. Optimised with numba.
         """
         # Calculate the bins
         hist, edges = np.histogram(nn_np[:, 2], bins=2)
@@ -273,9 +278,8 @@ class PhaseCorrectionModel:
             self, delayed_arr: np.ndarray, nn_np: np.ndarray
     ) -> pd.DataFrame:
         """
-        Applies an EllipticEnvelope filter to data to extract outliers and rematch or set them to missing.
-
-        Numba isn't used here as it isn't supported by EllipticEnvelope and sklearn.
+        Applies an EllipticEnvelope filter to data to extract outliers and rematch or set them to missing. Numba isn't
+        used here as it isn't supported by EllipticEnvelope and sklearn.
         """
         # Create the elliptic envelope with required contamination parameter
         ee = EllipticEnvelope(contamination=self._contamination, random_state=1)
@@ -322,6 +326,7 @@ class PhaseCorrectionModel:
         # Get median asynchrony time
         median = np.median(nn_np[:, 2])
         # Get unique matches
+        # TODO: investigate another function here, as return_counts argument isn't supported by numba
         unique, counts = np.unique(nn_np[:, 1], return_counts=True)
         # Get duplicate matches
         duplicates = nn_np[np.isin(nn_np[:, 1], unique[counts > 1])]
@@ -380,11 +385,58 @@ class PhaseCorrectionModel:
         df['my_prev_ioi_diff'] = df['my_prev_ioi'].diff()
         return df
 
+    def _get_rolling_standard_deviation_values(
+            self, nn_df: pd.DataFrame, cols: tuple[str] = ('my_prev_ioi', 'latency_std')
+    ) -> pd.DataFrame:
+        """
+        Resamples dataframe to every second, rolls by given window size, and gets standard deviation of given columns
+        """
+        # Create the temporary dataframe
+        temp = nn_df.copy()
+        # Create the timestamp column for rolling on
+        temp['td'] = pd.to_timedelta([timedelta(seconds=val) for val in temp['my_onset'].values])
+        # Resample data to every second and get the mean value
+        temp = temp.set_index('td').resample('1s').mean()
+        # Roll the data according to the rolling window size, default = eight seconds
+        roll = temp.rolling(window=timedelta(seconds=self._rolling_window_size), on=temp.index)
+        # Extract the rolling standard deviation of required columns
+        for col in cols:
+            temp[f'{col}_std'] = roll[col].std(skipna=True)
+        # Return the dataframe
+        return temp
+
+    def _lag_rolling_standard_deviation_values(
+            self, roll: pd.DataFrame, var: str = 'my_prev_ioi_std'
+    ) -> pd.DataFrame:
+        """
+
+        """
+        # Define the function for shifting values by a maximum number of seconds
+        shifter = lambda s: (
+            pd.concat([roll[s].shift(i).rename(f'{s}_l{i}') for i in range(1, self._maximum_lag + 1)], axis=1)
+              .set_index(roll.index)
+        )
+        # Create the shifted dataframe
+        train = pd.concat([roll, shifter('latency_std'), shifter(var)])
+        # Return the shifted dataframe
+        return train
+
+    def _regress_shifted_rolling_variables_against_latency(
+            self, lagged: pd.DataFrame, dep_var: str = 'my_prev_ioi_std'
+    ):
+        """
+
+        """
+        # Create the regression model
+        md = f'{dep_var}~' + '+'.join([f'{col}' for col in lagged.columns if col[-3:-1] == '_l'])
+        # Fit the regression model
+        res = smf.ols(md, lagged.dropna().fit())
+
     def _create_phase_correction_model(
             self, df: pd.DataFrame
     ):
         """
-
+        Create the linear phase correction model
         """
         return smf.ols(self._model, data=df.dropna(), missing='drop').fit()
 
@@ -463,4 +515,4 @@ if __name__ == '__main__':
     # Default location to save output models
     output = r"C:\Python Projects\jazz-jitter-analysis\models"
     # Generate models and pickle
-    mds = generate_phase_correction_models(raw_data=raw, output_dir=output)
+    generate_phase_correction_models(raw_data=raw, output_dir=output, force_rebuild=True)
