@@ -322,41 +322,115 @@ class BarPlotSimulationParameters(vutils.BasePlot):
             ax.get_legend().remove()
         # Add the legend back in, but only keep the values which relate to the bar plot (also add a title, adjust place)
         self.fig.legend(hand[5:], lab[5:], title='Duo', frameon=False, ncol=1, loc='center right')
-        # Adjust subplots positioning a bit to fit in the legend we've just created
-        self.fig.subplots_adjust(bottom=0.25, top=0.95, left=0.07, right=0.93, wspace=0.2)
 
 
 class RegPlotSimulationComparisons(vutils.BasePlot):
-    def __init__(self, df, **kwargs):
+    """
+    Creates two regression scatter plots, designed to show similarity in tempo slope and pairwise asynchrony between
+    actual and simulated performances (with original coupling patterns).
+    """
+    def __init__(
+            self, sim_list: list, **kwargs
+    ):
         super().__init__(**kwargs)
         self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=False, figsize=(18.8, 9))
-        self.df = df[df['parameter'] == 'original']
+        self.df = self._format_df(sim_list)
+
+    @staticmethod
+    def _format_df(
+            sim_list: list
+    ) -> pd.DataFrame:
+        """
+        Extracts results data from each Simulation class instance and subsets to get original coupling simulations only.
+        Results data is initialised when simulations are created, which makes this really fast.
+        """
+        df = pd.DataFrame([sim.results_dic for sim in sim_list])
+        return df[df['parameter'] == 'original']
 
     @vutils.plot_decorator
-    def create_plot(self):
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class; creates plot and returns to vutils.plot_decorator for saving.
+        """
         self._create_plot()
-        plt.tight_layout()
-        plt.show()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\regplot_simulations_comparison.png'
+        return self.fig, fname
 
-    def _create_plot(self):
-        for num, var in enumerate(['tempo_slope', 'pairwise_asynchrony']):
-            sim_var = var + '_sim'
-            g = sns.scatterplot(data=self.df, x=sim_var, y=var, ax=self.ax[num], hue='trial', )
-            g.set(
-                xlim=(min([self.df[sim_var].min(), self.df[var].min()]) * 1.1,
-                      max([self.df[sim_var].max(), self.df[var].max()]) * 1.1),
-                ylim=(min([self.df[sim_var].min(), self.df[var].min()]) * 1.1,
-                      max([self.df[sim_var].max(), self.df[var].max()]) * 1.1),
-                xlabel='Simulated', ylabel='Actual'
+    def _get_ax_lim(
+            self, orig_var: str, sim_var: str, multiplier: float = 1.1
+    ) -> tuple[float, float]:
+        """
+        Extracts minimum and maximum values from simulated and original datasets then multiplies by a constant
+        """
+        mi = min([self.df[orig_var].min(), self.df[sim_var].min()])
+        ma = max([self.df[orig_var].max(), self.df[sim_var].max()])
+        return mi / multiplier, ma * multiplier
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Creates scatter plots for both simulated and actual tempo slope/async values
+        """
+        # Define titles for subplots
+        titles = ['Tempo slope (BPM/s)', 'RMS of asynchrony (ms)']
+        for num, (var, title) in enumerate(zip(['tempo_slope', 'asynchrony'], titles)):
+            # Define variables
+            orig_var, sim_var = var + '_original', var + '_simulated'
+            # Create the plot
+            g = sns.scatterplot(
+                data=self.df, x=sim_var, y=orig_var, ax=self.ax[num], hue='trial', palette='tab10', s=70, style='trial'
             )
-            self.ax[num].axline(xy1=(0, 0), xy2=(1, 1), transform=self.ax[num].transAxes,
-                                color=vutils.BLACK, alpha=vutils.ALPHA)
+            # Get the axes limit from minimum and maximum values across both simulated and original data
+            lim = self._get_ax_lim(sim_var, orig_var, multiplier=1.1)
+            # Set the axes parameters
+            if num == 0:
+                g.set(xlim=lim, ylim=lim, title=title)
+            # For the asynchrony plot, minimum axes value must be 0ms
+            else:
+                g.set(xlim=(0, lim[1]), ylim=(0, lim[1]), title=title)
 
-    def _format_ax(self):
-        pass
+    def _format_ax(
+            self
+    ) -> None:
+        """
+        Formats axes objects, setting ticks, labels etc.
+        """
+        for ax in self.ax:
+            # Set axes labels
+            ax.set(xlabel='Simulated performance', ylabel='Actual performance', )
+            # Add the diagonal line
+            ax.axline(xy1=(0, 0), xy2=(1, 1), linewidth=3, transform=ax.transAxes,
+                      color=vutils.BLACK, alpha=vutils.ALPHA, ls='--')
+            # Adjust the width of the major and minor ticks and ax border
+            ax.tick_params(width=3, which='major')
+            plt.setp(ax.spines.values(), linewidth=2)
 
-    def _format_fig(self):
-        pass
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Formats figure object, setting legend and padding etc.
+        """
+        # Empty variables to hold our legend handles and labels
+        hand, lab = None, None
+        # Iterate through both our axes
+        for ax in self.ax:
+            # Store our handles and labels
+            hand, lab = ax.get_legend_handles_labels()
+            # Remove the legend
+            ax.get_legend().remove()
+        # Add the legend back in
+        lgnd = self.fig.legend(hand, lab, title='Duo', frameon=False, ncol=1, loc='center right')
+        # Set the legend marker size
+        for handle in lgnd.legendHandles:
+            handle.set_sizes([70])
+        # Adjust subplots positioning a bit to fit in the legend we've just created
+        self.fig.subplots_adjust(bottom=0.1, top=0.9, left=0.07, right=0.93, wspace=0.15)
 
 
 def generate_simulations_plots(

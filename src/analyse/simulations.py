@@ -10,30 +10,26 @@ import src.analyse.analysis_utils as autils
 
 class Simulation:
     def __init__(
-            self, keys_nn, drms_nn, keys_params, drms_params, latency_array, num_simulations: int = 1000, **kwargs
+            self, keys_params, drms_params, latency_array, num_simulations: int = 1000, **kwargs
     ):
         """
 
         """
         # Default parameters
-        self._keys_initial_iois: list[float] = self._get_initial_iois(keys_nn)
-        self._drms_initial_iois: list[float] = self._get_initial_iois(drms_nn)
-        self._keys_initial_onset: float = self._get_initial_onset(keys_nn)
-        self._drms_initial_onset: float = self._get_initial_onset(drms_nn)
         self._resample_interval: timedelta = timedelta(seconds=1)  # Get mean of IOIs within this window
-
         # Check and generate our input data
         self.total_beats: int = 1000
         self.latency: np.array = self._append_timestamps_to_latency_array(latency_array)
         self.num_simulations: int = num_simulations
-
+        # Phase correction models
+        self._keys_pcm: pd.DataFrame = keys_params
+        self._drms_pcm: pd.DataFrame = drms_params
         # Simulation parameters, in the form of numba dictionaries to be used inside a numba function
         self.parameter: str = kwargs.get('parameter', 'original')
         self.leader: str = kwargs.get('leader', None)
-        self.noise: float = kwargs.get('noise', 0.005)
-        self._keys_pcm: pd.DataFrame = keys_params
-        self._drms_pcm: pd.DataFrame = drms_params
-
+        # Noise parameters for the simulation
+        self._use_original_noise: bool = kwargs.get('use_original_noise', False)    # Whether to use noise from model
+        self.noise = kwargs.get('noise', 0.005)     # Default noise term, if original noise is not to be used
         # Musician parameters
         self.keys_params_raw: dict = self._get_raw_musician_parameters(init=self._keys_pcm)
         self.drms_params_raw: dict = self._get_raw_musician_parameters(init=self._drms_pcm)
@@ -43,12 +39,11 @@ class Simulation:
         self.drms_params: nb.typed.Dict = self._convert_musician_parameters_dict_to_numba(
             self._modify_musician_parameters_by_simulation_type(self.drms_params_raw)
         )
-
         # Empty lists to store our keys and drums simulations in
-        self._keys_simulations_raw: list[dict] = []
-        self._drms_simulations_raw: list[dict] = []
         self.keys_simulations: list[pd.DataFrame] = []
         self.drms_simulations: list[pd.DataFrame] = []
+        # Empty attribute that we will fill with our results dictionary after creating simulations
+        self.results_dic: dict = None
 
     @staticmethod
     def _get_number_of_beats_for_simulation(
@@ -72,41 +67,6 @@ class Simulation:
         lin = np.linspace(offset, end, num=len(latency_array), endpoint=False)
         # Append the two arrays together
         return np.c_[latency_array / 1000, lin]
-
-    @staticmethod
-    def _get_initial_iois(
-            nn, default: float = 0.5
-    ) -> tuple[float]:
-        """
-        Gets the first two IOI values from a performance dataset. If any are invalid, return our default of (0.5, 0.5)
-        """
-        try:
-            iois = nn.iloc[:2]['my_next_ioi'].values.tolist()
-        except KeyError:
-            return default, default
-        else:
-            if any(np.isnan(iois)):
-                return default, default
-            else:
-                return iois
-
-    @staticmethod
-    def _get_initial_onset(
-            nn: pd.DataFrame, default: float = 8, threshold: float = 9
-    ) -> float:
-        """
-        Gets the first onset time from a performance dataset. If this is invalid, returns our default of 8
-        """
-        try:
-            onset = nn.iloc[0]['my_onset']
-        except KeyError:
-            return default
-        else:
-            # This is used to capture a few cases where one performer didn't come straight in after the count in
-            if onset > threshold:
-                return default
-            else:
-                return onset
 
     @staticmethod
     def _get_raw_musician_parameters(
@@ -156,7 +116,7 @@ class Simulation:
                 output_data = {
                     'correction_self': -abs(mean('correction_self')),
                     'correction_partner': 0,
-                    'intercept': 0
+                    'intercept': 0,
                 }
             # Follower: corrects to leader by mean correction across duo, all other parameters set to 0
             else:
@@ -173,9 +133,10 @@ class Simulation:
                 'intercept': 0,
             }
         # Update our dictionary with the required amount of noise
-        output_data.update({
-            'resid_std': self.noise
-        })
+        if self._use_original_noise:
+            output_data.update({'resid_std': input_data['resid_std']})
+        else:
+            output_data.update({'resid_std': self.noise})
         return output_data
 
     @staticmethod
@@ -241,9 +202,6 @@ class Simulation:
                 np.random.normal(0, self.drms_params['resid_std'], 10000),
                 self.latency, self.total_beats  # Latency array and total number of beats
             )
-            # Append raw data for debugging
-            self._keys_simulations_raw.append(dict(keys))
-            self._drms_simulations_raw.append(dict(drms))
             # Format the simulated data and append to our list
             self.keys_simulations.append(self._format_simulated_data(data=keys))
             self.drms_simulations.append(self._format_simulated_data(data=drms))
@@ -251,6 +209,8 @@ class Simulation:
         # This will allow us to pickle instances of the Simulation class without errors
         self.keys_params = dict(self.keys_params)
         self.drms_params = dict(self.drms_params)
+        # Save our results dictionary to an attribute, so we don't have to do it later (or multiple times!)
+        self.results_dic = self._create_summary_dictionary()
 
     def _format_simulated_data(
             self, data: nb.typed.Dict
@@ -359,27 +319,23 @@ class Simulation:
         return individual_sims, grand_avg
 
     def _create_summary_dictionary(
-            self, include_simulations: bool = True
+            self,
     ) -> dict:
         """
         Creates a summary dictionary with important simulation parameters
         """
-        dic = {
+        return {
             'trial': self._keys_pcm["trial"].iloc[0],
             'block': self._keys_pcm["block"].iloc[0],
             'latency': self._keys_pcm["latency"].iloc[0],
             'jitter': self._keys_pcm["jitter"].iloc[0],
             'parameter': self.parameter,
             'leader': self.leader,
-            'ts': self.get_average_tempo_slope(),
-            'asynchrony': self.get_average_pairwise_asynchrony(),
+            'tempo_slope_original': self._keys_pcm['tempo_slope'].iloc[0],
+            'asynchrony_original': self._keys_pcm['pw_asym'].iloc[0],
+            'tempo_slope_simulated': self.get_average_tempo_slope(),
+            'asynchrony_simulated': self.get_average_pairwise_asynchrony(),
         }
-        if include_simulations:
-            dic.update({
-                'keys_sim': self.keys_simulations,
-                'drms_sim': self.drms_simulations,
-            })
-        return dic
 
 
 # noinspection PyBroadException
@@ -502,7 +458,7 @@ def generate_phase_correction_simulations(
             # Initialise the simulation class
             sim = Simulation(
                 keys_params=ke, drms_params=dr, latency_array=z, num_simulations=num_simulations,
-                parameter=param, leader=leader, keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn,
+                parameter=param, leader=leader, keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn, use_original_noise=False
             )
             # Create all simulations for this parameter/leader combination
             sim.create_all_simulations()

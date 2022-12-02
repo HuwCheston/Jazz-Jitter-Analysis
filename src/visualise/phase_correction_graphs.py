@@ -544,7 +544,7 @@ class PointPlotLaggedLatency(vutils.BasePlot):
         super().__init__(**kwargs)
         self.lag_var_name = kwargs.get('lag_var_name', 'pc_l')
         if self.df is not None:
-            self.df = self._format_df()
+            self.df = self._format_df(self.df)
 
     @vutils.plot_decorator
     def create_plot(self) -> tuple[plt.Figure, str]:
@@ -558,26 +558,29 @@ class PointPlotLaggedLatency(vutils.BasePlot):
         fname = f'{self.output_dir}\\pointplot_{self.lag_var_name}.png'
         return self.g.figure, fname
 
-    def _format_df(self):
+    def _format_df(self, df):
         """
         Formats the dataframe for the plot
         """
-        # Extract the value vars
-        val_vars = [col for col in self.df if self.lag_var_name in col and not col.endswith('_p')]
-        self.df = (
-            self.df.melt(id_vars=['trial', 'block', 'latency', 'jitter', 'instrument', 'abbrev'],
-                         value_vars=val_vars, value_name='coef', var_name='lag')
-                   .sort_values(by=['trial', 'block', 'latency', 'jitter', 'instrument'])
+        all_coefs = pd.DataFrame(df['ioi_std_vs_jitter_coefficients'].to_list())
+        cols = [f'lag_{s}' for s in range(1, all_coefs.shape[1] + 1)]
+        all_coefs.columns = cols
+        big_df = (
+            pd.concat([df, all_coefs], axis=1)
+                .melt(id_vars=['trial', 'block', 'latency', 'jitter', 'instrument', ],
+                      value_vars=cols, value_name='coef', var_name='lag')
+                .sort_values(by=['trial', 'block', 'latency', 'jitter', 'instrument'])
+                .reset_index(drop=True)
         )
-        self.df.lag = self.df.lag.str.extract(r'(\d+)')
-        return self.df
+        big_df = big_df[big_df['jitter'] != 0]
+        return big_df
 
     def _create_facetgrid(self):
         """
         Creates the facetgrid and maps plots onto it
         """
         return sns.catplot(
-            data=self.df[self.df['jitter'] != 0], col='trial', row='jitter', x="lag", y="coef", hue='instrument',
+            data=self.df, col='trial', row='jitter', x="lag", y="coef", hue='instrument',
             kind="point", height=5.5, aspect=0.62, dodge=0.2, palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'],
             scale=1.25, estimator=np.median, ci=None
         )

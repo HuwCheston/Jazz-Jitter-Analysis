@@ -32,6 +32,7 @@ alpha_func = lambda pal: ListedColormap(np.c_[pal.colors, np.full(len(pal.colors
 SLOPES_CMAP = alpha_func(color_palette('vlag_r', as_cmap=True))     # Used for plotting tempo slopes
 INSTR_CMAP = ['#9933ff', '#00ff00']     # Palette used for plotting data that contrasts against slopes color map
 LINE_CMAP = ['#1f77b4', '#ff7f0e']     # Original matplotlib colour palette used for manual plotting
+DUO_CMAP = 'tab10'
 
 
 def plot_decorator(plotter: callable):

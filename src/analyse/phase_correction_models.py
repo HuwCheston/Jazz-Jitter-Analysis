@@ -4,6 +4,7 @@ import numba as nb
 import json
 import os
 import pickle
+import warnings
 import statsmodels.formula.api as smf
 from sklearn.covariance import EllipticEnvelope
 from datetime import timedelta
@@ -27,7 +28,7 @@ class PhaseCorrectionModel:
         self._iqr_filter_range: tuple[float] = kwargs.get('iqr_filter', (0.1, 0.9))  # Filter IOIs above and below
         self._model: str = kwargs.get('model', 'my_next_ioi_diff~my_prev_ioi_diff+asynchrony')  # regression model
         self._rolling_window_size: int = kwargs.get('rolling_window_size', 8)
-        self._maximum_lag: int = kwargs.get('maximum_lag', 8)
+        self._maximum_lag: int = kwargs.get('maximum_lag', 4)
         # The cleaned data, before dataframe conversion
         self.keys_raw: dict = c1_keys
         self.drms_raw: dict = c2_drms
@@ -87,6 +88,8 @@ class PhaseCorrectionModel:
         for first, second in zip(zarr, zarr[1:]):
             # Set any rows in the performance dataframe between our timestamps to the respective latency time
             perf_df.loc[perf_df[onset_col].between(first[1], second[1]), 'latency'] = first[0]
+        # Convert latency into milliseconds now
+        perf_df['latency'] /= 1000
         return perf_df
 
     def _generate_df(
@@ -111,7 +114,7 @@ class PhaseCorrectionModel:
         # Fill na in latency column with next/previous valid observation
         df['latency'] = df['latency'].bfill().ffill()
         # Add the latency column (divided by 1000 to convert from ms to sec) to the onset column
-        df['my_onset_delayed'] = (df['my_onset'] + (df['latency'] / 1000))
+        df['my_onset_delayed'] = (df['my_onset'] + df['latency'])
         return df
 
     def _extract_tempo_slope(
@@ -187,11 +190,9 @@ class PhaseCorrectionModel:
         # Append the zoom array onto our dataframe
         nn_df = self._append_zoom_array(nn_df, zoom_arr=zoom_arr)
         # Add the correct amount of latency onto our partner's onset time
-        nn_df['their_onset'] += (nn_df['latency'] / 1000)
+        nn_df['their_onset'] += (nn_df['latency'])
         # Recalculate our asynchrony column with the now delayed partner onsets
         nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
-        # Drop the latency column
-        nn_df = nn_df.drop(['latency'], axis=1)
         # Format the now matched dataframe and return
         return self._format_df_for_model(nn_df)
 
@@ -385,52 +386,67 @@ class PhaseCorrectionModel:
         df['my_prev_ioi_diff'] = df['my_prev_ioi'].diff()
         return df
 
+    def _regress_ioi_standard_deviation_against_jitter(
+            self, nn_df: pd.DataFrame
+    ) -> list[float]:
+        """
+
+        """
+        roll = self._get_rolling_standard_deviation_values(nn_df, cols=('my_prev_ioi_diff', 'latency'))
+        train = self._lag_rolling_values(roll, cols=('my_prev_ioi_diff_std', 'latency_std'))
+        coefs = self._regress_shifted_rolling_variables(train, dep_var='my_prev_ioi_diff_std', ind_var='latency_std')
+        return coefs
+
     def _get_rolling_standard_deviation_values(
-            self, nn_df: pd.DataFrame, cols: tuple[str] = ('my_prev_ioi', 'latency_std')
+            self, nn_df: pd.DataFrame, cols: tuple[str] = ('my_prev_ioi', 'latency')
     ) -> pd.DataFrame:
         """
         Resamples dataframe to every second, rolls by given window size, and gets standard deviation of given columns
         """
         # Create the temporary dataframe
-        temp = nn_df.copy()
-        # Create the timestamp column for rolling on
-        temp['td'] = pd.to_timedelta([timedelta(seconds=val) for val in temp['my_onset'].values])
-        # Resample data to every second and get the mean value
-        temp = temp.set_index('td').resample('1s').mean()
+        temp = nn_df.copy(deep=True)
+        # Resample the temporary dataframe
+        temp = autils.resample(temp, col='my_onset')
+        # Format the resampled dataframe
+        temp = temp.reset_index(drop=False).drop(columns=['my_onset']).rename(columns={'index': 'my_onset'})
+        # Filter out warnings, as df.rolling keeps throwing FutureWarnings
+        warnings.filterwarnings('ignore')
         # Roll the data according to the rolling window size, default = eight seconds
-        roll = temp.rolling(window=timedelta(seconds=self._rolling_window_size), on=temp.index)
-        # Extract the rolling standard deviation of required columns
+        roll = temp.rolling(window=timedelta(seconds=self._rolling_window_size), on='my_onset')
+        # Iterate through required columns
         for col in cols:
-            temp[f'{col}_std'] = roll[col].std(skipna=True)
+            # Extract the standard deviation and convert into milliseconds
+            temp[f'{col}_std'] = roll[col].std(skipna=True) * 1000
         # Return the dataframe
         return temp
 
-    def _lag_rolling_standard_deviation_values(
-            self, roll: pd.DataFrame, var: str = 'my_prev_ioi_std'
+    def _lag_rolling_values(
+            self, roll: pd.DataFrame, cols: tuple[str] = ('my_prev_ioi_std', 'latency_std')
     ) -> pd.DataFrame:
         """
-
+        Shifts rolling values by a given number of seconds and concatenates together.
         """
         # Define the function for shifting values by a maximum number of seconds
-        shifter = lambda s: (
-            pd.concat([roll[s].shift(i).rename(f'{s}_l{i}') for i in range(1, self._maximum_lag + 1)], axis=1)
-              .set_index(roll.index)
+        shifter = lambda s: pd.concat(
+            [roll[s].shift(i).rename(f'{s}_l{i}') for i in range(1, self._maximum_lag + 1)], axis=1
         )
         # Create the shifted dataframe
-        train = pd.concat([roll, shifter('latency_std'), shifter(var)])
+        train = pd.concat([roll, *(shifter(col) for col in cols)], axis=1)
         # Return the shifted dataframe
         return train
 
-    def _regress_shifted_rolling_variables_against_latency(
-            self, lagged: pd.DataFrame, dep_var: str = 'my_prev_ioi_std'
-    ):
+    def _regress_shifted_rolling_variables(
+            self, lagged: pd.DataFrame, dep_var: str = 'my_prev_ioi_std', ind_var: str = 'latency'
+    ) -> list[float]:
         """
-
+        Creates a regression model of lagged variables vs non-lagged variables and extracts coefficients.
         """
         # Create the regression model
         md = f'{dep_var}~' + '+'.join([f'{col}' for col in lagged.columns if col[-3:-1] == '_l'])
         # Fit the regression model
-        res = smf.ols(md, lagged.dropna().fit())
+        res = smf.ols(md, lagged.dropna()).fit()
+        # Return the regression coefficients
+        return res.params.filter(like=ind_var, axis=0).to_list()
 
     def _create_phase_correction_model(
             self, df: pd.DataFrame
@@ -459,8 +475,8 @@ class PhaseCorrectionModel:
             'tempo_intercept': self._extract_tempo_slope().params.loc['Intercept'],
             'contamination': self._contamination,
             'asynchrony_na': nn['asynchrony'].isna().sum(),
-            # 'ioi_std': std,
-            # 'ioi_npvi': npvi,
+            'ioi_std': self._get_rolling_standard_deviation_values(nn_df=nn)['my_prev_ioi_std'].median(),
+            'ioi_std_vs_jitter_coefficients': self._regress_ioi_standard_deviation_against_jitter(nn_df=nn),
             'pw_asym': self._extract_pairwise_asynchrony(),
             'my_prev_ioi_diff_mean': nn['my_prev_ioi_diff'].mean(),
             'my_next_ioi_diff_mean': nn['my_next_ioi_diff'].mean(),
