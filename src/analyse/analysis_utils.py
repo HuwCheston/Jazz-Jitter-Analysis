@@ -2,6 +2,7 @@ import os
 import pickle
 import pandas as pd
 import numpy as np
+import numba as nb
 from datetime import timedelta
 import statsmodels.api as sm
 from statsmodels.formula import api as smf
@@ -330,3 +331,92 @@ def load_from_disc(
     # Else, return the models
     else:
         return mds
+
+
+# noinspection PyBroadException
+@nb.jit(nopython=True)
+def create_one_simulation(
+        keys_data: nb.typed.Dict, drms_data: nb.typed.Dict,
+        keys_params: nb.typed.Dict, drms_params: nb.typed.Dict,
+        keys_noise, drms_noise,
+        lat: np.ndarray, beats: int
+) -> tuple:
+    """
+    Create data for one simulation, using numba optimisations. This function is defined outside of the Simulation
+    class to enable instances of the Simulation class to be pickled.
+    """
+
+    def get_latency_at_onset(
+            my_onset: float
+    ) -> float:
+        """
+        Get the current amount of latency applied to our partner when we played our onset
+        """
+        # If our first onset was before the 8 second count-in, return the first amount of delay applied
+        if my_onset < lat[0, :][1]:
+            return lat[:, 0][0]
+        # Else, return the correct amount of latency
+        else:
+            return lat[lat[:, 1] == lat[:, 1][lat[:, 1] <= my_onset].max()][:, 0][0]
+
+    def calculate_async(
+            my_onset: float, their_onset: float
+    ) -> float:
+        """
+        Calculates the current asynchrony with our partner at our onset. Note the order of positional arguments!!
+        """
+        return (their_onset + get_latency_at_onset(my_onset)) - my_onset
+
+    def predict_next_ioi_diff(
+            prev_diff: float, asynchrony: float, params: nb.typed.Dict, noise: np.ndarray
+    ) -> float:
+        """
+        Predict the difference between previous and next IOIs using inputted data and model parameters
+        """
+        a = prev_diff * params['correction_self']
+        b = asynchrony * params['correction_partner']
+        c = params['intercept']
+        n = np.random.choice(noise)
+        return a + b + c + n
+
+    # Calculate our first two async values. We don't do this when initialising the empty data, because it
+    # both requires the get_latency_at_onset function and access to both keys and drums data.
+    for i in range(0, 2):
+        keys_data['asynchrony'][i] = calculate_async(keys_data['my_onset'][i], drms_data['my_onset'][i])
+        drms_data['asynchrony'][i] = calculate_async(drms_data['my_onset'][i], keys_data['my_onset'][i])
+    # We don't use the full range of beats, given that we've already added some in when initialising our data
+    for i in range(2, beats):
+        # Shift difference
+        keys_data['my_prev_ioi_diff'][i] = keys_data['my_next_ioi_diff'][i - 1]
+        drms_data['my_prev_ioi_diff'][i] = drms_data['my_next_ioi_diff'][i - 1]
+        # Shift IOI
+        keys_data['my_prev_ioi'][i] = keys_data['my_next_ioi'][i - 1]
+        drms_data['my_prev_ioi'][i] = drms_data['my_next_ioi'][i - 1]
+        # Get next onset by adding previous onset to predicted IOI
+        keys_data['my_onset'][i] = keys_data['my_onset'][i - 1] + keys_data['my_prev_ioi'][i]
+        drms_data['my_onset'][i] = drms_data['my_onset'][i - 1] + drms_data['my_prev_ioi'][i]
+        # Get async value by subtracting partner's onset (plus latency) from ours
+        try:
+            keys_data['asynchrony'][i] = calculate_async(keys_data['my_onset'][i], drms_data['my_onset'][i])
+            drms_data['asynchrony'][i] = calculate_async(drms_data['my_onset'][i], keys_data['my_onset'][i])
+        # If there's an issue here, break out of the simulation
+        except:
+            break
+        # Predict difference between previous IOI and next IOI
+        keys_data['my_next_ioi_diff'][i] = predict_next_ioi_diff(
+            keys_data['my_prev_ioi_diff'][i], keys_data['asynchrony'][i], keys_params, keys_noise
+        )
+        drms_data['my_next_ioi_diff'][i] = predict_next_ioi_diff(
+            drms_data['my_prev_ioi_diff'][i], drms_data['asynchrony'][i], drms_params, drms_noise
+        )
+        # Use predicted difference between IOIs to get next actual IOI
+        keys_data['my_next_ioi'][i] = keys_data['my_next_ioi_diff'][i] + keys_data['my_prev_ioi'][i]
+        drms_data['my_next_ioi'][i] = drms_data['my_next_ioi_diff'][i] + drms_data['my_prev_ioi'][i]
+        # If we've accelerated to a ridiculous extent (due to noise), we need to break.
+        if keys_data['my_next_ioi'][i] < 0 or drms_data['my_next_ioi'][i] < 0:
+            break
+        # TODO: should be the same length as original performance?
+        # If we've exceeded our endpoint, break
+        if keys_data['my_onset'][i] > 100 or drms_data['my_onset'][i] > 100:
+            break
+    return keys_data, drms_data

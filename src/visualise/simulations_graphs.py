@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
-from scipy.stats import stats
+import scipy.stats as stats
 
 import src.visualise.visualise_utils as vutils
 import src.analyse.analysis_utils as autils
@@ -76,7 +76,7 @@ class LinePlotAllParameters(vutils.BasePlot):
             # Plot onto the required axis
             self.ax[num].plot(
                 conc['my_onset'], conc[s].rolling(window='4s').mean(), alpha=1, color=vutils.BLACK,
-                label='Actual', linewidth=4
+                label='Actual performance', linewidth=4, ls='--'
             )
 
     @vutils.plot_decorator
@@ -156,20 +156,21 @@ class BarPlotSimulationParameters(vutils.BasePlot):
     Creates a plot showing the simulation results per parameter, designed to look similar to fig 2.(d)
     in Jacoby et al. (2021).
     """
-    def __init__(self, **kwargs):
+    def __init__(self, raw: list, **kwargs):
         super().__init__(**kwargs)
         self.key: dict = {'Original': 0, 'Democracy': 1, 'Anarchy': 2, 'Leadership': 3}
-        self.df = self._format_df(df=self.df)
+        self.df = self._format_df(sims=raw)
         self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=True, figsize=(18.8, 5))
         self.ax[1].set_yscale('log')
 
     @staticmethod
     def _format_df(
-            df: pd.DataFrame
+            sims: list
     ) -> pd.DataFrame:
         """
         Wrangles dataframe into form required for plotting.
         """
+        df = pd.DataFrame([sim.results_dic for sim in sims])
         # Fill our 'None' leader values with empty strings
         df['leader'] = df['leader'].fillna(value='').str.lower()
         # Format our parameter column by combining with leader column, replacing values with title case
@@ -228,7 +229,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         Creates the stripplot and barplot for both variables, then carries out t-test and adds in asterisks
         """
         # Iterate through both variables which we wish to plot
-        for num, var in enumerate(['tempo_slope', 'asynchrony']):
+        for num, var in enumerate(['tempo_slope_simulated', 'asynchrony_simulated']):
             # Add the scatter plot, showing each individual performance
             sns.stripplot(
                 data=self.df, ax=self.ax[num], x='parameter', y=var, hue='trial', dodge=True, s=4, marker='.',
@@ -322,6 +323,8 @@ class BarPlotSimulationParameters(vutils.BasePlot):
             ax.get_legend().remove()
         # Add the legend back in, but only keep the values which relate to the bar plot (also add a title, adjust place)
         self.fig.legend(hand[5:], lab[5:], title='Duo', frameon=False, ncol=1, loc='center right')
+        # Adjust subplots positioning a bit to fit in the legend we've just created
+        self.fig.subplots_adjust(bottom=0.25, top=0.95, left=0.07, right=0.93, wspace=0.2)
 
 
 class RegPlotSimulationComparisons(vutils.BasePlot):
