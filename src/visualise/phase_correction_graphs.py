@@ -535,82 +535,8 @@ class RegPlotSingle(RegPlot):
         return g
 
 
-class PointPlotLaggedLatency(vutils.BasePlot):
-    """
-    Make a pointplot showing lagged timestamps on x-axis and regression coefficients on y. Columns grouped by trial,
-    rows grouped by jitter.
-    """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.lag_var_name = kwargs.get('lag_var_name', 'pc_l')
-        if self.df is not None:
-            self.df = self._format_df(self.df)
 
-    @vutils.plot_decorator
-    def create_plot(self) -> tuple[plt.Figure, str]:
-        """
-        Called from outside the class to generate and save the image.
-        """
-        self.g = self._create_facetgrid()
-        self._format_ax()
-        self._format_fig()
-        # Create filename and return to save
-        fname = f'{self.output_dir}\\pointplot_{self.lag_var_name}.png'
-        return self.g.figure, fname
-
-    def _format_df(self, df):
-        """
-        Formats the dataframe for the plot
-        """
-        all_coefs = pd.DataFrame(df['ioi_std_vs_jitter_coefficients'].to_list())
-        cols = [f'lag_{s}' for s in range(1, all_coefs.shape[1] + 1)]
-        all_coefs.columns = cols
-        big_df = (
-            pd.concat([df, all_coefs], axis=1)
-                .melt(id_vars=['trial', 'block', 'latency', 'jitter', 'instrument', ],
-                      value_vars=cols, value_name='coef', var_name='lag')
-                .sort_values(by=['trial', 'block', 'latency', 'jitter', 'instrument'])
-                .reset_index(drop=True)
-        )
-        big_df = big_df[big_df['jitter'] != 0]
-        return big_df
-
-    def _create_facetgrid(self):
-        """
-        Creates the facetgrid and maps plots onto it
-        """
-        return sns.catplot(
-            data=self.df, col='trial', row='jitter', x="lag", y="coef", hue='instrument',
-            kind="point", height=5.5, aspect=0.62, dodge=0.2, palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'],
-            scale=1.25, estimator=np.median, ci=None
-        )
-
-    def _format_ax(self):
-        """
-        Formats plot subplots and axes
-        """
-        # Add the reference line now or else it messes up the titles
-        self.g.refline(y=0, alpha=1, linestyle='-', color=vutils.BLACK)
-        # Set axes tick parameters and line width
-        self.g.set_axis_labels(x_var='', y_var='')
-        for ax in self.g.axes.flatten():
-            ax.tick_params(width=3, )
-            plt.setp(ax.spines.values(), linewidth=2)
-
-    def _format_fig(self):
-        """
-        Formats the overall figure
-        """
-        # Format titles, labels
-        self.g.figure.supxlabel('Lag (s)', y=0.04)
-        self.g.figure.supylabel('Coefficient, jitter vs. coupling', x=0.007)
-        self.g.set_titles('{col_name}, Jitter: {row_name}x')
-        # Set figure properties
-        self.g.figure.subplots_adjust(bottom=0.1, top=0.95, left=0.07, right=0.97)
-        sns.move_legend(self.g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01))
-
-
-class NumberLine(vutils.BasePlot):
+class NumberLinePairwiseAsynchrony(vutils.BasePlot):
     """
     Creates a numberline showing difference in pairwise asynchrony between duos this experiment during the control
     condition and a corpus of pairwise asynchrony values from other studies and genres
@@ -965,7 +891,7 @@ def generate_phase_correction_plots(
     # pp = PointPlotLaggedLatency(df=df, output_dir=figures_output_dir, lag_var_name='ioi_std_lag')
     # pp.create_plot()
     # TODO: corpus should be saved in the root//references directory!
-    nl = NumberLine(df=df, output_dir=figures_output_dir, corpus_filepath=f'{output_dir}\\pw_asymmetry_corpus.xlsx')
+    nl = NumberLinePairwiseAsynchrony(df=df, output_dir=figures_output_dir, corpus_filepath=f'{output_dir}\\pw_asymmetry_corpus.xlsx')
     nl.create_plot()
     bar = BarPlot(df=df, output_dir=figures_output_dir)
     bar.create_plot()

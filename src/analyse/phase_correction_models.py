@@ -27,8 +27,8 @@ class PhaseCorrectionModel:
         # Parameters
         self._iqr_filter_range: tuple[float] = kwargs.get('iqr_filter', (0.1, 0.9))  # Filter IOIs above and below
         self._model: str = kwargs.get('model', 'my_next_ioi_diff~my_prev_ioi_diff+asynchrony')  # regression model
-        self._rolling_window_size: int = kwargs.get('rolling_window_size', 8)
-        self._maximum_lag: int = kwargs.get('maximum_lag', 4)
+        self._rolling_window_size: int = kwargs.get('rolling_window_size', 4)   # 4 seconds = 1 bar at 120BPM
+        self._maximum_lag: int = kwargs.get('maximum_lag', 4)   # 4 seconds = 1 bar at 120BPM
         # The cleaned data, before dataframe conversion
         self.keys_raw: dict = c1_keys
         self.drms_raw: dict = c2_drms
@@ -103,14 +103,12 @@ class PhaseCorrectionModel:
         df = self._append_zoom_array(df,  data['zoom_array'])
         # Drop pitch and velocity columns if not needed (default)
         df['my_prev_ioi'] = df['my_onset'].diff().astype(float)
-
         # Remove ioi values below threshold
-        # temp = df.dropna()
-        # temp = temp[temp['my_prev_ioi'] < threshold]
-        # df = df[~df.index.isin(temp.index)]
+        temp = df.dropna()
+        temp = temp[temp['my_prev_ioi'] < threshold]
+        df = df[~df.index.isin(temp.index)]
         # Recalculate IOI column after removing those below threshold
-        # df['my_prev_ioi'] = df['my_onset'].diff().astype(float)
-
+        df['my_prev_ioi'] = df['my_onset'].diff().astype(float)
         # Fill na in latency column with next/previous valid observation
         df['latency'] = df['latency'].bfill().ffill()
         # Add the latency column (divided by 1000 to convert from ms to sec) to the onset column
@@ -392,9 +390,9 @@ class PhaseCorrectionModel:
         """
 
         """
-        roll = self._get_rolling_standard_deviation_values(nn_df, cols=('my_prev_ioi_diff', 'latency'))
-        train = self._lag_rolling_values(roll, cols=('my_prev_ioi_diff_std', 'latency_std'))
-        coefs = self._regress_shifted_rolling_variables(train, dep_var='my_prev_ioi_diff_std', ind_var='latency_std')
+        roll = self._get_rolling_standard_deviation_values(nn_df, cols=('my_prev_ioi', 'latency'))
+        train = self._lag_rolling_values(roll, cols=('my_prev_ioi_std', 'latency_std'))
+        coefs = self._regress_shifted_rolling_variables(train, dep_var='my_prev_ioi_std', ind_var='latency_std')
         return coefs
 
     def _get_rolling_standard_deviation_values(
@@ -406,13 +404,19 @@ class PhaseCorrectionModel:
         # Create the temporary dataframe
         temp = nn_df.copy(deep=True)
         # Resample the temporary dataframe
-        temp = autils.resample(temp, col='my_onset')
+        temp = autils.resample(temp, func=np.nanmean, col='my_onset')
         # Format the resampled dataframe
         temp = temp.reset_index(drop=False).drop(columns=['my_onset']).rename(columns={'index': 'my_onset'})
         # Filter out warnings, as df.rolling keeps throwing FutureWarnings
         warnings.filterwarnings('ignore')
-        # Roll the data according to the rolling window size, default = eight seconds
-        roll = temp.rolling(window=timedelta(seconds=self._rolling_window_size), on='my_onset')
+        # Roll the data according to the rolling window size, default = four seconds
+        roll = temp.rolling(
+            window=timedelta(seconds=self._rolling_window_size),
+            min_periods=1,
+            center=False,
+            closed='both',
+            on='my_onset'
+        )
         # Iterate through required columns
         for col in cols:
             # Extract the standard deviation and convert into milliseconds
@@ -436,15 +440,20 @@ class PhaseCorrectionModel:
         return train
 
     def _regress_shifted_rolling_variables(
-            self, lagged: pd.DataFrame, dep_var: str = 'my_prev_ioi_std', ind_var: str = 'latency'
+            self, lagged: pd.DataFrame, dep_var: str = 'my_prev_ioi_std', ind_var: str = 'latency_std'
     ) -> list[float]:
         """
         Creates a regression model of lagged variables vs non-lagged variables and extracts coefficients.
         """
         # Create the regression model
         md = f'{dep_var}~' + '+'.join([f'{col}' for col in lagged.columns if col[-3:-1] == '_l'])
+        # Subset the dataframe for the required columns
+        # This will prevent us from dropping values e.g. where asynchrony or other nearest-neighbour column is NaN
+        lagged = lagged[[col for col in lagged.columns if dep_var in col or ind_var in col]]
         # Fit the regression model
         res = smf.ols(md, lagged.dropna()).fit()
+        if self.keys_raw['trial'] == 1 and self.keys_raw['block'] == 2 and self.keys_raw['latency'] == 180 and self.keys_raw['jitter'] == 0.5:
+            pass
         # Return the regression coefficients
         return res.params.filter(like=ind_var, axis=0).to_list()
 
@@ -531,4 +540,4 @@ if __name__ == '__main__':
     # Default location to save output models
     output = r"C:\Python Projects\jazz-jitter-analysis\models"
     # Generate models and pickle
-    generate_phase_correction_models(raw_data=raw, output_dir=output, force_rebuild=True)
+    mds = generate_phase_correction_models(raw_data=raw, output_dir=output, force_rebuild=True)
