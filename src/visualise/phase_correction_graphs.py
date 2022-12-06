@@ -414,126 +414,53 @@ class SingleConditionAnimation:
 
 
 class RegPlot(vutils.BasePlot):
-    def __init__(self, **kwargs):
+    def __init__(self, df, **kwargs):
         super().__init__(**kwargs)
-        self.yvar: str = kwargs.get('yvar', 'tempo_slope')
-        self.ylabel: str = kwargs.get('ylabel', 'Tempo slope (BPM/s)')
-        self.ylim: tuple = kwargs.get('ylim', None)
-        self.xvar: str = kwargs.get('xvar', 'abs_correction')
-        self.xlabel: str = kwargs.get('xlabel', 'Coupling balance')
-        self.xlim: tuple = kwargs.get('xlim', None)
-        self.hline: bool = kwargs.get('hline', True)
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 9.4))
+        self.xvars: list[str] = kwargs.get('xvars', ['tempo_slope', 'ioi_std'])
+        self.xlabs: list[str] = kwargs.get('xlabs', ['Tempo slope (BPM/s)', 'Tempo stability (ms)'])
+        self.fig, self.ax = plt.subplots(1, 2, figsize=(18.8, 9.4), sharex=True, sharey=False)
+        self.df = self._format_df(df)
 
-    def _format_plot(self):
-        """
-        Formats a regression plot, including both the figure and axes
-        """
-        # Set axes level formatting
-
-        self.ax.tick_params(width=3, )
-        self.ax.set(
-            ylabel='', xlabel='', xlim=self.xlim if self.xlim is not None else self.ax.get_xlim(),
-            ylim=self.ylim if self.ylim is not None else self.ax.get_ylim(),
+    def _format_df(self, df):
+        groupers = ['trial', 'block', 'latency', 'jitter']
+        cols = groupers + ['coupling_balance', *self.xvars]
+        abs_correction = lambda grp: abs(grp.iloc[1]['correction_partner'] - grp.iloc[0]['correction_partner'])
+        return pd.DataFrame(
+            [[*i, abs_correction(g), *(g[v].mean() for v in self.xvars)] for i, g in df.groupby(groupers)], columns=cols
         )
-        plt.setp(self.ax.spines.values(), linewidth=2)
-        # Plot a horizontal line at x=0
-        if self.hline:
-            self.ax.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK)
-        # Set axis labels
-        self.fig.supylabel(self.ylabel, x=0.03)
-        self.fig.supxlabel(self.xlabel, y=0.09)
-
-
-class RegPlotDuo(RegPlot):
-    """
-    Creates a regression & scatter plot for absolute correction difference between duo members versus another variable
-    (defaults to tempo slope, but can be changed by setting yvar argument)
-    """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        if self.df is not None:
-            self.df = self._format_df()
 
     @vutils.plot_decorator
-    def create_plot(self) -> tuple[plt.Figure, str]:
-        """
-        Called from outside the class to generate and save the image.
-        """
-        self.ax = self._create_plot()
-        self._format_plot()
-        # Format axis positioning and move legend
-        plt.tight_layout()
+    def create_plot(self):
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\regplot_coupling_balance.png'
+        return self.fig, fname
+
+    def _create_plot(self):
+        for num, var in enumerate(self.xvars):
+            g = sns.scatterplot(
+                data=self.df, x='coupling_balance', y=var, hue='trial', s=100, style='trial',
+                palette=vutils.DUO_CMAP, ax=self.ax[num], legend=None if num == 1 else True
+            )
+            g = sns.regplot(
+                data=self.df, x='coupling_balance', y=var, x_ci=95, n_boot=10000, scatter=None,
+                truncate=True, color=vutils.BLACK, ax=self.ax[num], line_kws={'linewidth': 3}
+            )
+
+    def _format_ax(self):
+        for a, lab in zip(self.ax.flatten(), self.xlabs):
+            a.tick_params(width=3, )
+            plt.setp(a.spines.values(), linewidth=2)
+            a.set(xlabel='Coupling balance', ylabel=lab)
+            a.axhline(y=0, linestyle='-', alpha=0.3, color=vutils.BLACK, lw=3)
+
+    def _format_fig(self):
         sns.move_legend(
-            self.ax, 'lower center', ncol=6, title=None, frameon=False, bbox_to_anchor=(0.45, -0.2), markerscale=1.6,
-            columnspacing=0.2, handletextpad=0.1,
+            self.ax[0], 'center right', ncol=1, title='Duo', frameon=False, bbox_to_anchor=(2.3, 0.5),
+            markerscale=1.6, columnspacing=0.2, handletextpad=0.1,
         )
-        self.ax.figure.subplots_adjust(bottom=0.17, top=0.93, left=0.14, right=0.90)
-        # Return with filename to be saved and closed in outer function
-        fname = f'{self.output_dir}\\regplot_{self.xvar}_vs_{self.yvar}.png'
-        return self.ax.figure, fname
-
-    def _format_df(self):
-        self.df = self.df.groupby(by=['trial', 'block', 'latency', 'jitter']).apply(self._get_abs_correction)
-        self.df['trial_abbrev'] = self.df['trial'].replace({n: f'Duo {n}' for n in range(1, 6)})
-        return self.df
-
-    def _get_abs_correction(self, grp: pd.DataFrame.groupby) -> pd.DataFrame.groupby:
-        """
-        Function used to calculate absolute coupling difference across duo
-        """
-        grp['abs_correction'] = abs(grp.iloc[1]['correction_partner'] - grp.iloc[0]['correction_partner'])
-        return grp.drop_duplicates(subset=[self.xvar, self.yvar])
-
-    def _create_plot(self):
-        g = sns.scatterplot(
-            data=self.df, x=self.xvar, y=self.yvar, hue='trial_abbrev', style='trial_abbrev',
-            s=150, ax=self.ax, palette='tab10'
-        )
-        g = sns.regplot(
-            data=self.df, x=self.xvar, y=self.yvar, scatter=None, truncate=True, ax=g, color=vutils.BLACK
-        )
-        return g
-
-
-class RegPlotSingle(RegPlot):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        if self.df is not None:
-            self.df = self._format_df()
-
-    @vutils.plot_decorator
-    def create_plot(self) -> tuple[plt.Figure, str]:
-        """
-        Called from outside the class to generate and save the image.
-        """
-        self.ax = self._create_plot()
-        self._format_plot()
-        # Create the legend
-        handles, labels = self.ax.get_legend_handles_labels()
-        self.ax.legend(handles=handles[1:6] + handles[7:], labels=labels[1:6] + labels[7:], ncol=8, frameon=False,
-                       markerscale=1.6, columnspacing=0.1, handletextpad=0.1, bbox_to_anchor=(1.15, -0.1))
-        self.ax.figure.subplots_adjust(bottom=0.17, top=0.93, left=0.14, right=0.90)
-        # Return with filename to be saved and closed in outer function
-        fname = f'{self.output_dir}\\regplot_{self.xvar}_vs_{self.yvar}.png'
-        return self.ax.figure, fname
-
-    def _format_df(self):
-        self.df['trial_abbrev'] = self.df['trial'].replace({n: f'Duo {n}' for n in range(1, 6)})
-        # Convert r-squared to percentage
-        if self.yvar == 'rsquared':
-            self.df['rsquared'] = self.df['rsquared'].apply(lambda x: x * 100)
-        return self.df
-
-    def _create_plot(self):
-        g = sns.regplot(
-            data=self.df, x=self.xvar, y=self.yvar, scatter=False, color=vutils.BLACK, ax=self.ax
-        )
-        g = sns.scatterplot(
-            data=self.df, x=self.xvar, y=self.yvar, hue='trial_abbrev', palette='tab10', style='instrument', s=100, ax=g
-        )
-        return g
-
+        self.fig.subplots_adjust(left=0.07, right=0.93, bottom=0.1, top=0.95, wspace=0.15)
 
 
 class NumberLinePairwiseAsynchrony(vutils.BasePlot):
@@ -877,19 +804,8 @@ def generate_phase_correction_plots(
     )
     pg.create_plot()
     # Create regression plots
-    rp1 = RegPlotDuo(df=df, output_dir=figures_output_dir)
-    rp1.create_plot()
-    rp2 = RegPlotDuo(df=df, output_dir=figures_output_dir, yvar='pw_asym', ylabel='Pairwise asynchrony (ms)',
-                     ylim=(20, 180), xlim=(0, 0.8))
-    rp2.create_plot()
-    # rp3 = RegPlotSingle(df=df, output_dir=figures_output_dir, xvar='ioi_std', yvar='rsquared', ylabel='R-Squared (%)',
-    #                     xlabel='Median IOI standard deviation, 8-second window (ms)')
-    # rp3.create_plot()
-    # Create point plot
-    # pp = PointPlotLaggedLatency(df=df, output_dir=figures_output_dir, lag_var_name='correction_partner_lag')
-    # pp.create_plot()
-    # pp = PointPlotLaggedLatency(df=df, output_dir=figures_output_dir, lag_var_name='ioi_std_lag')
-    # pp.create_plot()
+    rp = RegPlot(df=df, output_dir=figures_output_dir)
+    rp.create_plot()
     # TODO: corpus should be saved in the root//references directory!
     nl = NumberLinePairwiseAsynchrony(df=df, output_dir=figures_output_dir, corpus_filepath=f'{output_dir}\\pw_asymmetry_corpus.xlsx')
     nl.create_plot()

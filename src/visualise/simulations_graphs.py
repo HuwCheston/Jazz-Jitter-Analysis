@@ -437,11 +437,17 @@ class RegPlotSimulationComparisons(vutils.BasePlot):
 
 
 def generate_simulations_plots(
-
+    sims: list, output_dir: str,
 ) -> None:
-    pass
+    figures_output_dir = output_dir + '\\figures\\simulations_plots'
+    rp = RegPlotSimulationComparisons(sims, output_dir=figures_output_dir)
+    rp.create_plot()
+    bp = BarPlotSimulationParameters(sims, output_dir=figures_output_dir)
+    bp.create_plot()
 
 
 if __name__ == '__main__':
     raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", "phase_correction_sims.p")
-    pass
+    # Default location to save plots
+    output = r"C:\Python Projects\jazz-jitter-analysis\reports"
+    generate_simulations_plots(raw, output)

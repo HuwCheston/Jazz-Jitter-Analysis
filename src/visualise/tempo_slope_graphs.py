@@ -1,116 +1,209 @@
+import numpy as np
+import pandas as pd
+from datetime import timedelta
 import matplotlib.pyplot as plt
 import seaborn as sns
-from operator import itemgetter
-from itertools import groupby
 
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
 
 
-@vutils.plot_decorator
-def gen_tempo_slope_graph(data, output_dir, block_num: int = None,) -> tuple[plt.Figure, str]:
-    """
-    Creates a graph with subplots showing the average tempo trajectory of every condition in a trial.
-    Repeats of one condition are plotted as different coloured lines on the same subplot.
-    """
-    # Set colormap properties
-    vutils.create_normalised_cmap(
-        slopes=[autils.reg_func(d[5], xcol='elapsed', ycol='bpm_avg').params.iloc[1:].values[0] for d in data]
-    )
-    plt.rcParams.update({'font.size': vutils.FONTSIZE})
-    # Calculate number of discrete trials and conditions within dataset
-    fn = lambda nu: max(data, key=itemgetter(nu))[nu]
-    n_trials = fn(0)
-    n_conditions = fn(2)
-    # Construct figure and axis object
-    fig, ax = plt.subplots(nrows=n_trials, ncols=n_conditions, sharex='all', sharey='all', figsize=(6.2677165*3, 10))
-    # Iterate through data from each trial
-    for k, g in groupby(data, itemgetter(0)):
-        # Sort the data from each trial by block, latency, and jitter and subset for required block number
-        li = sorted(list(g), key=lambda e: (e[0], e[1], e[3], e[4]))
-        if block_num is not None:
-            li = [t for t in li if t[1] == block_num]
-        # Iterate through each condition and plot
-        for num, i in enumerate(li):
-            _format_ax(num_iter=num, con_data=i, ax=ax, n_conditions=n_conditions, )
-    # Format the figure
-    fig = _format_fig(fig=fig,)
-    # Save the result to the output_filepath
-    fname = f'{output_dir}\\tempo_slopes.png'
-    return fig, fname
+class LinePlotTempoSlopes(vutils.BasePlot):
+    def __init__(self, df, **kwargs):
+        super().__init__(**kwargs)
+        self._window_size = kwargs.get('window_size', 8)
+        self._ioi_threshold = kwargs.get('ioi_threshold', 0.2)
+        self.df = self._format_df(df)
+        self.fig, self.ax = plt.subplots(nrows=5, ncols=13, sharex='all', sharey='all', figsize=(18.8, 10))
+
+    def _format_df(
+            self, df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Formats dataframe into correct format for plotting
+        """
+        res = []
+        # Iterate through each condition, both performers
+        for idx, grp in df.groupby(['trial', 'block', 'latency', 'jitter']):
+            idx = tuple(idx)
+            grp = grp.sort_values(by='instrument')
+            # Iterate through each performer individually, create dataframe, concatenate
+            avg = pd.concat(
+                [self._format_performance_df(g['raw_beats'].values[0][0]) for _, g in grp.groupby('instrument')], axis=1
+            )
+            # Get the rolling average BPM according to the window size
+            avg = (60 / avg.mean(axis=1)).rolling(window=timedelta(seconds=self._window_size), min_periods=4).mean()
+            # Append the raw data to our list, alongside index variables
+            res.append({'trial': idx[0], 'block': idx[1], 'latency': idx[2], 'jitter': idx[3], 'tempo_slope': avg})
+        return pd.DataFrame(res)
+
+    def _format_performance_df(
+            self, g
+    ) -> pd.DataFrame:
+        """
+        Coerces an individual performance dataframe into the correct format.
+        """
+        # Create the performance dataframe, sort values by onset, and drop unnecessary columns
+        perf_df = pd.DataFrame(g, columns=['my_onset', 'p', 'v']).sort_values('my_onset').drop(columns=['p', 'v'])
+        # Get IOIs
+        perf_df['my_prev_ioi'] = perf_df['my_onset'].diff().astype(float)
+        # Remove ioi values below threshold
+        temp = perf_df.dropna()
+        temp = temp[temp['my_prev_ioi'] < self._ioi_threshold]
+        perf_df = perf_df[~perf_df.index.isin(temp.index)]
+        # Recalculate IOI column after removing those below threshold
+        perf_df['my_prev_ioi'] = perf_df['my_onset'].diff().astype(float)
+        # Resample the dataframe to get mean IOI every second and return
+        return autils.resample(perf_df)
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class to carry out all plotting functions and save
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\lineplot_tempo_slopes.png'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Creates individual lineplots for each condition
+        """
+        # X counter variable, incremented manually
+        x = 0
+        # Iterate through each individual condition (both blocks)
+        for idx, grp in self.df.groupby(['trial', 'latency', 'jitter']):
+            idx = tuple(idx)
+            # Y counter variable, equivalent to the current duo number subtract 1
+            y = idx[0] - 1
+            # Iterate through each individual repeat of a condition
+            for i, g in grp.groupby('block'):
+                # Plot the individual condition
+                pdf = g['tempo_slope'].values[0]
+                self.ax[y, x].plot(pdf.index.seconds, pdf, color=vutils.LINE_CMAP[i - 1], lw=2, label=f'Repeat {i}')
+            # Set axes titles, labels now as we have access to our index variables already
+            if y == 0:
+                self.ax[y, x].set_title(f'{idx[1]}ms\n{idx[2]}x')
+            if x == 0:
+                self.ax[y, x].set_ylabel(f'Duo {idx[0]}', rotation=90)
+            # Increment or reset our x counter variable
+            x += 1
+            if x > 12:
+                x = 0
+
+    def _format_ax(
+            self
+    ) -> None:
+        """
+        Formats axes-level objects
+        """
+        # Iterate through all axes
+        for ax in self.ax.flatten():
+            # Set x and y ticks, axes limits
+            ax.set(xlim=(0, 101), ylim=(30, 160), xticks=[0, 50], xticklabels=[0, 50], )
+            ax.tick_params(axis='both', which='both', bottom=False, left=False, )
+            plt.setp(ax.spines.values(), linewidth=2)
+            # Add horizontal line at metronome tempo
+            ax.axhline(y=120, color=vutils.BLACK, linestyle='--', alpha=vutils.ALPHA, label='Metronome tempo', lw=2)
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Formats figure-level objects
+        """
+        # Set x and y labels, title
+        self.fig.supxlabel('Performance duration (s)', y=0.06)
+        self.fig.supylabel(f'Average tempo (BPM, {self._window_size}-seconds rolling)', x=0.01)
+        # Add the legend
+        handles, labels = plt.gca().get_legend_handles_labels()
+        self.fig.legend(handles, labels, ncol=3, loc='lower center', bbox_to_anchor=(0.5, 0), frameon=False)
+        # Reduce the space between plots a bit
+        self.fig.subplots_adjust(bottom=0.13, wspace=0.05, hspace=0.05, right=0.98, left=0.08)
 
 
-def _format_ax(num_iter: int, con_data: tuple, ax: plt.Axes, n_conditions: int = 13, ):
+class BarPlotTempoSlope(vutils.BasePlot):
     """
-    Plots the data for one condition on one subplot of the overall figure
+
     """
-    # Generate X and Y coordinates and subset axis object
-    x = con_data[0] - 1
-    y = num_iter if num_iter < n_conditions else num_iter - n_conditions    # Plot data from both blocks on one subplot
-    condition_axis = ax[x, y]
-    con_data[5]['elapsed'] -= 8
-    plt.setp(condition_axis.spines.values(), linewidth=2)
-    # Plot the data on required subplot
-    condition_axis.plot(con_data[5]['elapsed'], con_data[5]['bpm_rolling'],
-                        label=f'Repeated Measure {con_data[1]}', color=vutils.LINE_CMAP[con_data[1] - 1],
-                        linewidth=2)
-    condition_axis.tick_params(axis='both', which='both', bottom=False, left=False,)
-    # If this condition is either in the first row or column, add the required label
-    if x == 0:
-        condition_axis.set_title(f'{con_data[3]}ms\n{con_data[4]}x')
-    if num_iter == 0:
-        condition_axis.set_ylabel(f'Duo {con_data[0]}', rotation=90)
-    # Add the reference column as a horizontal line
-    if con_data[1] == 2:
-        condition_axis.axhline(y=120, color=vutils.BLACK, linestyle='--', alpha=vutils.ALPHA, label='Metronome Tempo',
-                               linewidth=2)
+    def __init__(self, df, **kwargs):
+        super().__init__(**kwargs)
+        self.df = df[df['instrument'] == 'Keys']
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharey=True, sharex=False, figsize=(18.8, 5))
+
+    @vutils.plot_decorator
+    def create_plot(self):
+        """
+
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\barplot_tempo_slope.png'
+        return self.fig, fname
+
+    def _create_plot(self):
+        """
+
+        """
+        for num, var in enumerate(['latency', 'jitter']):
+            _ = sns.stripplot(
+                data=self.df, x=var, y='tempo_slope', hue='trial', dodge=True, color=vutils.BLACK, s=6, marker='.',
+                jitter=1, ax=self.ax[num],
+            )
+            _ = sns.barplot(
+                data=self.df, x=var, y='tempo_slope', hue='trial', ax=self.ax[num], ci=15, palette=vutils.DUO_CMAP,
+                errcolor='#3953a3', errwidth=5, estimator=np.mean, edgecolor=vutils.BLACK, lw=2
+            )
+
+    def _format_ax(self):
+        """
+
+        """
+        # Set ax formatting
+        for num, (ax, var) in enumerate(zip(self.ax.flatten(), ['Latency (ms)', 'Jitter'])):
+            ax.tick_params(width=3, )
+            ax.set(ylabel='Tempo slope (BPM/s)' if num == 0 else '', xlabel=var, ylim=(-0.6, 0.6))
+            plt.setp(ax.spines.values(), linewidth=2)
+            # Plot a horizontal line at x=0
+            ax.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK, linewidth=2)
+
+    def _format_fig(self):
+        """
+
+        """
+        handles, labels = None, None
+        for ax in self.ax.flatten():
+            handles, labels = ax.get_legend_handles_labels()
+            ax.get_legend().remove()
+        plt.legend(handles[5:], labels[5:], ncol=1, title='Duo', frameon=False, bbox_to_anchor=(1, 0.8))
+        self.fig.subplots_adjust(bottom=0.15, top=0.9, left=0.07, right=0.93, wspace=0.05)
 
 
-def _format_fig(fig: plt.Figure, ) -> plt.Figure:
-    """
-    Formats the overall figure, setting axis limits, adding labels/titles, configuring legend
-    """
-    # Set x and y axis limit for figure according to max/min values of data
-    plt.xlim(0, 93)
-    plt.ylim(30, 160)
-    # Set x and y labels, title
-    fig.supxlabel('Performance duration (s)', y=0.06)
-    fig.supylabel('Average tempo (BPM, 8-seconds rolling)', x=0.01)
-    # Call tight_layout only once we've finished formatting but before we, add the legend
-    plt.tight_layout()
-    # Add the legend
-    handles, labels = plt.gca().get_legend_handles_labels()
-    fig.legend(handles, labels, ncol=3, loc='lower center', bbox_to_anchor=(0.5, 0), frameon=False)
-    # Reduce the space between plots a bit
-    plt.subplots_adjust(bottom=0.13, wspace=0.05, hspace=0.05, right=0.98, left=0.08)
-    return fig
+def generate_tempo_slope_plots(
+        mds: list, output_dir: str
+):
+    df = []
+    for pcm in mds:
+        df.append(pcm.keys_dic)
+        df.append(pcm.drms_dic)
+    df = pd.DataFrame(df)
+    figures_output_dir = output_dir + '\\figures\\tempo_slopes_plots'
+    bp = BarPlotTempoSlope(df=df, output_dir=figures_output_dir)
+    bp.create_plot()
+    lp = LinePlotTempoSlopes(df=df, output_dir=figures_output_dir)
+    lp.create_plot()
 
 
-@vutils.plot_decorator
-def gen_tempo_slope_heatmap(df, output_dir,):
-    # Set colormap properties
-    df['abbrev'] = df['latency'].astype('str') + 'ms/' + round(df['jitter'], 1).astype('str') + 'x'
-    n_trials = max(df['trial'])
-    fig, ax = plt.subplots(nrows=n_trials, ncols=1, sharex='all', sharey='all', figsize=(15, 8))
-    norm = vutils.create_normalised_cmap(slopes=df['tempo_slope'])
-    for idx, grp in df.groupby(by=['trial']):
-        piv = grp.pivot_table(index=['latency', 'jitter', 'abbrev'], columns='block', values='tempo_slope').reset_index(
-            drop=False).set_index('abbrev').drop(columns=['latency', 'jitter']).transpose()
-        sns.heatmap(piv, ax=ax[idx - 1], cmap=vutils.SLOPES_CMAP, cbar=False, norm=norm, linewidth=1, linecolor='w')
-        ax[idx - 1].xaxis.set_ticks_position('top')
-        ax[idx - 1].yaxis.set_ticks_position('right')
-        ax[idx - 1].tick_params(axis='y', labelrotation=0)
-        ax[idx - 1].tick_params(axis='x', which='both', bottom=False, top=False, labelsize=12)
-        ax[idx - 1].set(xlabel='', ylabel=f'Duo {idx}')
-        if idx != 1:
-            ax[idx - 1].tick_params(axis='x', labeltop=False)
-    fig.suptitle('Performance Tempo Slopes')
-    fig.supylabel('Duo Number', x=0.01)
-    fig.supxlabel('Condition')
-    position = fig.add_axes([0.95, 0.2, 0.01, 0.6])
-    fig.colorbar(vutils.create_scalar_cbar(norm=norm), cax=position)
-    position.text(0, 0.3, 'Slope\n(BPM/s)\n', fontsize=12)  # Super hacky way to add a title...
-    plt.subplots_adjust(bottom=0.05, wspace=0.05, hspace=0.15, right=0.90, left=0.05, top=0.91)
-    plt.text(-3, -0.18, 'Measure Number', rotation=-90, fontsize=12)
-    fname = f'{output_dir}\\tempo_slopes_heatmap.png'
-    return fig, fname
+if __name__ == '__main__':
+    # Default location for phase correction models
+    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p')
+    # Default location to save plots
+    output = r"C:\Python Projects\jazz-jitter-analysis\reports"
+    generate_tempo_slope_plots(raw, output)

@@ -4,6 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 import src.visualise.visualise_utils as vutils
+import src.analyse.analysis_utils as autils
 
 
 @vutils.plot_decorator
@@ -214,3 +215,10 @@ class PointPlotLaggedLatency(vutils.BasePlot):
         # Set figure properties
         self.g.figure.subplots_adjust(bottom=0.1, top=0.95, left=0.07, right=0.97)
         sns.move_legend(self.g, 'lower center', ncol=2, title=None, frameon=False, bbox_to_anchor=(0.5, -0.01))
+
+
+if __name__ == '__main__':
+    # Default location for phase correction models
+    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p')
+    # Default location to save plots
+    output = r"C:\Python Projects\jazz-jitter-analysis\reports"
