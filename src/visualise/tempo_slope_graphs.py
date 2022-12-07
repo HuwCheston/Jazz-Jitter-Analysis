@@ -9,6 +9,9 @@ import src.visualise.visualise_utils as vutils
 
 
 class LinePlotTempoSlopes(vutils.BasePlot):
+    """
+    Creates a lineplot for each individual performance showing average tempo progression over the condition
+    """
     def __init__(self, df, **kwargs):
         super().__init__(**kwargs)
         self._window_size = kwargs.get('window_size', 8)
@@ -66,7 +69,7 @@ class LinePlotTempoSlopes(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\lineplot_tempo_slopes.png'
+        fname = f'{self.output_dir}\\lineplot_tempo_slopes'
         return self.fig, fname
 
     def _create_plot(
@@ -89,7 +92,10 @@ class LinePlotTempoSlopes(vutils.BasePlot):
                 self.ax[y, x].plot(pdf.index.seconds, pdf, color=vutils.LINE_CMAP[i - 1], lw=2, label=f'Repeat {i}')
             # Set axes titles, labels now as we have access to our index variables already
             if y == 0:
-                self.ax[y, x].set_title(f'{idx[1]}ms\n{idx[2]}x')
+                if x == 0:
+                    self.ax[y, x].set_title(f'Latency:   {idx[1]}ms\n   Jitter:     {idx[2]}x', x=-0.05)
+                else:
+                    self.ax[y, x].set_title(f'{idx[1]}ms\n{idx[2]}x')
             if x == 0:
                 self.ax[y, x].set_ylabel(f'Duo {idx[0]}', rotation=90)
             # Increment or reset our x counter variable
@@ -125,12 +131,12 @@ class LinePlotTempoSlopes(vutils.BasePlot):
         handles, labels = plt.gca().get_legend_handles_labels()
         self.fig.legend(handles, labels, ncol=3, loc='lower center', bbox_to_anchor=(0.5, 0), frameon=False)
         # Reduce the space between plots a bit
-        self.fig.subplots_adjust(bottom=0.13, wspace=0.05, hspace=0.05, right=0.98, left=0.08)
+        self.fig.subplots_adjust(bottom=0.13, top=0.9, wspace=0.05, hspace=0.05, right=0.98, left=0.08)
 
 
 class BarPlotTempoSlope(vutils.BasePlot):
     """
-
+    Creates two bar plots showing tempo slope against latency and jitter, stratified by duo number
     """
     def __init__(self, df, **kwargs):
         super().__init__(**kwargs)
@@ -140,31 +146,31 @@ class BarPlotTempoSlope(vutils.BasePlot):
     @vutils.plot_decorator
     def create_plot(self):
         """
-
+        Called from outside the class to carry out all plotting functions and save the figure
         """
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_tempo_slope.png'
+        fname = f'{self.output_dir}\\barplot_tempo_slope'
         return self.fig, fname
 
     def _create_plot(self):
         """
-
+        Creates the strip and bar plot for each variable
         """
         for num, var in enumerate(['latency', 'jitter']):
             _ = sns.stripplot(
-                data=self.df, x=var, y='tempo_slope', hue='trial', dodge=True, color=vutils.BLACK, s=6, marker='.',
-                jitter=1, ax=self.ax[num],
+                data=self.df, x=var, y='tempo_slope', hue='trial', dodge=True, palette='dark:' + vutils.BLACK,
+                s=6, marker='.', jitter=0.1, ax=self.ax[num],
             )
             _ = sns.barplot(
-                data=self.df, x=var, y='tempo_slope', hue='trial', ax=self.ax[num], ci=15, palette=vutils.DUO_CMAP,
-                errcolor='#3953a3', errwidth=5, estimator=np.mean, edgecolor=vutils.BLACK, lw=2
+                data=self.df, x=var, y='tempo_slope', hue='trial', ax=self.ax[num], errorbar='se', errcolor='#3953a3',
+                palette=vutils.DUO_CMAP, errwidth=5, estimator=np.mean, edgecolor=vutils.BLACK, lw=2
             )
 
     def _format_ax(self):
         """
-
+        Formats axes objects
         """
         # Set ax formatting
         for num, (ax, var) in enumerate(zip(self.ax.flatten(), ['Latency (ms)', 'Jitter'])):
@@ -176,12 +182,14 @@ class BarPlotTempoSlope(vutils.BasePlot):
 
     def _format_fig(self):
         """
-
+        Formats figure objects
         """
         handles, labels = None, None
+        # Remove legend from all plots but keep handles and labels
         for ax in self.ax.flatten():
             handles, labels = ax.get_legend_handles_labels()
             ax.get_legend().remove()
+        # Readd the legend, keeping only the handles and labels that we want
         plt.legend(handles[5:], labels[5:], ncol=1, title='Duo', frameon=False, bbox_to_anchor=(1, 0.8))
         self.fig.subplots_adjust(bottom=0.15, top=0.9, left=0.07, right=0.93, wspace=0.05)
 

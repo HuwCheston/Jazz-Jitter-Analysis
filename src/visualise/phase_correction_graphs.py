@@ -19,8 +19,7 @@ class PairGrid(vutils.BasePlot):
         self.xlim: tuple = kwargs.get('xlim', (-1.5, 1.5))
         self.xlabel: str = kwargs.get('xlabel', None)
         self.cvar: str = kwargs.get('cvar', 'tempo_slope')
-        self.clabel: str = kwargs.get('clabel', 'Tempo\nSlope\n(BPM/s)\n\n')
-
+        self.clabel: str = kwargs.get('clabel', 'Tempo\nslope\n(BPM/s)\n\n')
         # If we've passed our dataframe
         if self.df is not None:
             self.df = self._format_df()
@@ -34,7 +33,7 @@ class PairGrid(vutils.BasePlot):
         self.g = self._create_facetgrid()
         self._format_pairgrid_ax()
         self._format_pairgrid_fig()
-        fname = f'{self.output_dir}\\pairgrid_condition_vs_{self.xvar}_vs_{self.cvar}.png'
+        fname = f'{self.output_dir}\\pairgrid_condition_vs_{self.xvar}_vs_{self.cvar}'
         return self.g.fig, fname
 
     def _format_df(self) -> pd.DataFrame:
@@ -51,7 +50,7 @@ class PairGrid(vutils.BasePlot):
         return sns.catplot(
             data=self.df, x=self.xvar, y='abbrev', row='block', col='trial', hue='instrument', sharex=True, sharey=True,
             hue_order=['Keys', 'Drums'], palette=vutils.INSTR_CMAP, kind='strip', height=5.5, marker='o', aspect=0.62,
-            s=10, jitter=False, dodge=False
+            s=100, jitter=False, dodge=False
         )
 
     def _format_pairgrid_ax(self):
@@ -64,10 +63,10 @@ class PairGrid(vutils.BasePlot):
             ax1 = self.g.axes[0, num]
             ax2 = self.g.axes[1, num]
             # When we want different formatting for each row
-            ax1.set_title(f'Measure 1\nDuo {num + 1}' if num == 2 else f'\nDuo {num + 1}', fontsize=vutils.FONTSIZE)
+            ax1.set_title(f'Repeat 1\nDuo {num + 1}' if num == 2 else f'\nDuo {num + 1}', fontsize=vutils.FONTSIZE + 3)
             ax1.set(ylabel='', xlim=self.xlim, )
             ax1.tick_params(bottom=False)
-            ax2.set_title(f'Measure 2' if num == 2 else '', fontsize=vutils.FONTSIZE)
+            ax2.set_title(f'Repeat 2' if num == 2 else '', fontsize=vutils.FONTSIZE + 3)
             ax2.set(ylabel='', xlabel='', xlim=self.xlim)
             # When we want the same formatting for both rows
             for x, ax in enumerate([ax1, ax2]):
@@ -88,18 +87,16 @@ class PairGrid(vutils.BasePlot):
         """
         # Format the figure
         self.g.despine(left=True, bottom=True)
-        self.g.fig.supxlabel(self.xlabel, x=0.53, y=0.05)
+        self.g.fig.supxlabel(self.xlabel, x=0.505, y=0.05)
         self.g.fig.supylabel('Condition', x=0.01)
         # Add the color bar
         position = self.g.fig.add_axes([0.94, 0.2, 0.01, 0.6])
         self.g.fig.colorbar(vutils.create_scalar_cbar(norm=self.norm), cax=position, ticks=vutils.CBAR_BINS)
-        position.text(0., 0.3, self.clabel, fontsize=vutils.FONTSIZE)  # Super hacky way to add a title...
+        position.text(0.0, 0.3, self.clabel, fontsize=vutils.FONTSIZE + 3)  # Super hacky way to add a title...
         # Add the legend
-        self.g.legend.remove()
-        i = self.g.fig.get_axes()[0].legend(loc='lower center', ncol=2, bbox_to_anchor=(2.85, -1.45), title=None,
-                                            frameon=False)
-        for handle in i.legendHandles:
-            handle.set_sizes([100.0])
+        sns.move_legend(
+            self.g, loc='lower center', ncol=2, title=None, frameon=False, markerscale=1.5, fontsize=vutils.FONTSIZE + 3
+        )
         # Adjust the plot spacing
         self.g.fig.subplots_adjust(bottom=0.12, top=0.93, wspace=0.15, left=0.11, right=0.93)
 
@@ -118,7 +115,7 @@ class BoxPlot(vutils.BasePlot):
         self.xvar: str = kwargs.get('xvar', 'jitter')
         self.yvar: str = kwargs.get('yvar', 'correction_partner_onset')
         self.ylim: tuple = kwargs.get('ylim', (-1, 1))
-        self.ylabel: str = kwargs.get('ylabel', None)
+        self.ylabel: str = kwargs.get('ylabel', 'Coupling constant')
         # If we're removing 0 latency conditions
         if self.subset:
             self.df = self._format_df()
@@ -134,7 +131,7 @@ class BoxPlot(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\boxplot_{self.yvar}_vs_{self.xvar}.png'
+        fname = f'{self.output_dir}\\boxplot_{self.yvar}_vs_{self.xvar}'
         return self.g.figure, fname
 
     def _format_df(self):
@@ -216,10 +213,10 @@ class SingleConditionPlot:
         self._plot_polar()
         self._plot_slopes()
         # Format the figure and save
-        self.fig.suptitle(f'Duo {self.metadata[0]} (measure {self.metadata[1]}): '
+        self.fig.suptitle(f'Duo {self.metadata[0]} (repeat {self.metadata[1]}): '
                           f'latency {self.metadata[2]}ms, jitter {self.metadata[3]}x')
-        fname = f'{self.output_dir}\\duo{self.metadata[0]}_measure{self.metadata[1]}' \
-                f'_latency{self.metadata[2]}_jitter{self.metadata[3]}.png'
+        fname = f'{self.output_dir}\\duo{self.metadata[0]}_repeat{self.metadata[1]}' \
+                f'_latency{self.metadata[2]}_jitter{self.metadata[3]}'
         return self.fig, fname
 
     def _plot_coefficients(self):
@@ -434,18 +431,18 @@ class RegPlot(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\regplot_coupling_balance.png'
+        fname = f'{self.output_dir}\\regplot_coupling_balance'
         return self.fig, fname
 
     def _create_plot(self):
         for num, var in enumerate(self.xvars):
-            g = sns.scatterplot(
+            _ = sns.scatterplot(
                 data=self.df, x='coupling_balance', y=var, hue='trial', s=100, style='trial',
                 palette=vutils.DUO_CMAP, ax=self.ax[num], legend=None if num == 1 else True
             )
-            g = sns.regplot(
-                data=self.df, x='coupling_balance', y=var, x_ci=95, n_boot=10000, scatter=None,
-                truncate=True, color=vutils.BLACK, ax=self.ax[num], line_kws={'linewidth': 3}
+            _ = sns.regplot(
+                data=self.df, x='coupling_balance', y=var, x_ci=95, n_boot=100, scatter=None, lowess=True,
+                truncate=True, color=vutils.BLACK, ax=self.ax[num], line_kws={'linewidth': 3},
             )
 
     def _format_ax(self):
@@ -481,7 +478,7 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
         self.g = self._create_plot()
         self._add_annotations()
         self._format_plot()
-        fname = f'{self.output_dir}\\numberline_pairwise_asynchrony.png'
+        fname = f'{self.output_dir}\\numberline_pairwise_asynchrony'
         return self.g.figure, fname
 
     def _format_df(self, corpus_filepath) -> pd.DataFrame:
@@ -553,7 +550,7 @@ class BarPlot(vutils.BasePlot):
         super().__init__(**kwargs)
         self.estimator: callable = kwargs.get('estimator', np.median)
         self.yvar: str = kwargs.get('yvar', 'correction_partner')
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 9.4))
 
     @vutils.plot_decorator
     def create_plot(self):
@@ -563,7 +560,7 @@ class BarPlot(vutils.BasePlot):
         self.g = self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_correction_vs_instrument.png'
+        fname = f'{self.output_dir}\\barplot_correction_vs_instrument'
         return self.fig, fname
 
     def _create_plot(self):
@@ -572,12 +569,12 @@ class BarPlot(vutils.BasePlot):
         """
         ax = sns.stripplot(
             data=self.df, x='trial', y=self.yvar, hue='instrument', dodge=True,
-            color=vutils.BLACK, s=4, marker='.', jitter=1, ax=self.ax
+            palette='dark:' + vutils.BLACK, s=4, marker='.', jitter=0.1, ax=self.ax
         )
         ax = sns.barplot(
-            data=self.df, x='trial', y=self.yvar, hue='instrument', ax=ax, ci=25, palette=vutils.INSTR_CMAP,
-            hue_order=['Keys', 'Drums'], errcolor='#3953a3', errwidth=10, estimator=self.estimator,
-            edgecolor=vutils.BLACK, lw=2
+            data=self.df, x='trial', y=self.yvar, hue='instrument', ax=ax, errorbar=('ci', 25),
+            palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'], errcolor='#3953a3', errwidth=10,
+            estimator=self.estimator, edgecolor=vutils.BLACK, lw=2
         )
         return ax
 
@@ -598,14 +595,14 @@ class BarPlot(vutils.BasePlot):
         """
         # Set figure labels
         self.fig.supylabel('Coupling constant', x=0.02, y=0.55)
-        self.fig.supxlabel('Duo', y=0.09)
+        self.fig.supxlabel('Duo', y=0.04)
         # Format the legend to remove the handles/labels added automatically by the strip plot
         handles, labels = self.g.get_legend_handles_labels()
         self.g.get_legend().remove()
-        plt.legend(handles[2:], labels[2:], ncol=6, title=None, frameon=False, bbox_to_anchor=(0.7, -0.15),
+        plt.legend(handles[2:], labels[2:], ncol=6, title=None, frameon=False, bbox_to_anchor=(0.7, -0.07),
                    markerscale=1.6)
         # Adjust the figure a bit and return for saving in decorator
-        self.g.figure.subplots_adjust(bottom=0.22, top=0.95, left=0.14, right=0.95)
+        self.g.figure.subplots_adjust(bottom=0.12, top=0.95, left=0.14, right=0.95)
 
 
 class HistPlotR2(vutils.BasePlot):
@@ -624,7 +621,7 @@ class HistPlotR2(vutils.BasePlot):
         """
         self.g = self._create_plot()
         self._format_plot()
-        fname = f'{self.output_dir}\\histplot_{self.xvar}.png'
+        fname = f'{self.output_dir}\\histplot_{self.xvar}'
         return self.g.figure, fname
 
     def _create_plot(self):
@@ -666,7 +663,7 @@ class BoxPlotR2WindowSize(vutils.BasePlot):
         """
         self.g = self._create_plot()
         self._format_plot()
-        fname = f'{self.output_dir}\\boxplot_r2_vs_windowsize.png'
+        fname = f'{self.output_dir}\\boxplot_r2_vs_windowsize'
         return self.g.figure, fname
 
     def _format_df(self):
@@ -720,7 +717,7 @@ class BarPlotInterpolatedIOIs(vutils.BasePlot):
         self._add_total_beats_to_plot()
         self._format_ax()
         self._format_plot()
-        fname = f'{self.output_dir}\\barplot_total_vs_interpolated_beats.png'
+        fname = f'{self.output_dir}\\barplot_total_vs_interpolated_beats'
         return self.fig, fname
 
     def _format_plot(self):

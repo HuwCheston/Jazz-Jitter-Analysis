@@ -42,6 +42,8 @@ def plot_decorator(plotter: callable):
     """
     @functools.wraps(plotter)
     def wrapper(*args, **kwargs):
+        # Define the filetypes we want to save the plot as
+        filetypes = ['png', 'svg']
         # Create the output directory to store the plot
         output = kwargs.get('output_dir', None)
         # If we're accessing this decorator from a class, need to get the output by accessing the class attributes
@@ -52,7 +54,9 @@ def plot_decorator(plotter: callable):
         # If we've provided an output directory, create a folder and save the plot within it
         if output is not None:
             create_output_folder(output)
-            fig.savefig(fname, facecolor=WHITE)
+            # Iterate through all filetypes and save the plot as each type
+            for filetype in filetypes:
+                fig.savefig(f'{fname}.{filetype}', format=filetype, facecolor=WHITE)
         # Close the plot to prevent it from remaining in memory
         plt.close(fig)
     return wrapper

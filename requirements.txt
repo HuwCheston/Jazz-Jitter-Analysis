@@ -14,15 +14,14 @@ numpy==1.22.3
 numba
 matplotlib~=3.5.2
 pretty_midi
+pingouin
 librosa
 scipy~=1.9.0
-seaborn==0.11.2
+seaborn>=0.12
 statsmodels~=0.13.2
 openpyxl
 lxml
-bioinfokit~=2.0.8
 patsy
-pymer4
 stargazer~=0.0.5
 
 scikit-learn~=1.1.2

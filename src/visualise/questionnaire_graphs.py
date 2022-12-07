@@ -36,7 +36,7 @@ class ScatterPlotQuestionnaire(vutils.BasePlot):
         self._map_facetgrid_plots()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\scatterplot_{self.ax_var}_{self.marker_var}.png'
+        fname = f'{self.output_dir}\\scatterplot_{self.ax_var}_{self.marker_var}'
         return self.g.figure, fname
 
     def _format_df(self) -> pd.DataFrame:
@@ -136,7 +136,7 @@ class HeatmapQuestionnaire(vutils.BasePlot):
     def create_plot(self):
         self._create_plot()
         self._format_fig()
-        fname = f'{self.output_dir}\\heatmap_duo_correlations.png'
+        fname = f'{self.output_dir}\\heatmap_duo_correlations'
         return self.fig, fname
 
     def _format_ax(self, g, i):
@@ -214,7 +214,7 @@ class BarPlotTestRetestReliability(vutils.BasePlot):
         self.g = self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_test_retest_reliability.png'
+        fname = f'{self.output_dir}\\barplot_test_retest_reliability'
         return self.g.figure, fname
 
     def _create_plot(self):
@@ -280,7 +280,7 @@ class BarPlotQuestionnaireCorrelation(vutils.BasePlot):
         self.g = self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_questionnaire_correlation.png'
+        fname = f'{self.output_dir}\\barplot_questionnaire_correlation'
         return self.fig, fname
 
     def _create_plot(self):
@@ -314,11 +314,16 @@ class BarPlotQuestionnaireCorrelation(vutils.BasePlot):
 
 
 def generate_questionnaire_plots(
-        df: pd.DataFrame, output_dir: str
+        mds: list, output_dir: str
 ) -> None:
     """
 
     """
+    df = []
+    for pcm in mds:
+        df.append(pcm.keys_dic)
+        df.append(pcm.drms_dic)
+    df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\questionnaire_plots'
     hm = HeatmapQuestionnaire(df=df, output_dir=figures_output_dir)
     hm.create_plot()
@@ -330,9 +335,8 @@ def generate_questionnaire_plots(
 
 if __name__ == '__main__':
     # Default location for processed raw data
-    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models",
-                                filename='phase_correction_df.p')
+    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p')
     # Default location to save output models
     output = r"C:\Python Projects\jazz-jitter-analysis\reports"
     # Generate models and pickle
-    generate_questionnaire_plots(df=raw, output_dir=output)
+    generate_questionnaire_plots(mds=raw, output_dir=output)

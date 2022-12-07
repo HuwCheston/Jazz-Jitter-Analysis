@@ -94,7 +94,7 @@ class LinePlotAllParameters(vutils.BasePlot):
         self.fig.suptitle(f"Duo {self.params['trial']}, block {self.params['block']}, "
                           f"latency {self.params['latency']}, jitter {self.params['jitter']}")
         fname = f"{self.output_dir}\\lineplot_all_parameters_{self.params['trial']}_" \
-                f"{self.params['block']}_{self.params['latency']}_{self.params['jitter']}.png"
+                f"{self.params['block']}_{self.params['latency']}_{self.params['jitter']}"
         return self.fig, fname
 
     def _get_min_max_x_val(
@@ -193,7 +193,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         self._add_parameter_graphics()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_simulation_by_parameter.png'
+        fname = f'{self.output_dir}\\barplot_simulation_by_parameter'
         return self.fig, fname
 
     def _ttest_group_against_original(
@@ -233,12 +233,12 @@ class BarPlotSimulationParameters(vutils.BasePlot):
             # Add the scatter plot, showing each individual performance
             sns.stripplot(
                 data=self.df, ax=self.ax[num], x='parameter', y=var, hue='trial', dodge=True, s=4, marker='.',
-                jitter=1, color=vutils.BLACK,
+                jitter=0.1, palette='dark:' + vutils.BLACK,
             )
             # Add the bar plot, showing the median values
             sns.barplot(
-                data=self.df, x='parameter', y=var, hue='trial', ax=self.ax[num], ci=25, errcolor=vutils.BLACK,
-                errwidth=2, estimator=np.median, edgecolor=vutils.BLACK, capsize=0.03,
+                data=self.df, x='parameter', y=var, hue='trial', ax=self.ax[num], errorbar=('ci', 25),
+                errcolor=vutils.BLACK, errwidth=2, estimator=np.median, edgecolor=vutils.BLACK, capsize=0.03,
             )
             # Get the t test results, comparing all parameters across all trials for this variable
             ttest = self._ttest_group_against_original(var)
@@ -360,7 +360,7 @@ class RegPlotSimulationComparisons(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\regplot_simulations_comparison.png'
+        fname = f'{self.output_dir}\\regplot_simulations_comparison'
         return self.fig, fname
 
     def _get_ax_lim(
