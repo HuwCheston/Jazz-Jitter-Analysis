@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
+import scipy.stats as stats
 from statistics import mean
 from matplotlib import animation, pyplot as plt
 import seaborn as sns
@@ -339,7 +340,7 @@ class SingleConditionPlot:
 class SingleConditionAnimation:
     """
     Creates an animation of actual and predicted tempo slope that should(!) be synchronised to the AV_Manip videos.
-    Default FPS is 30 seconds, with data interpolated so plotting look nice and smooth. This can be changed in vutils.
+    Default FPS is 30 seconds, with data interpolated so plotting look nices and smooth. This can be changed in vutils.
     WARNING: this will take a really long time to complete!!!
     """
     def __init__(self, **kwargs):
@@ -771,6 +772,65 @@ class BarPlotInterpolatedIOIs(vutils.BasePlot):
             df.plot(kind="bar", stacked=True, ax=self.ax, legend=False,
                     grid=False, color=cmap, edgecolor=vutils.BLACK, lw=2)
         self._format_rect(dfall)
+
+
+class PairPlotAllVariables(vutils.BasePlot):
+    """
+
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.vars = ['Tempo slope (BPM/s)', 'IOI variability (ms)', 'RMS of asynchrony (ms)', 'Performance success']
+        self.df = self._format_df()
+
+    def _format_df(self):
+        unf = ['tempo_slope', 'ioi_std', 'pw_asym', 'success']
+        df = self.df[['trial', 'block', 'latency', 'jitter', 'instrument', *unf]]
+        df['success'] = [val + np.random.normal(0, 0.01) for val in df['success'].to_list()]
+        return (
+            df.groupby(['trial', 'latency', 'jitter'])
+                .mean()
+                .reset_index()
+                .rename(columns={k: v for k, v in zip(unf, self.vars)})
+        )
+
+    def create_plot(self):
+        self.g = self._create_plot()
+        self._format_ax()
+        plt.tight_layout()
+        plt.show()
+
+    def _create_plot(self):
+        def reg_coef(x, y, label=None, color=None, **kwargs):
+            ax = plt.gca()
+            r, p = stats.pearsonr(x, y)
+            ax.annotate(round(r, 2), xy=(0.5, 0.45), xycoords='axes fraction', ha='center', fontsize=69)
+            ax.tick_params(which='both', axis='both', bottom=False, top=False, left=False, right=False)
+
+        g = sns.PairGrid(data=self.df, vars=self.vars, height=4.7, aspect=1)
+        g.map_diag(sns.histplot, color=vutils.BLACK, alpha=vutils.ALPHA, stat='count', bins=10, kde=True,
+                   line_kws={'lw': 5, })
+        g.map_lower(sns.scatterplot, s=100, color=vutils.BLACK)
+        g.map_lower(sns.regplot, scatter=False, color='#FF0000', ci=None, line_kws={'linewidth': 5})
+        g.map_upper(reg_coef)
+        return g
+
+    def _format_ax(self):
+        for ax in self.g.axes.flatten():
+            ax.tick_params(width=3, )
+            plt.setp(ax.spines.values(), linewidth=2)
+            ax.spines['top'].set_visible(True)
+            ax.spines['right'].set_visible(True)
+        for i, lim, step in zip(range(0, 4), [(-0.5, 0.5), (0, 100), (0, 150), (0, 10)], [3, 5, 4, 6]):
+            ticks = np.linspace(lim[0], lim[1], step)
+            self.g.axes[i, i].set(ylim=lim, xlim=lim, yticks=ticks, xticks=ticks)
+        for i in range(0, 3):
+            self.g.axes[i, 0].tick_params(width=0, axis='x')
+            self.g.axes[3, i + 1].tick_params(width=0, axis='y')
+        self.g.axes[1, 1].tick_params(width=0)
+        self.g.axes[2, 1].tick_params(width=0)
+        self.g.axes[2, 2].tick_params(width=0)
 
 
 def generate_phase_correction_plots(
