@@ -7,7 +7,7 @@ import pickle
 import warnings
 import statsmodels.formula.api as smf
 from sklearn.covariance import EllipticEnvelope
-from pingouin import partial_corr, corr
+from pingouin import partial_corr
 from datetime import timedelta
 
 import src.analyse.analysis_utils as autils
@@ -26,10 +26,11 @@ class PhaseCorrectionModel:
             self, c1_keys: list, c2_drms: list, **kwargs
     ):
         # Parameters
-        self._iqr_filter_range: tuple[float] = kwargs.get('iqr_filter', (0.1, 0.9))  # Filter IOIs above and below
+        self._iqr_filter_range: tuple[float] = kwargs.get('iqr_filter', (0.05, 0.95))  # Filter IOIs above and below
         self._model: str = kwargs.get('model', 'my_next_ioi_diff~my_prev_ioi_diff+asynchrony')  # regression model
-        self._rolling_window_size: int = kwargs.get('rolling_window_size', 4)   # 4 seconds = 1 bar at 120BPM
-        self._maximum_lag: int = kwargs.get('maximum_lag', 8)   # 4 seconds = 1 bar at 120BPM
+        self._rolling_window_size: str = kwargs.get('rolling_window_size', '2s')   # 2 seconds = 2 beats at 120BPM
+        self._rolling_min_periods: int = kwargs.get('rolling_min_periods', 2)
+        self._maximum_lag: int = kwargs.get('maximum_lag', 8)   # 8 seconds = 2 bars at 120BPM
         # The cleaned data, before dataframe conversion
         self.keys_raw: dict = c1_keys
         self.drms_raw: dict = c2_drms
@@ -377,6 +378,7 @@ class PhaseCorrectionModel:
         """
         # Extract inter-onset intervals
         df['my_prev_ioi'] = df['my_onset'].diff()
+        df['their_prev_ioi'] = df['their_onset'].diff()
         df = self._iqr_filter(df, 'my_prev_ioi',)
         # Shift to get next IOI
         df['my_next_ioi'] = df['my_prev_ioi'].shift(-1)
@@ -386,80 +388,86 @@ class PhaseCorrectionModel:
         return df
 
     def _get_rolling_coefficients(
-            self, nn_df: pd.DataFrame, func=None, ind_var: str = 'latency', dep_var: str = 'my_prev_ioi'
-    ) -> list[float]:
+            self, nn_df: pd.DataFrame, func=None, ind_var: str = 'latency',
+            dep_var: str = 'my_prev_ioi', cov: str = 'their_prev_ioi'
+    ) -> list[float | int]:
         """
 
         """
         if func is None:
             func = self._regress_shifted_rolling_variables
-        roll = self._get_rolling_standard_deviation_values(nn_df, cols=(dep_var, ind_var))
-        train = self._lag_rolling_values(roll, cols=(dep_var + '_std', ind_var + '_std'))
-        return func(train, dep_var=dep_var + '_std', ind_var=ind_var + '_std')
+        roll = self._get_rolling_standard_deviation_values(nn_df, cols=(dep_var, ind_var, cov))
+        train = self._lag_rolling_values(roll, cols=(dep_var + '_std', ind_var + '_std', cov + '_std'))
+        return func(train, dep_var=dep_var + '_std', ind_var=ind_var + '_std', cov_var=cov + '_std')
 
     def _get_rolling_standard_deviation_values(
-            self, nn_df: pd.DataFrame, cols: tuple[str] = ('my_prev_ioi', 'latency')
+            self, nn_df: pd.DataFrame, cols: tuple[str] = ('my_prev_ioi', 'their_prev_ioi', 'latency')
     ) -> pd.DataFrame:
         """
-        Resamples dataframe to every second, rolls by given window size, and gets standard deviation of given columns
+        Extracts the rolling standard deviation of values within a given window size, then resample to get mean value
+        for every second
         """
         # Create the temporary dataframe
         temp = nn_df.copy(deep=True)
-        # Resample the temporary dataframe
-        temp = autils.resample(temp, func=np.nanmean, col='my_onset')
-        # Format the resampled dataframe
-        temp = temp.reset_index(drop=False).drop(columns=['my_onset']).rename(columns={'index': 'my_onset'})
-        # Filter out warnings, as df.rolling keeps throwing FutureWarnings
+        # Create the timedelta index
+        idx = pd.to_timedelta([timedelta(seconds=val) for val in temp['my_onset']])
+        # Create the offset -- we'll use this later
+        offset = timedelta(seconds=8 - temp.iloc[0]['my_onset'])
+        # Set the index to the timedelta
+        temp = temp.set_index(idx)
+        # Filter warnings thrown repeatedly by df.rolling for no reason
         warnings.filterwarnings('ignore')
-        # Roll the data according to the rolling window size, default = four seconds
+        # Create the rolling window with the desired window size
         roll = temp.rolling(
-            window=timedelta(seconds=self._rolling_window_size),
-            min_periods=1,
-            center=False,
-            closed='both',
-            on='my_onset'
+            window=self._rolling_window_size, min_periods=self._rolling_min_periods, closed='both', on=temp.index
         )
-        # Iterate through required columns
+        # Iterate through the required columns
         for col in cols:
             # Extract the standard deviation and convert into milliseconds
             temp[f'{col}_std'] = roll[col].std(skipna=True) * 1000
-        # Return the dataframe
-        return temp
+        # Resample to the desired frequency, get the mean value, and interpolate from previous values to fill NaNs
+        return temp.resample('1s', offset=offset).apply(np.nanmean).interpolate(limit_direction='backward')
 
     def _lag_rolling_values(
-            self, roll: pd.DataFrame, cols: tuple[str] = ('my_prev_ioi_std', 'latency_std')
+            self, roll: pd.DataFrame, cols: tuple[str] = ('my_prev_ioi_std', 'their_prev_ioi_std', 'latency_std')
     ) -> pd.DataFrame:
         """
         Shifts rolling values by a given number of seconds and concatenates together.
         """
         # Define the function for shifting values by a maximum number of seconds
         shifter = lambda s: pd.concat(
-            [roll[s].shift(i).rename(f'{s}_l{i}') for i in range(1, self._maximum_lag + 1)], axis=1
+            [roll[s].shift(i).rename(f'{s}_l{i}') for i in range(0, self._maximum_lag + 1)], axis=1
         )
-        # Create the shifted dataframe
-        train = pd.concat([roll, *(shifter(col) for col in cols)], axis=1)
-        # Return the shifted dataframe
-        return train
+        # Create the shifted dataframe with all required columns and return it
+        return pd.concat([roll, *(shifter(col) for col in cols)], axis=1)
 
     def _partial_corr_shifted_rolling_variables(
-            self, lagged: pd.DataFrame, dep_var: str = 'my_prev_ioi_std', ind_var: str = 'latency_std'
-    ) -> list[float]:
+            self, lagged: pd.DataFrame, dep_var: str = 'my_prev_ioi_std',
+            ind_var: str = 'latency_std', cov_var: str = 'their_prev_ioi_std'
+    ) -> list[float | int]:
         """
-
+        Gets the partial correlation between dep_var and ind_var, controlling for covariate cov_var
         """
+        # If we don't have jitter, we'll get errors when calculating partial correlation, because our latency
+        # standard deviation columns will all equal zero. So, we need to manually return a list of zeros
+        if self.keys_raw['jitter'] == 0:
+            return [0 for _ in range(0, self._maximum_lag + 1)]
         corrs = []
-        lagged = lagged.dropna()
-        for i in range(1, self._maximum_lag + 1):
-            if i == 0:
-                c = corr(lagged[dep_var], lagged[f'{ind_var}_l{i}'])
-            else:
-                c = partial_corr(data=lagged, x=dep_var, y=f'{ind_var}_l{i}', covar=f'{dep_var}_l{i}')
+        # Iterate through all the lag terms we want
+        for i in range(0, self._maximum_lag + 1):
+            # Subset the columns for the correct lags, and then drop NaN values to preserve as much as possible
+            data = lagged[[dep_var, ind_var,  f'{dep_var}_l{i}', f'{ind_var}_l{i}']].dropna()
+            # Get the partial correlation between dep_var and ind_var, controlling for lagged dep_ and cov_ variables
+            c = partial_corr(data=data, x=dep_var, y=f'{ind_var}_l{i}', covar=[f'{dep_var}_l{i}'])
+            # Extract the coefficient
             corrs.append(c.r.values[0])
+        # Return list of results
         return corrs
 
     @staticmethod
     def _regress_shifted_rolling_variables(
-            lagged: pd.DataFrame, dep_var: str = 'my_prev_ioi_std', ind_var: str = 'latency_std'
+            lagged: pd.DataFrame, dep_var: str = 'my_prev_ioi_std',
+            ind_var: str = 'latency_std', cov_var: str = 'their_prev_ioi_std'
     ) -> list[float]:
         """
         Creates a regression model of lagged variables vs non-lagged variables and extracts coefficients.
@@ -471,7 +479,7 @@ class PhaseCorrectionModel:
         lagged = lagged[[col for col in lagged.columns if dep_var in col or ind_var in col]]
         # Fit the regression model
         res = smf.ols(md, lagged.dropna()).fit()
-        # Return the regression coefficients
+        # Return the regression coefficients as a generator of floats
         return res.params.filter(like=ind_var, axis=0).to_list()
 
     def _create_phase_correction_model(
@@ -502,7 +510,7 @@ class PhaseCorrectionModel:
             'contamination': self._contamination,
             'asynchrony_na': nn['asynchrony'].isna().sum(),
             'ioi_std': self._get_rolling_standard_deviation_values(nn_df=nn)['my_prev_ioi_std'].median(),
-            'ioi_std_vs_jitter_coefficients': self._get_rolling_coefficients(nn_df=nn),
+            # 'ioi_std_vs_jitter_coefficients': self._get_rolling_coefficients(nn_df=nn),
             'ioi_std_vs_jitter_partial_correlation': self._get_rolling_coefficients(
                 nn_df=nn, func=self._partial_corr_shifted_rolling_variables
             ),

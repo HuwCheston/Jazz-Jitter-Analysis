@@ -304,7 +304,8 @@ def extract_npvi(
 
 
 def resample(
-        perf: pd.DataFrame, func=np.mean,  col: str = 'my_onset', resample_window: str = '1s',
+        perf: pd.DataFrame, func=np.nanmean,  col: str = 'my_onset',
+        resample_window: str = '1s', interpolate: bool = True
 ) -> pd.DataFrame:
     """
     Resamples an individual performance dataframe to get mean of every second.
@@ -314,7 +315,10 @@ def resample(
     # Create the offset: 8 - first onset time
     offset = timedelta(seconds=8 - perf.iloc[0][col])
     # Set the index, resample to every second, and take the mean
-    return perf.set_index(idx).resample(resample_window, offset=offset).apply(func)
+    if interpolate:
+        return perf.set_index(idx).resample(resample_window, offset=offset).apply(func).interpolate(limit_direction='backward')
+    else:
+        return perf.set_index(idx).resample(resample_window, offset=offset).apply(func)
 
 
 def load_from_disc(
