@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -121,6 +122,8 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         super().__init__(**kwargs)
         self.var = kwargs.get('var', 'ioi_std_vs_jitter_partial_correlation')
         self.df = self._format_df()
+        self.df = self._bootstrap_df()
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
 
     @vutils.plot_decorator
     def create_plot(
@@ -134,7 +137,7 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         self._format_fig()
         # Create filename and return to save
         fname = f'{self.output_dir}\\lineplot_lagged_latency'
-        return self.g.figure, fname
+        return self.fig, fname
 
     def _format_df(
             self,
@@ -157,67 +160,85 @@ class LinePlotLaggedLatency(vutils.BasePlot):
                   .sort_values(by=melters)
                   .reset_index(drop=True)
         )
-        big_df = big_df[big_df['jitter'] != 0]
-        all_duos = big_df.copy(deep=True)
-        all_duos['trial'] = 6
-        return pd.concat([big_df, all_duos], axis=0, ignore_index=True)
+        return big_df
+
+    def _bootstrap_df(
+            self, quantiles: tuple[int] = (0.05, 0.95), func=np.mean
+    ) -> pd.DataFrame:
+        """
+        Create a dataframe showing actual mean and boostrapped confidence intervals of lag effects at each jitter level.
+        Unit of resampling is the individual performer.
+        """
+        # Create the pivot table: each row is the data for an individual musician, with columns the coefficient at each
+        # amount of lag across both 0.5 and 1.0x jitter scales. As such, coefficients are averaged across conditions
+        # with the same amount of latency, e.g. 0.5x/lag_4 contains coefficients obtained for each musician for both
+        # 45ms and 180ms latency at 4 seconds of lag
+        reshape = self.df.pivot_table(index=['trial', 'instrument'], columns=['jitter', 'lag'], values='coef',
+                                      aggfunc=func)
+        # Create a list of new dataframes by resampling with replacement (frac=1 means returned df is 100% of length of
+        # original). Mean function is used to get the row-wise mean of coefficients, i.e. across musicians, not lag
+        samples = [reshape.sample(frac=1, replace=True, random_state=n).mean(axis=0) for n in range(0, 1000)]
+        # Combine all of our resampled dataframes together
+        boot = pd.concat(samples, axis=1)
+        # Extract the 5% and 95% quantile from our samples, as well as the actual mean
+        boot_low = boot.quantile(quantiles[0], axis=1).rename('low')
+        boot_mu = reshape.mean(axis=0).rename('mean')
+        boot_high = boot.quantile(quantiles[1], axis=1).rename('high')
+        # Concatenate all the dataframes together
+        boot = pd.concat([boot_low, boot_mu, boot_high], axis=1).reset_index(drop=False)
+        # Change the formatting of the jitter column to make plotting easier
+        boot['jitter'] = boot['jitter'].astype(str) + 'x'
+        return boot
 
     def _create_plot(
             self
-    ) -> sns.FacetGrid:
+    ) -> plt.Axes:
         """
-        Creates the facetgrid object and returns
+        Create the basic line plot in seaborn and return
         """
-        return sns.relplot(
-            data=self.df, col="trial", row='jitter', hue="instrument", hue_order=['Keys', 'Drums'],
-            kind='line', aspect=1.625, x='lag', y='coef', errorbar='se', palette=vutils.INSTR_CMAP, height=2.1, lw=3,
+        return sns.lineplot(
+            data=self.df, hue='jitter', x='lag', y='mean', errorbar=None, palette=vutils.JITTER_CMAP,
+            lw=3, ax=self.ax, style='jitter', markers=['o', 's', '^'], markersize=10
         )
 
     def _format_ax(
             self
     ) -> None:
         """
-        Formats axes-level objects
+        Adjust axes-level parameters
         """
-        # Add the horizontal line in at y=0 to use as our x axis
-        self.g.refline(y=0, alpha=1, linestyle='-', color=vutils.BLACK, lw=2)
-        # Set a load of axes properties
+        # Fill between the confidence intervals
+        for num, (_, jit) in enumerate(self.df.groupby('jitter')):
+            self.ax.fill_between(jit['lag'], jit['low'], jit['high'], alpha=vutils.ALPHA, color=vutils.JITTER_CMAP[num])
+        # Set axes parameters - labels, axes limits etc
+        ticks = [n for n in range(0, 9)]
         self.g.set(
-            xticks=[num for num in range(0, 9)], xticklabels=[num for num in range(0, 9)],
-            ylabel='', xlabel='', title='', ylim=(-0.35, 0.35)
+            ylim=(-0.1, 0.3), xlabel=None, ylabel=None, xticks=ticks, xticklabels=ticks
         )
-        # Iterate through every ax
-        for ax in self.g.axes.flatten():
-            # Set the position of our x axis to the horizontal line we created above
-            ax.spines['bottom'].set_position(('data', 0))
-            # Adjust the width of our ticks and axes
-            ax.tick_params(width=3, )
-            plt.setp(ax.spines.values(), linewidth=2)
-        # Iterate through just the first column of plots and add the y axis label
-        for i in range(1, self.g.axes.shape[0] + 1):
-            self.g.axes[i - 1, 0].set_ylabel(f'{i / 2}x jitter', fontsize=vutils.FONTSIZE)
-        # Iterate through just the first row of plots and add the duo title
-        for i in range(self.g.axes.shape[1]):
-            if i == self.g.axes.shape[1] - 1:
-                self.g.axes[0, i].set_title(f'Average')
-            else:
-                self.g.axes[0, i].set_title(f'Duo {i + 1}')
+        # Adjust axes parameters
+        self.ax.tick_params(width=3, )
+        plt.setp(self.ax.spines.values(), linewidth=2)
+        # Set bottom spine to y=0
+        self.ax.spines['bottom'].set_position(('data', 0))
+        # Hide right and top spines that Seaborn adds by default
+        for spine in ['right', 'top']:
+            self.ax.spines[spine].set_visible(False)
 
     def _format_fig(
             self
     ) -> None:
         """
-        Formats figure-level objects
+        Adjust figure-level parameters
         """
-        # Add the large y and x axes labels to the whole figure
-        self.g.figure.supylabel('Correlation ($r$)', x=0.01)
-        self.g.figure.supxlabel('Lag (s)', y=0.03)
-        # Remove the bottom spine of all the plots
-        self.g.despine(left=False, bottom=True)
-        # Move the legend positioning
-        sns.move_legend(self.g, 'center right', ncol=1, title='Instrument')
-        # Adjust the subplot layout
-        self.g.figure.subplots_adjust(right=0.89, left=0.09, bottom=0.12, top=0.9, hspace=0.1, wspace=0.1)
+        # Add axes labels
+        self.fig.supxlabel('Lag (s)')
+        self.fig.supylabel('Correlation ($r$)')
+        # Move legend
+        sns.move_legend(
+            self.g, 'center right', ncol=1, title='Jitter', frameon=False, bbox_to_anchor=(1.3, 0.5)
+        )
+        # Adjust padding around plot edges
+        self.fig.subplots_adjust(left=0.15, right=0.8, bottom=0.15, top=0.9)
 
 
 def generate_tempo_stability_plots(
@@ -232,36 +253,6 @@ def generate_tempo_stability_plots(
     lp = LinePlotLaggedLatency(df=df, output_dir=figures_output_dir)
     lp.create_plot()
 
-
-# import scipy.stats as stats
-# import numpy as np
-# df = []
-# for pcm in raw:
-#     df.append(pcm.keys_dic)
-#     df.append(pcm.drms_dic)
-# df = pd.DataFrame(df)
-# lp = LinePlotLaggedLatency(df=df,)
-# res = []
-# for i, g in lp.df.groupby(['jitter', 'instrument', 'lag']):
-#     boot = stats.bootstrap((g.coef.values,), np.mean, confidence_level=0.95, n_resamples=1000)
-#     res.append((*i, *boot.confidence_interval, np.mean(g.coef.values)))
-# res = pd.DataFrame(res, columns=['jitter', 'instrument', 'lag', 'low', 'high', 'actual'])
-# g = sns.relplot(data=res, col='jitter', hue='instrument', hue_order=['Keys', 'Drums'], kind='line', x='lag', y='actual', marker='o', errorbar=None, palette=vutils.INSTR_CMAP, lw=3)
-# INSTR_CMAP = ['#00ff00', '#9933ff', ]
-# g.refline(y=0, alpha=1, linestyle='-', color=vutils.BLACK, lw=2)
-#
-# for num, (i_, grp_) in enumerate(res.groupby('jitter')):
-#     for num_, (i, grp) in enumerate(grp_.groupby('instrument', sort=False)):
-#         g.axes[0, num].tick_params(width=3, )
-#         plt.setp(g.axes[0, num].spines.values(), linewidth=2)
-#         g.axes[0, num].spines['bottom'].set_position(('data', 0))
-#         g.axes[0, num].fill_between(grp['lag'], grp['high'], grp['low'], alpha=0.1, color=INSTR_CMAP[num_])
-#         g.axes[0, num].set(xticks=[num for num in range(0, 9)], xticklabels=[num for num in range(0, 9)], ylabel='', xlabel='', title=f'Jitter: {i_}x',)
-# g.figure.supxlabel('Lag (s)')
-# g.figure.supylabel('Correlation ($r$)')
-# sns.move_legend(g, 'center right', ncol=1, title='Instrument')
-# g.figure.subplots_adjust(right=0.85, left=0.12, bottom=0.12, top=0.9, hspace=0.2)
-# plt.show()
 
 if __name__ == '__main__':
     # Default location for phase correction models
