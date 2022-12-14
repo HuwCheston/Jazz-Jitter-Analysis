@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
+from statsmodels.nonparametric.smoothers_lowess import lowess as sm_lowess
 from statistics import mean
 from matplotlib import animation, pyplot as plt
 import seaborn as sns
@@ -471,7 +472,9 @@ class BarPlot(vutils.BasePlot):
         super().__init__(**kwargs)
         self.estimator: callable = kwargs.get('estimator', np.median)
         self.yvar: str = kwargs.get('yvar', 'correction_partner')
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 9.4))
+        self.ylim: tuple[float] = kwargs.get('ylim', (0., 1.5))
+        self.ylabel: str = kwargs.get('ylabel', 'Partner coupling')
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
 
     @vutils.plot_decorator
     def create_plot(self):
@@ -481,7 +484,7 @@ class BarPlot(vutils.BasePlot):
         self.g = self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_correction_vs_instrument'
+        fname = f'{self.output_dir}\\barplot_{self.yvar}_vs_instrument'
         return self.fig, fname
 
     def _create_plot(self):
@@ -505,7 +508,7 @@ class BarPlot(vutils.BasePlot):
         """
         # Set ax formatting
         self.g.tick_params(width=3, )
-        self.g.set(ylabel='', xlabel='', ylim=(0, 1.5))
+        self.g.set(ylabel='', xlabel='', ylim=self.ylim)
         plt.setp(self.g.spines.values(), linewidth=2)
         # Plot a horizontal line at x=0
         self.g.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK, linewidth=2)
@@ -515,15 +518,15 @@ class BarPlot(vutils.BasePlot):
         Set figure-level formatting
         """
         # Set figure labels
-        self.fig.supylabel('Coupling constant', x=0.02, y=0.55)
-        self.fig.supxlabel('Duo', y=0.04)
+        self.fig.supylabel(self.ylabel, x=0.02, y=0.55)
+        self.fig.supxlabel('Duo', y=0.02)
         # Format the legend to remove the handles/labels added automatically by the strip plot
         handles, labels = self.g.get_legend_handles_labels()
         self.g.get_legend().remove()
-        plt.legend(handles[2:], labels[2:], ncol=6, title=None, frameon=False, bbox_to_anchor=(0.7, -0.07),
+        plt.legend(handles[2:], labels[2:], ncol=1, title='Instrument', frameon=False, bbox_to_anchor=(1, 0.65),
                    markerscale=1.6)
         # Adjust the figure a bit and return for saving in decorator
-        self.g.figure.subplots_adjust(bottom=0.12, top=0.95, left=0.14, right=0.95)
+        self.g.figure.subplots_adjust(bottom=0.15, top=0.95, left=0.14, right=0.8)
 
 
 class HistPlotR2(vutils.BasePlot):
@@ -613,6 +616,102 @@ class BoxPlotR2WindowSize(vutils.BasePlot):
         plt.tight_layout()
 
 
+class RegPlotGrid(vutils.BasePlot):
+    """
+
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.xvars: list[str] = kwargs.get('xvars', ['tempo_slope', 'ioi_std', 'pw_asym', 'success'])
+        self.xlabs: list[str] = kwargs.get(
+            'xlab', ['Tempo slope (BPM/s)', 'IOI variability (SD, ms)', 'Asynchrony (RMS, ms)', 'Self-reported success']
+        )
+        self.df = self._format_df()
+        self.fig, self.ax = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=False, figsize=(18.8, 18.8))
+        self.lw = kwargs.get('lw', 5)
+        self.ci_frac: float = kwargs.get('ci_frac', 0.66666667)
+        self.ci_it: int = kwargs.get('ci_int', 3)
+        self.n_boot: int = kwargs.get('n_boot', 1000)
+        self.hand, self.lab = None, None
+
+    def _format_df(self):
+        test = self.df[self.df['latency'] != 0]
+        gps = ['trial', 'latency', 'jitter']
+        cols = gps + ['coupling_balance', *self.xvars]
+        abs_correction = lambda grp: abs(grp.iloc[1]['correction_partner'] - grp.iloc[0]['correction_partner'])
+        test = pd.DataFrame(
+            [[*i, abs_correction(g, ), *(g[v].mean() for v in self.xvars)] for i, g in test.groupby(gps)], columns=cols
+        )
+        return test.melt(id_vars=[*gps, 'coupling_balance'], value_vars=self.xvars)
+
+    def create_plot(self):
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        plt.show()
+
+    def _create_plot(self):
+        for a, (idx, grp) in zip(self.ax.flatten(), self.df.groupby('variable', sort=False)):
+            _ = sns.scatterplot(
+                data=grp, x='coupling_balance', y='value', hue='latency', ax=a, palette=vutils.DUO_CMAP,
+                style='latency', s=250
+            )
+            if idx == 'tempo_slope':
+                self._add_lowess(ax=a, grp=grp)
+            else:
+                sns.regplot(
+                    data=grp, x='coupling_balance', y='value', ax=a, scatter=False, scatter_kws={'alpha': vutils.ALPHA},
+                    color=vutils.BLACK, n_boot=self.n_boot, line_kws={'lw': self.lw},
+                )
+
+    def _add_lowess(self, ax: plt.Axes, grp: pd.DataFrame, add_hline: bool = True):
+        def lowess(x, y, it, frac):
+            return sm_lowess(x, y, it=it, frac=frac, return_sorted=True).T
+
+        # Add in actual line from raw data
+        act_x, act_y = lowess(grp['value'], grp['coupling_balance'], self.ci_it, self.ci_frac)
+        ax.plot(act_x, act_y, color=vutils.BLACK, lw=self.lw)
+        # Bootstrap confidence intervals
+        res_x, res_y = [], []
+        for n in range(0, self.n_boot):
+            # Resample the dataframe, with replacement (resampling unit = performance)
+            boot = grp.sample(frac=1, replace=True, random_state=n)
+            # Get the lowess model and append to our lists
+            sm_x, sm_y = lowess(boot['value'], boot['coupling_balance'], self.ci_it, self.ci_frac)
+            res_x.append(sm_x)
+            res_y.append(sm_y)
+        # Format the resampled dataframes
+        fmt = lambda d: pd.DataFrame(d).transpose().reset_index(drop=True)
+        fmt_x = fmt(res_x)
+        fmt_y = fmt(res_y)
+        # Extract the quantiles: median x value, 0.05 and 0.95 quantiles from y
+        x_5 = fmt_x.quantile(0.5, axis=1)
+        y_05 = fmt_y.quantile(0.05, axis=1)
+        y_95 = fmt_y.quantile(0.95, axis=1)
+        # Fill between the quantiles
+        ax.fill_between(x_5, y_05, y_95, color=vutils.BLACK, alpha=0.2)
+        # Add horizontal line at y=0 if required
+        if add_hline:
+            ax.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK, linewidth=self.lw)
+
+    def _format_ax(self):
+        for ax, lab in zip(self.ax.flatten(), self.xlabs):
+            self.hand, self.lab = ax.get_legend_handles_labels()
+            ax.get_legend().remove()
+            ax.set_ylabel(lab, fontsize=20)
+            ax.set(xlabel='', xticks=np.linspace(0, 1.2, 5))
+            ax.tick_params(width=3, )
+            plt.setp(ax.spines.values(), linewidth=2)
+
+    def _format_fig(self):
+        self.fig.supxlabel('Coupling balance', y=0.02)
+        leg = self.fig.legend(self.hand, self.lab, 'center right', ncol=1, title='Latency (ms)', frameon=False,
+                              markerscale=2, prop={'size': 20})
+        plt.setp(leg.get_title(), fontsize=20)
+        self.fig.subplots_adjust(left=0.09, right=0.88, bottom=0.07, top=0.93, wspace=0.2, hspace=0.2)
+
+
 def generate_phase_correction_plots(
     mds: list, output_dir: str,
 ) -> None:
@@ -643,6 +742,8 @@ def generate_phase_correction_plots(
     rp = RegPlot(df=df, output_dir=figures_output_dir)
     rp.create_plot()
     bar = BarPlot(df=df, output_dir=figures_output_dir)
+    bar.create_plot()
+    bar = BarPlot(df=df, output_dir=figures_output_dir, yvar='correction_self', ylabel='Self coupling', ylim=(-1, 1))
     bar.create_plot()
 
 

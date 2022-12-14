@@ -26,7 +26,7 @@ class PhaseCorrectionModel:
             self, c1_keys: list, c2_drms: list, **kwargs
     ):
         # Parameters
-        self._iqr_filter_range: tuple[float] = kwargs.get('iqr_filter', (0.05, 0.95))  # Filter IOIs above and below
+        self._iqr_filter_range: tuple[float] = kwargs.get('iqr_filter', (0.1, 0.9))  # Filter IOIs above and below
         self._model: str = kwargs.get('model', 'my_next_ioi_diff~my_prev_ioi_diff+asynchrony')  # regression model
         self._rolling_window_size: str = kwargs.get('rolling_window_size', '2s')   # 2 seconds = 2 beats at 120BPM
         self._rolling_min_periods: int = kwargs.get('rolling_min_periods', 2)
@@ -142,7 +142,7 @@ class PhaseCorrectionModel:
         return smf.ols('bpm~my_onset', data=conc.dropna()).fit()
 
     def _extract_pairwise_asynchrony(
-            self
+            self, asynchrony_col: str = 'asynchrony'
     ):
         """
         Extract pairwise asynchrony as a float (in milliseconds, as standard for this unit)
@@ -160,7 +160,22 @@ class PhaseCorrectionModel:
         - Take the square root of the mean (RMS = Root-Mean-Square)
         - Multiply the result by 1000 to convert to milliseconds
         """
-        return np.sqrt(np.mean(np.square([self.keys_nn['asynchrony'].std(), self.drms_nn['asynchrony'].std()]))) * 1000
+        con = np.concatenate((self.keys_nn[asynchrony_col].to_numpy(), self.drms_nn[asynchrony_col].to_numpy()))
+        return np.sqrt(np.nanmean(np.square(con))) * 1000
+
+    def _extract_pairwise_asynchrony_with_std(
+            self, asynchrony_col: str = 'asynchrony'
+    ):
+        """
+
+        """
+        con = self.keys_nn.rename(columns={'my_onset': 'ons'}).merge(self.drms_nn.rename(columns={'their_onset': 'ons'}),
+                                                                     how='left', on='ons')
+        m1 = np.sqrt(np.nanmean(np.square(con[[f'{asynchrony_col}_x', f'{asynchrony_col}_y']].std(axis=1)))) * 1000
+        con = self.drms_nn.rename(columns={'my_onset': 'ons'}).merge(self.keys_nn.rename(columns={'their_onset': 'ons'}),
+                                                                     how='left', on='ons')
+        m2 = np.sqrt(np.nanmean(np.square(con[[f'{asynchrony_col}_x', f'{asynchrony_col}_y']].std(axis=1)))) * 1000
+        return np.mean([m1, m2])
 
     def _match_onsets(
             self, live_arr: np.ndarray, delayed_arr: np.ndarray, zoom_arr: np.ndarray,
@@ -190,9 +205,10 @@ class PhaseCorrectionModel:
         # Append the zoom array onto our dataframe
         nn_df = self._append_zoom_array(nn_df, zoom_arr=zoom_arr)
         # Add the correct amount of latency onto our partner's onset time
-        nn_df['their_onset'] += (nn_df['latency'])
+        nn_df['their_onset_delayed'] = nn_df['their_onset'] + nn_df['latency']
         # Recalculate our asynchrony column with the now delayed partner onsets
-        nn_df['asynchrony'] = nn_df['their_onset'] - nn_df['my_onset']
+        nn_df['asynchrony'] = nn_df['their_onset_delayed'] - nn_df['my_onset']
+        nn_df['asynchrony_raw'] = nn_df['their_onset'] - nn_df['my_onset']
         # Format the now matched dataframe and return
         return self._format_df_for_model(nn_df)
 
@@ -515,6 +531,9 @@ class PhaseCorrectionModel:
                 nn_df=nn, func=self._partial_corr_shifted_rolling_variables
             ),
             'pw_asym': self._extract_pairwise_asynchrony(),
+            'pw_asym_raw': self._extract_pairwise_asynchrony(asynchrony_col='asynchrony_raw'),
+            'pw_asym_std': self._extract_pairwise_asynchrony_with_std(),
+            'pw_asym_raw_std': self._extract_pairwise_asynchrony_with_std(asynchrony_col='asynchrony_raw'),
             'my_prev_ioi_diff_mean': nn['my_prev_ioi_diff'].mean(),
             'my_next_ioi_diff_mean': nn['my_next_ioi_diff'].mean(),
             'asynchrony_mean': nn['asynchrony'].mean(),

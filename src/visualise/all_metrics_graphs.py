@@ -19,7 +19,8 @@ class PairPlotAllVariables(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.labels: list[str] = kwargs.get(
-            'labels', ['Slope\n(BPM/s)', 'Variability\n(SD, ms)', 'Asynchrony\n(RMS SD, ms)', 'Success\n']
+            'labels', ['Absolute slope\n(BPM/s)', 'IOI variability\n(SD, ms)',
+                       'Asynchrony\n(RMS, ms)', 'Self-reported\nsuccess']
         )
         self._jitter_success: bool = kwargs.get('jitter_success', True)
         self._abs_slope: bool = kwargs.get('abs_slope', True)
@@ -73,7 +74,9 @@ class PairPlotAllVariables(vutils.BasePlot):
         # Get the required label from our list
         s = self.labels[self.counter]
         # Add the label to the upper centre of the diagonal plot
-        ax.annotate(s, xy=(0.5, 0.75), xycoords='axes fraction', va='center', ha='center', fontsize=30)
+        ax.annotate(
+            s, xy=(0.97, 0.85), transform=ax.transAxes, xycoords='axes fraction', va='center', ha='right', fontsize=30
+        )
         # Increment the counter by one for the next plot
         self.counter += 1
 
@@ -98,7 +101,10 @@ class PairPlotAllVariables(vutils.BasePlot):
         else:
             s = "${{{}}}$".format(round(r, 2))
         # Add the format string to the middle of the axis, with fontsize scaled to match the absolute r value
-        ax.annotate(s, xy=(0.5, 0.5), xycoords='axes fraction', va='center', ha='center', fontsize=80 * abs(r))
+        scaling = abs(r)
+        if scaling < 0.3:
+            scaling = 0.3
+        ax.annotate(s, xy=(0.5, 0.5), xycoords='axes fraction', va='center', ha='center', fontsize=80 * scaling)
         # Disable ticks on the diagonal plots
         ax.tick_params(which='both', axis='both', bottom=False, top=False, left=False, right=False)
 
@@ -112,7 +118,7 @@ class PairPlotAllVariables(vutils.BasePlot):
         g = sns.PairGrid(data=self.df, vars=self.vars, height=4.7, aspect=1, corner=False, dropna=True, despine=False,)
         # Map a histogram with KDE estimate to the diagonal plots
         g.map_diag(
-            sns.histplot, color=vutils.BLACK, alpha=vutils.ALPHA, stat='count', bins=10, kde=True, line_kws={'lw': 5, }
+            sns.histplot, color=vutils.BLACK, alpha=vutils.ALPHA, stat='count', bins=7, kde=True, line_kws={'lw': 5, }
         )
         # Map a scatter plot to the lower plots
         g.map_lower(sns.scatterplot, s=100, edgecolor=vutils.BLACK, facecolor='#FFFFFF', marker='o', linewidth=2)
@@ -145,7 +151,7 @@ class PairPlotAllVariables(vutils.BasePlot):
         # If we're using absolute slope, we need to define a different axis limit
         slope_lim = (0, 0.5) if self._abs_slope else (-0.5, 0.5)
         # Iterate through all rows and columns and set required axis limits and step values
-        for i, lim, step in zip(range(0, 4), [slope_lim, (0, 100), (0, 150), (0, 10)], [3, 5, 4, 6]):
+        for i, lim, step in zip(range(0, 4), [slope_lim, (0, 100), (0, 400), (0, 10)], [3, 5, 5, 6]):
             ticks = np.linspace(lim[0], lim[1], step)
             self.g.axes[i, i].set(ylim=lim, xlim=lim, yticks=ticks, xticks=ticks)
         # If using absolute tempo slope, adjust axis limit slightly so we don't cut off some markers

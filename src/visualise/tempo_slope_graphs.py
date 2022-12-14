@@ -134,6 +134,92 @@ class LinePlotTempoSlopes(vutils.BasePlot):
         self.fig.subplots_adjust(bottom=0.13, top=0.9, wspace=0.05, hspace=0.05, right=0.98, left=0.08)
 
 
+class NumberLineTempoSlope(vutils.BasePlot):
+    """
+    Creates a numberline showing difference in tempo slope between duos this experiment during the control
+    condition and a corpus of pairwise asynchrony values from other studies and genres
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.df = self._format_df(corpus_filepath=kwargs.get('corpus_filepath', None))
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 5))
+
+    @vutils.plot_decorator
+    def create_plot(self) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class to generate and save the image.
+        """
+        self.g = self._create_plot()
+        self._add_annotations()
+        self._format_plot()
+        fname = f'{self.output_dir}\\numberline_tempo_slope'
+        return self.g.figure, fname
+
+    def _format_df(self, corpus_filepath) -> pd.DataFrame:
+        """
+        Formats the dataframe by concatenating with data from the corpus
+        """
+        # Read in the corpus data
+        corpus = pd.read_excel(io=corpus_filepath, sheet_name=1)
+        # Read in the data from the experimental dataframe
+        trial = self.df[self.df['latency'] == 0]
+        trial = (
+            trial.drop_duplicates(subset='tempo_slope')
+                 .groupby('trial')
+                 .mean()
+                 .reset_index(drop=False)
+                 .rename(columns={'trial': 'style'})
+        )
+        trial = trial[['style', 'tempo_slope']]
+        trial['source'] = ''
+        trial['style'] = trial['style'].replace({n: f'Duo {n}, this study' for n in range(1, 6)})
+        # Concatenate trial and corpus data together
+        self.df = pd.concat([corpus.reset_index(drop=True), trial.reset_index(drop=True)])
+        self.df['this_study'] = (self.df['source'] == '')
+        self.df['placeholder'] = ''
+        return self.df
+
+    def _create_plot(self):
+        """
+        Creates the facetgrid object
+        """
+        _ = sns.stripplot(
+            data=self.df[self.df['this_study'] == True], x='tempo_slope', y='placeholder', jitter=False, dodge=False,
+            s=15, ax=self.ax, orient='h', marker='o'
+        )
+        return sns.stripplot(
+            data=self.df[self.df['this_study'] == False], x='tempo_slope', y='placeholder', jitter=False, dodge=False,
+            s=12, ax=self.ax, orient='h', marker='s'
+        )
+
+    def _add_annotations(self):
+        """
+        Add the annotations onto the plot
+        """
+        for k, v in self.df.iterrows():
+            x = v['tempo_slope']
+            if v['this_study']:
+                self.g.annotate(text=v['style'], xy=(v['tempo_slope'], 0), xytext=(x, -1.45), rotation=315)
+            else:
+                self.g.annotate(text=v['style'] + '\n' + v['source'], xy=(v['tempo_slope'], 0), xytext=(x, 0.15),
+                                rotation=45)
+
+    def _format_plot(self):
+        """
+        Formats the plot
+        """
+        # Format the plot
+        self.ax.spines['bottom'].set_position(('data', 0))
+        self.ax.tick_params(axis="x", direction="in", pad=-25, width=3, )
+        plt.setp(self.ax.spines.values(), linewidth=2)
+        self.g.set(xlim=(-0.05, 0.75), ylim=(-1, 1), xticks=np.linspace(0, 0.75, 4), xlabel='', ylabel='')
+        self.g.figure.supxlabel('Tempo slope (BPM/s)', y=0.01)
+        sns.despine(left=True, bottom=False)
+        plt.subplots_adjust(top=0.7, bottom=0.2, left=0.03, right=0.97)
+        plt.yticks([], [])
+        plt.legend([], [], frameon=False)
+
+
 class BarPlotTempoSlope(vutils.BasePlot):
     """
     Creates two bar plots showing tempo slope against latency and jitter, stratified by duo number
@@ -207,6 +293,9 @@ def generate_tempo_slope_plots(
     bp.create_plot()
     lp = LinePlotTempoSlopes(df=df, output_dir=figures_output_dir)
     lp.create_plot()
+    corpus_dir = r"C:\Python Projects\jazz-jitter-analysis\references\corpus.xlsx"
+    nl = NumberLineTempoSlope(df=df, output_dir=figures_output_dir, corpus_filepath=corpus_dir)
+    nl.create_plot()
 
 
 if __name__ == '__main__':

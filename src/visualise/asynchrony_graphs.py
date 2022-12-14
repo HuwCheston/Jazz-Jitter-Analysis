@@ -12,10 +12,11 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
     Creates a numberline showing difference in pairwise asynchrony between duos this experiment during the control
     condition and a corpus of pairwise asynchrony values from other studies and genres
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.df = self._format_df(corpus_filepath=kwargs.get('corpus_filepath', None))
-        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 4))
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 5))
 
     @vutils.plot_decorator
     def create_plot(self) -> tuple[plt.Figure, str]:
@@ -35,16 +36,23 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
         # Read in the corpus data
         corpus = pd.read_excel(io=corpus_filepath, sheet_name=0)
         # Read in the data from the experimental dataframe
+        trial = self.df[self.df['latency'] == 0]
         trial = (
-            self.df[self.df['latency'] == 0].drop_duplicates(subset='pw_asym')
-                                            .groupby(['trial']).mean()[['pw_asym']]
-                                            .reset_index(drop=False)
-                                            .rename(columns={'trial': 'style'})
+            trial.drop_duplicates(subset='pw_asym')
+                 .groupby('trial')
+                 .mean()
+                 .reset_index(drop=False)
+                 .rename(columns={'trial': 'style'})
+
         )
+        trial = trial[['style', 'pw_asym']]
         trial['source'] = ''
+        # Add a bit of noise to trial 3 and 4 so they don't overlap exactly on the graph
+        trial.loc[trial['style'] == 3, 'pw_asym'] += 0.5
+        trial.loc[trial['style'] == 4, 'pw_asym'] -= 0.5
         trial['style'] = trial['style'].replace({n: f'Duo {n}, this study' for n in range(1, 6)})
         # Concatenate trial and corpus data together
-        self.df = pd.concat([corpus.reset_index(drop=True), trial.reset_index(drop=True)]).round(0)
+        self.df = pd.concat([corpus.reset_index(drop=True), trial.reset_index(drop=True)])
         self.df['this_study'] = (self.df['source'] == '')
         self.df['placeholder'] = ''
         return self.df
@@ -53,9 +61,13 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
         """
         Creates the facetgrid object
         """
+        _ = sns.stripplot(
+            data=self.df[self.df['this_study'] == True], x='pw_asym', y='placeholder', jitter=False, dodge=False, s=15,
+            ax=self.ax, orient='h', marker='o'
+        )
         return sns.stripplot(
-            data=self.df, x='pw_asym', y='placeholder', hue='this_study',
-            jitter=False, dodge=False, s=12, ax=self.ax, orient='h'
+            data=self.df[self.df['this_study'] == False], x='pw_asym', y='placeholder', jitter=False, dodge=False, s=12,
+            ax=self.ax, orient='h', marker='s'
         )
 
     def _add_annotations(self):
@@ -65,29 +77,31 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
         for k, v in self.df.iterrows():
             x = v['pw_asym']
             if v['this_study']:
-                x += 0.1
-            self.g.annotate(
-                text=v['style'] + '\n' + v['source'], xy=(v['pw_asym'], 0), xytext=(x, -0.3),
-                rotation=45
-            )
+                x -= 0.25
+                self.g.annotate(text=v['style'], xy=(v['pw_asym'], 0), xytext=(x, -1.45), rotation=315)
+            else:
+                x -= 0.5
+                self.g.annotate(text=v['style'] + '\n' + v['source'], xy=(v['pw_asym'], 0), xytext=(x, 0.15),
+                                rotation=45)
 
     def _format_plot(self):
         """
         Formats the plot
         """
-        # Add the horizontal line
-        self.g.axhline(y=0, alpha=1, linestyle='-', color=vutils.BLACK, linewidth=3)
         # Format the plot
-        self.g.set(xlim=(17, 41), xticks=np.arange(15, 41, 5, ), xlabel='', ylabel='')
-        self.g.figure.supxlabel('Pairwise asynchrony (ms)', y=0.05)
-        sns.despine(left=True, bottom=True)
-        plt.subplots_adjust(top=0.34, bottom=0.25, left=0.05, right=0.93)
+        self.ax.spines['bottom'].set_position(('data', 0))
+        self.ax.tick_params(axis="x", direction="in", pad=-25, width=3, )
+        plt.setp(self.ax.spines.values(), linewidth=2)
+        self.g.set(xlim=(15, 45), ylim=(-1, 1), xticks=np.linspace(15, 45, 7), xlabel='', ylabel='')
+        self.g.figure.supxlabel('Asynchrony (RMS, ms)', y=0.01)
+        sns.despine(left=True, bottom=False)
+        plt.subplots_adjust(top=0.7, bottom=0.2, left=0.03, right=0.97)
         plt.yticks([], [])
         plt.legend([], [], frameon=False)
 
 
 def generate_asynchrony_plots(
-    mds: list, output_dir: str,
+        mds: list, output_dir: str,
 ) -> None:
     """
 
@@ -100,8 +114,9 @@ def generate_asynchrony_plots(
     figures_output_dir = output_dir + '\\figures\\asynchrony_plots'
 
     # TODO: corpus should be saved in the root//references directory!
+    corpus_dir = r"C:\Python Projects\jazz-jitter-analysis\references\corpus.xlsx"
     nl = NumberLinePairwiseAsynchrony(
-        df=df, output_dir=figures_output_dir, corpus_filepath=f'{output_dir}\\pw_asymmetry_corpus.xlsx'
+        df=df, output_dir=figures_output_dir, corpus_filepath=corpus_dir
     )
     nl.create_plot()
 

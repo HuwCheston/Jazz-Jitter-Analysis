@@ -38,21 +38,19 @@ class BarPlotInterpolatedIOIs(vutils.BasePlot):
     def _format_plot(self):
         self.ax.tick_params(width=3, )
         self.ax.set(ylabel='', xlabel='',)
-        self.fig.supxlabel('Duo number', y=0.09)
+        self.fig.supxlabel('Duo', y=0.02)
         self.fig.supylabel('Total IOIs', x=0.01)
         plt.setp(self.ax.spines.values(), linewidth=2)
-        self.fig.subplots_adjust(bottom=0.22, top=0.95, left=0.12, right=0.95)
+        self.fig.subplots_adjust(bottom=0.15, top=0.95, left=0.14, right=0.8)
 
     def _format_ax(self):
         # Add invisible data to add another legend for instrument
         n1 = [self.ax.bar(0, 0, color=cmap) for i, cmap in zip(range(2), vutils.INSTR_CMAP)]
-        l1 = plt.legend(n1, ['Keys', 'Drums'], loc=[0, -0.32], ncol=2, frameon=False, columnspacing=1,
-                        handletextpad=0.1)
+        l1 = plt.legend(n1, ['Keys', 'Drums'], title='Instrument', bbox_to_anchor=(1, 0.8), ncol=1, frameon=False,)
         self.ax.add_artist(l1)
         # Add invisible data to add another legend for interpolation
         n2 = [self.ax.bar(0, 0, color='gray', hatch=h, alpha=vutils.ALPHA) for i, h in zip(range(2), ['', '//'])]
-        l2 = plt.legend(n2, ['No interpolation', 'Interpolation'], loc=[0.37, -0.32], ncol=2, frameon=False,
-                        columnspacing=1, handletextpad=0.1)
+        l2 = plt.legend(n2, ['No', 'Yes'], bbox_to_anchor=(0.915, 0.5), ncol=1, title='       Interpolation', frameon=False,)
         self.ax.add_artist(l2)
         # Set ticks
         self.ax.set_xticks([t + 0.09 for t in self.ax.get_xticks()], labels=[f'{n}' for n in range(1, 6)], rotation=0)
@@ -235,25 +233,34 @@ class LinePlotAllConditions(vutils.BasePlot):
         # Iterate through latency values
         for num, (i, g) in enumerate(self.df.groupby(['latency'])):
             # Iterate through jitter scales
-            for i_, g_ in g.groupby('jitter'):
+            for num_, (i_, g_) in enumerate(g.groupby('jitter')):
                 # Plotting latency
                 # We don't want to add labels for all our plots
                 if num == 1:
-                    self.ax[num, 0].plot(g_['data'].values[0]['timestamp'], g_['data'].values[0]['latency'], lw=3,
-                                         label=f'{i_}x')
+                    self.ax[num, 0].plot(
+                        g_['data'].values[0]['timestamp'], g_['data'].values[0]['latency'], lw=3, label=f'{i_}x',
+                        color=vutils.JITTER_CMAP[num_],
+                    )
                 else:
-                    self.ax[num, 0].plot(g_['data'].values[0]['timestamp'], g_['data'].values[0]['latency'], lw=3, )
-                self.ax[num, 0].set(title=f'{i}ms baseline', ylim=(-25, 300), xticks=[0, 30, 60, 90],
-                                    yticks=[0, 100, 200, 300])
+                    self.ax[num, 0].plot(
+                        g_['data'].values[0]['timestamp'], g_['data'].values[0]['latency'], lw=3,
+                        color=vutils.JITTER_CMAP[num_],
+                    )
+                self.ax[num, 0].set(
+                    title=f'{i}ms baseline', ylim=(-25, 300), xticks=[0, 30, 60, 90], yticks=[0, 100, 200, 300]
+                )
                 # Plotting jitter
-                self.ax[num, 1].plot(g_['data'].values[0]['timestamp'],
-                                     g_['data'].values[0].rolling(window=8, min_periods=1)['latency'].std(), lw=3)
-                self.ax[num, 1].set(title=f'{i}ms baseline', ylim=(-5, 60), xticks=[0, 30, 60, 90],
-                                    yticks=[0, 20, 40, 60])
+                roll = g_['data'].values[0].rolling(window=8, min_periods=1)['latency']
+                self.ax[num, 1].plot(
+                    g_['data'].values[0]['timestamp'], roll.std(), lw=3, color=vutils.JITTER_CMAP[num_],
+                )
+                self.ax[num, 1].set(
+                    title=f'{i}ms baseline', ylim=(-5, 60), xticks=[0, 30, 60, 90], yticks=[0, 20, 40, 60]
+                )
                 # Add y labels onto only the middle row of plots
                 if num == 2:
                     self.ax[num, 0].set_ylabel('Latency (ms)', labelpad=10, fontsize=vutils.FONTSIZE + 3)
-                    self.ax[num, 1].set_ylabel('Jitter (SD, ms)', labelpad=10, fontsize=vutils.FONTSIZE + 3)
+                    self.ax[num, 1].set_ylabel('Latency variability (SD, ms)', labelpad=10, fontsize=vutils.FONTSIZE + 3)
 
     def _format_ax(
             self
@@ -272,7 +279,7 @@ class LinePlotAllConditions(vutils.BasePlot):
         Format figure-level attributes
         """
         self.fig.supxlabel('Performance duration (s)', )
-        self.fig.legend(loc='center right', ncol=1, frameon=False, title='Scale')
+        self.fig.legend(loc='center right', ncol=1, frameon=False, title='Jitter')
         self.fig.subplots_adjust(top=0.95, bottom=0.09, left=0.07, right=0.9, wspace=0.15, hspace=0.4)
 
 

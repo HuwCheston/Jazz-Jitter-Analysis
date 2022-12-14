@@ -30,7 +30,7 @@ CBAR_BINS = np.linspace(-0.5, 0.3, 9, endpoint=True)
 # Function used to shade a color map by given alpha value (can be used in color bars etc)
 alpha_func = lambda pal: ListedColormap(np.c_[pal.colors, np.full(len(pal.colors), fill_value=ALPHA)])
 SLOPES_CMAP = alpha_func(color_palette('vlag_r', as_cmap=True))     # Used for plotting tempo slopes
-INSTR_CMAP = ['#9933ff', '#FFD700']     # Palette used for plotting data that contrasts against slopes color map
+INSTR_CMAP = ['#9933ff', '#00ff00']     # Palette used for plotting data that contrasts against slopes color map
 LINE_CMAP = ['#1f77b4', '#ff7f0e']     # Original matplotlib colour palette used for manual plotting
 DUO_CMAP = 'tab10'
 JITTER_CMAP = ['#FF0000', '#00FF00', '#0000FF']
