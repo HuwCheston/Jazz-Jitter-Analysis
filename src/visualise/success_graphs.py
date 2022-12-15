@@ -9,6 +9,7 @@ from matplotlib.transforms import ScaledTranslation
 import src.visualise.visualise_utils as vutils
 import src.analyse.analysis_utils as autils
 
+
 class ScatterPlotQuestionnaire(vutils.BasePlot):
     """
     Creates a scatterplot for each duo/question combination.
@@ -246,71 +247,111 @@ class BarPlotTestRetestReliability(vutils.BasePlot):
 
 class BarPlotQuestionnaireCorrelation(vutils.BasePlot):
     """
-    Creates a barplot showing Pearson's R between scores for the same question by drummer and keys player
+    Creates two barplots showing both between-performer and between-repeat correlations for each question,
+    stratified by duo number.
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.data = self._format_df()
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=2, figsize=(18.8, 5))
+        self.handles, self.labels = None, None
 
-    def _format_df(self):
+    def _format_df(
+            self
+    ) -> pd.DataFrame:
         """
-
+        Coerce df into correct format for plotting
         """
         res = []
+        # Group first by trial
         for idx, grp in self.df.groupby(['trial']):
-            g = (
-                grp.pivot(index=['trial', 'block', 'latency', 'jitter', ], columns='instrument',
-                          values=['interaction', 'coordination', 'success'])
-                   .reset_index(drop=False)
-            )
-            g.columns = [''.join(col) for col in g.columns]
-            for s in ['success', 'coordination', 'interaction']:
-                ke, dr = g[f'{s}Keys'].to_numpy(), g[f'{s}Drums'].to_numpy()
-                r, p = stats.pearsonr(ke, dr)
-                res.append({'trial': idx, 'question': s.title(), 'correlation': r,
-                            'significance': vutils.get_significance_asterisks(p)})
-        return pd.DataFrame(res).sort_values(by='question')
+            # Iterate through each combination of independent/dependent variable and variable names
+            for iv, dv, names in zip(['instrument', 'block'], ['block', 'instrument'], [('Keys', 'Drums'), ('1', '2')]):
+                # Pivot the dataframe according to the variables
+                g = (
+                       grp.pivot(index=['trial', dv, 'latency', 'jitter', ], columns=iv,
+                                 values=['interaction', 'coordination', 'success'])
+                       .reset_index(drop=False)
+                )
+                # Reset the column names
+                g.columns = [''.join(map(str, col)) for col in g.columns]
+                # Iterate through each question individually
+                for s in ['success', 'coordination', 'interaction']:
+                    # Get scores for each level of the independent variable separately
+                    ke, dr = g[f'{s}{names[0]}'].to_numpy(), g[f'{s}{names[1]}'].to_numpy()
+                    # Calculate Pearson's r
+                    r, p = stats.pearsonr(ke, dr)
+                    # Append the results to the list
+                    res.append(
+                        {'trial': idx, 'variable': iv, 'question': s.title(),
+                         'correlation': r, 'significance': vutils.get_significance_asterisks(p)}
+                    )
+        # Create a dataframe from all results, sort the values, and reset
+        return pd.DataFrame(res).sort_values(by=['trial', 'variable']).reset_index(drop=True)
 
     @vutils.plot_decorator
-    def create_plot(self):
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
         """
-
+        Called from outside the class and creates the plot, saving in plot_decorator
         """
-        self.g = self._create_plot()
+        self._create_plot()
         self._format_ax()
         self._format_fig()
         fname = f'{self.output_dir}\\barplot_questionnaire_correlation'
         return self.fig, fname
 
-    def _create_plot(self):
+    def _create_plot(
+            self
+    ) -> None:
         """
+        Create the plot and apply axis labels
+        """
+        # Iterate through each ax and variable
+        for num, (ax, var) in enumerate(zip(self.ax.flatten(), ['instrument', 'block'])):
+            # Subset the data for the required variable
+            sub = self.data[self.data['variable'] == var]
+            # Create the bar chart
+            g = sns.barplot(
+                data=sub, x='question', y='correlation', hue='trial', ax=ax, edgecolor=vutils.BLACK, lw=2
+            )
+            # Add the bar label onto each container
+            for (i, trial), con in zip(sub.groupby('trial'), g.containers):
+                ax.bar_label(con, labels=trial['significance'].to_list(), padding=5, fontsize=12)
 
+    def _format_fig(
+            self
+    ) -> None:
         """
-        return sns.barplot(
-            data=self.data, x='trial', y='correlation', hue='question', ax=self.ax, edgecolor=vutils.BLACK, lw=2
-        )
+        Set figure-level attributes
+        """
+        # Add labels
+        self.fig.supxlabel('Question', y=0.05)
+        self.fig.supylabel('Correlation ($r$)', x=0.01, y=0.55)
+        # Add the legend back in
+        self.fig.legend(self.handles, self.labels, 'center right', ncol=1, title='Duo', frameon=False)
+        # Adjust subplot positioning slightly
+        self.fig.subplots_adjust(bottom=0.2, top=0.9, left=0.09, right=0.93)
 
-    def _format_fig(self):
+    def _format_ax(
+            self
+    ) -> None:
         """
-
+        Set axis-level attributes
         """
-        self.fig.supxlabel('Duo', y=0.09)
-        self.fig.supylabel('Correlation ($r$)', x=0.02, y=0.6)
-        sns.move_legend(self.ax, 'lower center', ncol=3, title=None, frameon=False, bbox_to_anchor=(0.45, -0.33),
-                        markerscale=1.6, handletextpad=0.3, )
-        self.fig.subplots_adjust(bottom=0.22, top=0.95, left=0.12, right=0.95)
-
-    def _format_ax(self):
-        """
-
-        """
-        self.g.set(ylim=(-1, 1), ylabel='', xlabel='')
-        self.ax.axhline(y=0, alpha=1, linestyle='-', color=vutils.BLACK)
-        self.ax.tick_params(width=3)
-        plt.setp(self.ax.spines.values(), linewidth=2)
-        for (i, trial), con in zip(self.data.groupby('question'), self.ax.containers):
-            self.ax.bar_label(con, labels=trial['significance'].to_list(), padding=5, fontsize=12)
+        # Iterate through each axis and label combination
+        for ax, lab in zip(self.ax.flatten(), ['Between performers', 'Between repeats']):
+            # Store the legend handles for later, then remove it
+            self.handles, self.labels = ax.get_legend_handles_labels()
+            ax.get_legend().remove()
+            # Set axis parameters
+            ax.set(ylim=(-1.2, 1.2), yticks=np.linspace(-1, 1, 5), ylabel=lab, xlabel='')
+            # Add in the horizontal line at y=0
+            ax.axhline(y=0, alpha=1, linestyle='-', color=vutils.BLACK, lw=2)
+            # Adjust tick and spine width
+            ax.tick_params(width=3)
+            plt.setp(ax.spines.values(), linewidth=2)
 
 
 def generate_questionnaire_plots(
