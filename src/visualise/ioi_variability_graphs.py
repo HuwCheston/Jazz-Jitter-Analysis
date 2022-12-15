@@ -123,6 +123,7 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         self.var = kwargs.get('var', 'ioi_std_vs_jitter_partial_correlation')
         self.df = self._format_df()
         self.df = self._bootstrap_df()
+        self.quantiles: tuple[float] = kwargs.get('quantiles', (0.025, 0.975))
         self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
 
     @vutils.plot_decorator
@@ -163,7 +164,7 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         return big_df
 
     def _bootstrap_df(
-            self, quantiles: tuple[int] = (0.05, 0.95), func=np.mean
+            self, func=np.mean
     ) -> pd.DataFrame:
         """
         Create a dataframe showing actual mean and boostrapped confidence intervals of lag effects at each jitter level.
@@ -180,10 +181,10 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         samples = [reshape.sample(frac=1, replace=True, random_state=n).mean(axis=0) for n in range(0, 1000)]
         # Combine all of our resampled dataframes together
         boot = pd.concat(samples, axis=1)
-        # Extract the 5% and 95% quantile from our samples, as well as the actual mean
-        boot_low = boot.quantile(quantiles[0], axis=1).rename('low')
+        # Extract the 2.5% and 97.5% quantile from our samples, as well as the actual mean
+        boot_low = boot.quantile(self.quantiles[0], axis=1).rename('low')
         boot_mu = reshape.mean(axis=0).rename('mean')
-        boot_high = boot.quantile(quantiles[1], axis=1).rename('high')
+        boot_high = boot.quantile(self.quantiles[1], axis=1).rename('high')
         # Concatenate all the dataframes together
         boot = pd.concat([boot_low, boot_mu, boot_high], axis=1).reset_index(drop=False)
         # Change the formatting of the jitter column to make plotting easier

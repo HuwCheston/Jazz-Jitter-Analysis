@@ -618,58 +618,158 @@ class BoxPlotR2WindowSize(vutils.BasePlot):
 
 class RegPlotGrid(vutils.BasePlot):
     """
-
+    Creates a grid of scatter and regression plots, showing relationship between primary variables (tempo slope, ioi
+    variability, asynchrony, self-reported success) and coupling balance. Regression is linear for all but tempo slope,
+    which is lowess. Distributions are shown in marginal plots.
     """
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # Define plotting attributes
+        self.lw = kwargs.get('lw', 5)   # Width of plotted lines
+        self.ci_frac: float = kwargs.get('ci_frac', 0.66666667)     # Fraction of data to use in lowess curve
+        self.ci_it: int = kwargs.get('ci_int', 3)   # Iterations to use in lowess curve
+        self.n_boot: int = kwargs.get('n_boot', 1000)   # Number of bootstraps
+        self.hand, self.lab = None, None    # Empty variables that will be used to hold handles and labels of legend
+        # Define variables to plot, both as they appear in the raw dataframe and the labels that should be on the plot
         self.xvars: list[str] = kwargs.get('xvars', ['tempo_slope', 'ioi_std', 'pw_asym', 'success'])
         self.xlabs: list[str] = kwargs.get(
             'xlab', ['Tempo slope (BPM/s)', 'IOI variability (SD, ms)', 'Asynchrony (RMS, ms)', 'Self-reported success']
         )
+        # Format the dataframe
         self.df = self._format_df()
-        self.fig, self.ax = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=False, figsize=(18.8, 18.8))
-        self.lw = kwargs.get('lw', 5)
-        self.ci_frac: float = kwargs.get('ci_frac', 0.66666667)
-        self.ci_it: int = kwargs.get('ci_int', 3)
-        self.n_boot: int = kwargs.get('n_boot', 1000)
-        self.hand, self.lab = None, None
+        # Create the figure, main axis, and marginal axis
+        self.fig = plt.figure(figsize=(18.8, 18.8))
+        self.main_ax, self.marginal_ax = self._init_gridspec_subplots()
 
-    def _format_df(self):
-        test = self.df[self.df['latency'] != 0]
+    def _init_gridspec_subplots(
+            self, widths: tuple[int] = (5, 1, 5, 1), heights: tuple[int] = (1, 5, 5)
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Initialise grid of subplots. Returns two numpy arrays corresponding to main and marginal axes respectively.
+        """
+        # Initialise subplot grid with desired width and height ratios
+        grid = self.fig.add_gridspec(nrows=3, ncols=4, width_ratios=widths, height_ratios=heights)
+        # Create a list of index values for each subplot type
+        margins = [0, 2, 5, 7, 9, 11]
+        mains = [4, 6, 8, 10]
+        # Create empty lists to hold subplots
+        marginal_ax = []
+        main_ax = []
+        # Iterate through all the subplots we want to create
+        for i in range(len(heights) * len(widths)):
+            # Create the subplot object
+            ax = self.fig.add_subplot(grid[i // len(widths), i % len(widths)])
+            # Append the subplot to the desired list
+            if i in margins:
+                marginal_ax.append(ax)
+            elif i in mains:
+                main_ax.append(ax)
+            # If we don't want to keep the axis, turn it off so it is hidden from the plot
+            else:
+                ax.axis('off')
+        # Return the figure, main subplots (as numpy array), and marginal subplots (as numpy array)
+        return np.array(main_ax), np.array(marginal_ax)
+
+    def _format_df(
+            self, success_diff: bool = False
+    ) -> pd.DataFrame:
+        """
+        Coerce the dataframe into the correct format for plotting
+        """
+        # Create lists of columns for grouping
         gps = ['trial', 'latency', 'jitter']
         cols = gps + ['coupling_balance', *self.xvars]
+        # Define functions to be applied to variables
         abs_correction = lambda grp: abs(grp.iloc[1]['correction_partner'] - grp.iloc[0]['correction_partner'])
-        test = pd.DataFrame(
-            [[*i, abs_correction(g, ), *(g[v].mean() for v in self.xvars)] for i, g in test.groupby(gps)], columns=cols
+        abs_success = lambda grp: abs(
+            grp.groupby('instrument').mean()['success'].iloc[0] - grp.groupby('instrument').mean()['success'].iloc[1]
         )
+        # If we want the difference between self-reported success values
+        if success_diff:
+            test = pd.DataFrame(
+                [[*i, abs_correction(g, ), *(g[v].mean() if v != 'tempo_slope' else abs_success(g) for v in self.xvars)]
+                 for i, g in self.df.groupby(gps)], columns=cols
+            )
+        # If we want the mean of self-reported success values
+        else:
+            test = pd.DataFrame(
+                [[*i, abs_correction(g, ), *(g[v].mean() for v in self.xvars)]
+                 for i, g in self.df.groupby(gps)], columns=cols
+            )
+        # Melt the dataframe according to the x variables and return
         return test.melt(id_vars=[*gps, 'coupling_balance'], value_vars=self.xvars)
 
-    def create_plot(self):
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class to generate the plot and save in plot decorator
+        """
         self._create_plot()
-        self._format_ax()
+        self._format_main_ax()
         self._format_fig()
-        plt.show()
+        # Format the marginal axes after the figure, otherwise this will affect their position
+        self._format_marginal_ax()
+        fname = f'{self.output_dir}\\regplot_grid'
+        return self.fig, fname
 
-    def _create_plot(self):
-        for a, (idx, grp) in zip(self.ax.flatten(), self.df.groupby('variable', sort=False)):
-            _ = sns.scatterplot(
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Create the plots on both the main and marginal axes
+        """
+        # Define these variables now so we don't get warnings in PyCharm
+        grp, sp = None, None
+        # Iterate through our main axes, second row of marginal plots, and variables
+        for a, m, (idx, grp) in zip(self.main_ax.flatten(), self.marginal_ax.flatten()[2:],
+                                    self.df.groupby('variable', sort=False)):
+            # Create the scatter plot on the main axis
+            sp = sns.scatterplot(
                 data=grp, x='coupling_balance', y='value', hue='latency', ax=a, palette=vutils.DUO_CMAP,
                 style='latency', s=250
             )
+            # Create the kde plot on the marginal axis
+            kp = sns.kdeplot(
+                data=grp, y='value', hue='latency', ax=m, palette=vutils.DUO_CMAP, legend=False, lw=2,
+                multiple='stack', fill=True, common_grid=True, cut=0
+            )
+            # Set parameters of the kde plot now, as we have access to both it and the scatter plot
+            kp.set(yticks=sp.get_yticks(), yticklabels=[], xticks=[], xlabel='', ylabel='', ylim=sp.get_ylim(), )
+            # Add a lowess curve to the tempo slope variable plot, with confidence intervals created with bootstrapping
             if idx == 'tempo_slope':
                 self._add_lowess(ax=a, grp=grp)
+            # Else, add a standard linear regression line
             else:
                 sns.regplot(
-                    data=grp, x='coupling_balance', y='value', ax=a, scatter=False, scatter_kws={'alpha': vutils.ALPHA},
-                    color=vutils.BLACK, n_boot=self.n_boot, line_kws={'lw': self.lw},
+                    data=grp, x='coupling_balance', y='value', ax=a, scatter=False, ci=95, n_boot=self.n_boot,
+                    scatter_kws={'alpha': vutils.ALPHA}, color=vutils.BLACK, line_kws={'lw': self.lw},
                 )
+        # Create the first row of marginal plots, showing distribution of coupling balance
+        for m in self.marginal_ax.flatten()[:2]:
+            # We can just use the last group and scatter plot here as the data is the same
+            kp = sns.kdeplot(
+                data=grp, x='coupling_balance', hue='latency', ax=m, palette=vutils.DUO_CMAP, legend=False, lw=2,
+                multiple='stack', fill=True, common_grid=True,
+            )
+            kp.set(xticks=sp.get_xticks(), xticklabels=[], xlim=sp.get_xlim(), yticks=[], xlabel='', ylabel='')
 
-    def _add_lowess(self, ax: plt.Axes, grp: pd.DataFrame, add_hline: bool = True):
-        def lowess(x, y, it, frac):
+    def _add_lowess(
+            self, ax: plt.Axes, grp: pd.DataFrame, add_hline: bool = True
+    ) -> None:
+        """
+        Adds in a lowess curve to a single plot with bootstrapped confidence intervals
+        """
+        def lowess(
+                x: pd.Series, y: pd.Series, it: int, frac: float
+        ) -> np.ndarray:
+            """
+            Returns a single lowess curve in the form of a numpy array
+            """
             return sm_lowess(x, y, it=it, frac=frac, return_sorted=True).T
 
-        # Add in actual line from raw data
+        # Add in actual lowess curve from raw data
         act_x, act_y = lowess(grp['value'], grp['coupling_balance'], self.ci_it, self.ci_frac)
         ax.plot(act_x, act_y, color=vutils.BLACK, lw=self.lw)
         # Bootstrap confidence intervals
@@ -687,29 +787,81 @@ class RegPlotGrid(vutils.BasePlot):
         fmt_y = fmt(res_y)
         # Extract the quantiles: median x value, 0.05 and 0.95 quantiles from y
         x_5 = fmt_x.quantile(0.5, axis=1)
-        y_05 = fmt_y.quantile(0.05, axis=1)
-        y_95 = fmt_y.quantile(0.95, axis=1)
+        y_05 = fmt_y.quantile(0.025, axis=1)
+        y_95 = fmt_y.quantile(0.975, axis=1)
+        conc = pd.concat([x_5, y_05, y_95], axis=1)
+        conc.iloc[0:-5] = conc.iloc[0:-5].rolling(10, min_periods=1).mean()
         # Fill between the quantiles
-        ax.fill_between(x_5, y_05, y_95, color=vutils.BLACK, alpha=0.2)
+        ax.fill_between(conc[0.500], conc[0.025], conc[0.975], color=vutils.BLACK, alpha=0.2)
         # Add horizontal line at y=0 if required
         if add_hline:
             ax.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK, linewidth=self.lw)
 
-    def _format_ax(self):
-        for ax, lab in zip(self.ax.flatten(), self.xlabs):
+    def _format_main_ax(
+            self
+    ) -> None:
+        """
+        Applies axes-level formatting to main plots
+        """
+        # Iterate through main axes and labels
+        for num, (ax, lab) in enumerate(zip(self.main_ax.flatten(), self.xlabs)):
+            # Store our handles and labels here so we can refer to them later
             self.hand, self.lab = ax.get_legend_handles_labels()
+            # Remove the legend
             ax.get_legend().remove()
+            # Set parameters
             ax.set_ylabel(lab, fontsize=20)
             ax.set(xlabel='', xticks=np.linspace(0, 1.2, 5))
+            # For the top row of plots, we don't want tick labels, so remove them
+            if num < 2:
+                ax.set_xticklabels([])
+            # Adjust tick and axes thickness
             ax.tick_params(width=3, )
             plt.setp(ax.spines.values(), linewidth=2)
 
-    def _format_fig(self):
+    def _format_marginal_ax(
+            self,
+    ) -> None:
+        """
+        Applies axes-level formatting to marginal plots
+        """
+        # Iterate through marginal axes, with a counter
+        for i, ax in enumerate(self.marginal_ax.flatten()):
+            # Apply formatting to all marginal plots
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.tick_params(width=3, )
+            plt.setp(ax.spines.values(), linewidth=2)
+            ax.set(yticklabels=[], xticklabels=[])
+            # Apply formatting only to top row of plots
+            if i < 2:
+                box = ax.get_position()
+                box.y0 -= 0.03
+                box.y1 -= 0.03
+                ax.set_position(box)
+                ax.spines['left'].set_visible(False)
+            # Apply formatting only to bottom two rows of plots
+            else:
+                box = ax.get_position()
+                box.x0 -= 0.02
+                box.x1 -= 0.02
+                ax.set_position(box)
+                ax.spines['bottom'].set_visible(False)
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Apply figure-level formatting to overall image
+        """
+        # Add in label to x axis
         self.fig.supxlabel('Coupling balance', y=0.02)
-        leg = self.fig.legend(self.hand, self.lab, 'center right', ncol=1, title='Latency (ms)', frameon=False,
-                              markerscale=2, prop={'size': 20})
+        # Add in single legend, using attributes we saved when removing individual legends
+        leg = self.fig.legend(self.hand, self.lab, loc='upper center', ncol=1, title='Latency (ms)', frameon=False,
+                              bbox_to_anchor=(0.48, 1), markerscale=2, prop={'size': 20})
         plt.setp(leg.get_title(), fontsize=20)
-        self.fig.subplots_adjust(left=0.09, right=0.88, bottom=0.07, top=0.93, wspace=0.2, hspace=0.2)
+        # Adjust subplot positioning a bit: this will affect marginal positions, so we'll change these later
+        self.fig.subplots_adjust(left=0.07, right=1.01, bottom=0.07, top=0.99, hspace=0.15, wspace=0.2)
 
 
 def generate_phase_correction_plots(
@@ -739,7 +891,7 @@ def generate_phase_correction_plots(
     )
     pg.create_plot()
     # Create regression plots
-    rp = RegPlot(df=df, output_dir=figures_output_dir)
+    rp = RegPlotGrid(df=df, output_dir=figures_output_dir)
     rp.create_plot()
     bar = BarPlot(df=df, output_dir=figures_output_dir)
     bar.create_plot()
