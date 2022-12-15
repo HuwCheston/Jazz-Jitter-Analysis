@@ -346,7 +346,7 @@ class BarPlotQuestionnaireCorrelation(vutils.BasePlot):
             self.handles, self.labels = ax.get_legend_handles_labels()
             ax.get_legend().remove()
             # Set axis parameters
-            ax.set(ylim=(-1.2, 1.2), yticks=np.linspace(-1, 1, 5), ylabel=lab, xlabel='')
+            ax.set(ylim=(-1.1, 1.1), yticks=np.linspace(-1, 1, 5), ylabel=lab, xlabel='')
             # Add in the horizontal line at y=0
             ax.axhline(y=0, alpha=1, linestyle='-', color=vutils.BLACK, lw=2)
             # Adjust tick and spine width
@@ -365,7 +365,7 @@ def generate_questionnaire_plots(
         df.append(pcm.keys_dic)
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
-    figures_output_dir = output_dir + '\\figures\\questionnaire_plots'
+    figures_output_dir = output_dir + '\\figures\\success_plots'
     hm = HeatmapQuestionnaire(df=df, output_dir=figures_output_dir)
     hm.create_plot()
     bp = BarPlotTestRetestReliability(df=df, output_dir=figures_output_dir)

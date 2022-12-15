@@ -864,6 +864,67 @@ class RegPlotGrid(vutils.BasePlot):
         self.fig.subplots_adjust(left=0.07, right=1.01, bottom=0.07, top=0.99, hspace=0.15, wspace=0.2)
 
 
+class ArrowPlotPhaseCorrection(vutils.BasePlot):
+    """
+    Creates a plot showing the average strength, direction, and balance of the coupling within each duo.
+    Designed to look somewhat similar to fig 2.(b) in Jacoby et al. (2021)
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=5, figsize=(18.8, 2), sharex=True, sharey=True)
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called outside of the class to create plot and save in plot decorator
+        """
+        self._create_plot()
+        self._format_fig()
+        fname = f'{self.output_dir}\\arrowplot_phase_correction'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Creates the individual subplots
+        """
+        # Iterate through each ax and duo
+        for a, (idx, duo) in zip(self.ax.flatten(), self.df.groupby('trial')):
+            # Get means and standard errors for the duo and sort
+            means = duo.groupby('instrument').mean().sort_index(ascending=False)['correction_partner']
+            sems = duo.groupby('instrument')['correction_partner'].sem().sort_index(ascending=False)
+            # Add in the title showing the duo number
+            a.set_title(f'Duo {idx}', y=0.9)
+            # Add text showing the absolute coupling balance
+            a.text(0.5, 0, f'$Balance$: +{abs(means.iloc[0] - means.iloc[1]):.2f}', ha='center', va='center')
+            # Turn the axis off
+            a.axis('off')
+            # Iterate through colour, x values (x2), y values, and text
+            for col, x1, x2, y, text in zip(vutils.INSTR_CMAP, [0, 1], [1, 0], [0.65, 0.35, ], ['Keys', 'Drums']):
+                # Create the arrow
+                a.annotate('', xy=(x1, y), xycoords=a.transAxes, xytext=(x2, y), textcoords=a.transAxes,
+                           arrowprops=dict(edgecolor=vutils.BLACK, lw=1.5, facecolor=col, mutation_scale=1,
+                                           width=means.iloc[x1] * 15, shrink=0.1, headwidth=20))
+                # Add in the mean and standard error
+                a.text(0.5, y + 0.14, f'{means.iloc[x1]:.2f} $({sems.iloc[x1]:.2f})$', ha='center', va='center')
+                # Add in the rectangle and text showing the instrument and coupling direction
+                a.add_patch(plt.Rectangle((x1 - 0.1, 0.2), width=0.2, height=0.6, clip_on=False, linewidth=3,
+                                          edgecolor=vutils.BLACK, transform=a.transAxes, facecolor=col))
+                a.text(x1, 0.49, text, rotation=90 if x1 == 0 else 270, ha='center',
+                       va='center')
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Adjusts figure-level parameters
+        """
+        self.fig.subplots_adjust(right=0.95, left=0.05, wspace=0.4)
+
+
 def generate_phase_correction_plots(
     mds: list, output_dir: str,
 ) -> None:
