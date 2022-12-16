@@ -160,7 +160,7 @@ class PhaseCorrectionModel:
         # Square all the asynchrony values, take the mean, then the square root, then convert to milliseconds
         return np.sqrt(np.nanmean(np.square(con))) * 1000
 
-    def _extract_pairwise_asynchrony_with_std(
+    def _extract_pairwise_asynchrony_with_standard_deviations(
             self, asynchrony_col: str = 'asynchrony'
     ):
         """
@@ -182,7 +182,7 @@ class PhaseCorrectionModel:
             le = le.copy(deep=True)
             r = r.copy(deep=True)
             # Merge the dataframes together on their shared columns
-            con = le.rename(columns={'my_onset': 'o'}).merge(r.rename(columns={'their_onset', 'o'}), how='left', on='o')
+            con = le.rename(columns={'my_onset': 'o'}).merge(r.rename(columns={'their_onset': 'o'}), how='left', on='o')
             # Append the pairwise asynchrony value
             means.append(
                 np.sqrt(np.nanmean(np.square(con[[f'{asynchrony_col}_x', f'{asynchrony_col}_y']].std(axis=1)))) * 1000
@@ -195,10 +195,6 @@ class PhaseCorrectionModel:
     ) -> pd.DataFrame:
         """
         For a single performer, matches each of their live onsets with the closest delayed onset from their partner.
-
-        Method:
-        ---
-        # TODO: fill this in
         """
         # Carry out the nearest neighbour matching
         empty_arr = np.zeros(shape=(live_arr.shape[0], 2), dtype=np.float64)
@@ -417,11 +413,18 @@ class PhaseCorrectionModel:
         return df
 
     def _get_rolling_coefficients(
-            self, nn_df: pd.DataFrame, func=None, ind_var: str = 'latency',
-            dep_var: str = 'my_prev_ioi', cov: str = 'their_prev_ioi'
+            self, nn_df: pd.DataFrame, func=None, ind_var: str = 'latency', dep_var: str = 'my_prev_ioi',
+            cov: str = 'their_prev_ioi'
     ) -> list[float | int]:
         """
+        Centralised function for calculating the relationship between IOI and latency variancy. Takes in a single
+        independent and dependent variable and covariants, as well as a function to apply to these.
 
+        Method:
+        ---
+        -	Get rolling standard deviation values for all passed variables.
+        -	Lag these values according to the maximum lag attribute passed when creating the class instance.
+        -   Apply a function (defaults to regression) onto the lagged and non-lagged variables and return the results.
         """
         if func is None:
             func = self._regress_shifted_rolling_variables
@@ -434,7 +437,7 @@ class PhaseCorrectionModel:
     ) -> pd.DataFrame:
         """
         Extracts the rolling standard deviation of values within a given window size, then resample to get mean value
-        for every second
+        for every second.
         """
         # Create the temporary dataframe
         temp = nn_df.copy(deep=True)
@@ -461,7 +464,7 @@ class PhaseCorrectionModel:
             self, roll: pd.DataFrame, cols: tuple[str] = ('my_prev_ioi_std', 'their_prev_ioi_std', 'latency_std')
     ) -> pd.DataFrame:
         """
-        Shifts rolling values by a given number of seconds and concatenates together.
+        Shifts rolling values by a given number of seconds and concatenates together with the original dataframe.
         """
         # Define the function for shifting values by a maximum number of seconds
         shifter = lambda s: pd.concat(
@@ -526,40 +529,52 @@ class PhaseCorrectionModel:
         Creates a dictionary of summary statistics, used when analysing all models.
         """
         return {
+            # Metadata for the condition
             'trial': c['trial'],
             'block': c['block'],
             'latency': c['latency'],
             'jitter': c['jitter'],
             'instrument': c['instrument'],
+            # Raw data, including latency and MIDI arrays, used for creating tempo slope graphs
             'raw_beats': [c['midi_bpm']],
+            'zoom_arr': c['zoom_array'],
+            # Beat metadata: total number of beats and number requiring interpolation
             'total_beats': autils.extract_interpolated_beats(c)[0],
             'interpolated_beats': autils.extract_interpolated_beats(c)[1],
+            # Summary variables: tempo slope, ioi variability, asynchrony, self-reported success
             'tempo_slope': self._extract_tempo_slope().params.loc['my_onset'],
-            'tempo_intercept': self._extract_tempo_slope().params.loc['Intercept'],
-            'contamination': self._contamination,
-            'asynchrony_na': nn['asynchrony'].isna().sum(),
             'ioi_std': self._get_rolling_standard_deviation_values(nn_df=nn)['my_prev_ioi_std'].median(),
-            # 'ioi_std_vs_jitter_coefficients': self._get_rolling_coefficients(nn_df=nn),
+            'pw_asym': self._extract_pairwise_asynchrony(),
+            'success': c['success'],
+            # Tempo-slope related additional variables
+            'tempo_intercept': self._extract_tempo_slope().params.loc['Intercept'],
+            # IOI variability related additional variables
+            'my_prev_ioi_diff_mean': nn['my_prev_ioi_diff'].mean(),
+            'my_next_ioi_diff_mean': nn['my_next_ioi_diff'].mean(),
+            'ioi_std_vs_jitter_coefficients': self._get_rolling_coefficients(nn_df=nn),
             'ioi_std_vs_jitter_partial_correlation': self._get_rolling_coefficients(
                 nn_df=nn, func=self._partial_corr_shifted_rolling_variables
             ),
-            'pw_asym': self._extract_pairwise_asynchrony(),
-            'pw_asym_raw': self._extract_pairwise_asynchrony(asynchrony_col='asynchrony_raw'),
-            'pw_asym_std': self._extract_pairwise_asynchrony_with_std(),
-            'pw_asym_raw_std': self._extract_pairwise_asynchrony_with_std(asynchrony_col='asynchrony_raw'),
-            'my_prev_ioi_diff_mean': nn['my_prev_ioi_diff'].mean(),
-            'my_next_ioi_diff_mean': nn['my_next_ioi_diff'].mean(),
+            # Asynchrony related additional variables
             'asynchrony_mean': nn['asynchrony'].mean(),
+            'asynchrony_na': nn['asynchrony'].isna().sum(),
+            'pw_asym_raw': self._extract_pairwise_asynchrony(asynchrony_col='asynchrony_raw'),
+            'pw_asym_std': self._extract_pairwise_asynchrony_with_standard_deviations(),
+            'pw_asym_raw_std': self._extract_pairwise_asynchrony_with_standard_deviations(
+                asynchrony_col='asynchrony_raw'
+            ),
+            # Success related additional variables
+            'interaction': c['interaction'],
+            'coordination': c['coordination'],
+            # Phase correction model parameters
             'intercept': md.params.loc['Intercept'] if 'Intercept' in md.params.index else 0,
             'correction_self': md.params.loc['my_prev_ioi_diff'],
             'correction_partner': md.params.loc['asynchrony'],
+            # Phase correction model extra variables
+            'contamination': self._contamination,
             'resid_std': np.std(md.resid),
             'resid_len': len(md.resid),
             'rsquared': md.rsquared,
-            'zoom_arr': c['zoom_array'],
-            'success': c['success'],
-            'interaction': c['interaction'],
-            'coordination': c['coordination']
         }
 
 

@@ -11,10 +11,10 @@ python-dotenv>=0.5.1
 
 pandas~=1.4.3
 numpy==1.22.3
-numba
+numba~=0.56.4
 matplotlib~=3.5.2
 pretty_midi
-pingouin
+pingouin~=0.5.2
 librosa
 scipy~=1.9.0
 seaborn>=0.12
@@ -23,6 +23,7 @@ openpyxl
 lxml
 patsy
 stargazer~=0.0.5
-
-scikit-learn~=1.1.2
+scikit-learn~=1.0.2
 setuptools~=57.0.0
+joblib~=1.1.0
+bioinfokit~=2.0.8

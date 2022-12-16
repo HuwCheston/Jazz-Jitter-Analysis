@@ -7,30 +7,32 @@ from datetime import timedelta
 import statsmodels.formula.api as smf
 
 import src.analyse.analysis_utils as autils
+from src.analyse.phase_correction_models import PhaseCorrectionModel
 
 
 class Simulation:
     """
     Creates X number of simulated performances from two given phase correction models, the parameters of which depend
     on the arguments passed. Current options are: 'original', 'democracy', 'anarchy', 'leadership' (must specify leader)
+
+    Number of simulations defaults to 500, the same number in Jacoby et al. (2021).
     """
     def __init__(
-            self, keys_pcm: pd.DataFrame, drms_pcm: pd.DataFrame,
-            latency_array: np.ndarray, num_simulations: int = 1000,
-            **kwargs
+            self, pcm: PhaseCorrectionModel, num_simulations: int = 500, **kwargs
     ):
         # Default parameters
         self._resample_interval: timedelta = timedelta(seconds=1)  # Get mean of IOIs within this window
         # Check and generate our input data
         self.total_beats: int = 1000
-        self.latency: np.array = self._append_timestamps_to_latency_array(latency_array)
         self.num_simulations: int = num_simulations
         # Rolling window parameters -- should be the same as for the phase correction models
         self._rolling_window_size: str = kwargs.get('rolling_window_size', '2s')   # 2 seconds = 2 beats at 120BPM
         self._rolling_min_periods: int = kwargs.get('rolling_min_periods', 2)
-        # Phase correction models
-        self._keys_pcm: pd.DataFrame = keys_pcm
-        self._drms_pcm: pd.DataFrame = drms_pcm
+        # Get the raw data from our phase correction model
+        self.keys_pcm = pd.DataFrame([pcm.keys_dic])
+        self.drms_pcm = pd.DataFrame([pcm.drms_dic])
+        # Get the zoom array used in the performance
+        self.latency: np.ndarray = self._append_timestamps_to_latency_array(self.keys_pcm['zoom_arr'].iloc[0])
         # Raw simulation parameters, which will be used to create the dictionaries used in the simulations.
         self.parameter: str = kwargs.get('parameter', 'original')
         self.leader: str = kwargs.get('leader', None)
@@ -38,8 +40,8 @@ class Simulation:
         self.noise = kwargs.get('noise', 0.005)     # Default noise term, if original noise is not to be used
         self.use_original_noise: bool = kwargs.get('use_original_noise', False)    # Whether to use noise from model
         # Musician parameters
-        self.keys_params_raw: dict = self._get_raw_musician_parameters(init=self._keys_pcm)
-        self.drms_params_raw: dict = self._get_raw_musician_parameters(init=self._drms_pcm)
+        self.keys_params_raw: dict = self._get_raw_musician_parameters(init=self.keys_pcm)
+        self.drms_params_raw: dict = self._get_raw_musician_parameters(init=self.drms_pcm)
         self.keys_params: nb.typed.Dict = self._convert_musician_parameters_dict_to_numba(
             self._modify_musician_parameters_by_simulation_type(self.keys_params_raw)
         )
@@ -214,11 +216,12 @@ class Simulation:
         # Format simulated data
         self.keys_simulations = [self._format_simulated_data(d[0]) for d in all_sims]
         self.drms_simulations = [self._format_simulated_data(d[1]) for d in all_sims]
-        # After running simulations, clean up by converting parameters from numba to python dictionary
-        # This will allow us to pickle instances of the Simulation class without errors
+        # After running simulations, clean up by converting simulation parameters from numba back to python dictionary
+        # This will allow us to pickle instances of the Simulation class without errors, as numba dictionaries are
+        # currently not supported by the pickle package.
         self.keys_params = dict(self.keys_params)
         self.drms_params = dict(self.drms_params)
-        # Save our results dictionary to an attribute, so we don't have to do it later (or multiple times!)
+        # Save our results dictionary to an attribute in the class, so we don't have to do it later (or multiple times!)
         self.results_dic = self._create_summary_dictionary()
 
     def _format_simulated_data(
@@ -373,17 +376,22 @@ class Simulation:
         Creates a summary dictionary with important simulation parameters
         """
         return {
-            'trial': self._keys_pcm["trial"].iloc[0],
-            'block': self._keys_pcm["block"].iloc[0],
-            'latency': self._keys_pcm["latency"].iloc[0],
-            'jitter': self._keys_pcm["jitter"].iloc[0],
+            # Condition metadata
+            'trial': self.keys_pcm["trial"].iloc[0],
+            'block': self.keys_pcm["block"].iloc[0],
+            'latency': self.keys_pcm["latency"].iloc[0],
+            'jitter': self.keys_pcm["jitter"].iloc[0],
+            # Simulation metadata
             'parameter': self.parameter,
             'leader': self.leader,
-            # Get metrics from the actual original performance on which this simulation was based
-            'tempo_slope_original': self._keys_pcm['tempo_slope'].iloc[0],
-            'ioi_variability_original': np.mean([self._keys_pcm['ioi_std'].iloc[0], self._drms_pcm['ioi_std'].iloc[0]]),
-            'asynchrony_original': self._keys_pcm['pw_asym'].iloc[0],
-            # Get summary metrics from all the simulated performances
+            'original_noise': self.use_original_noise,
+            'keys_parameters': self.keys_params_raw,
+            'drums_parameters': self.drms_params_raw,
+            # Metrics from the actual original performance on which this simulation was based
+            'tempo_slope_original': self.keys_pcm['tempo_slope'].iloc[0],
+            'ioi_variability_original': np.mean([self.keys_pcm['ioi_std'].iloc[0], self.drms_pcm['ioi_std'].iloc[0]]),
+            'asynchrony_original': self.keys_pcm['pw_asym'].iloc[0],
+            # Summary metrics from all the simulated performances
             'tempo_slope_simulated': self.get_average_tempo_slope(),
             'ioi_variability_simulated': self.get_average_ioi_variability(),
             'asynchrony_simulated': self.get_average_pairwise_asynchrony(),
@@ -392,7 +400,7 @@ class Simulation:
 
 def generate_phase_correction_simulations(
         mds: pd.DataFrame, output_dir: str, logger=None, force_rebuild: bool = False, num_simulations: int = 100
-) -> list[dict]:
+) -> list[Simulation]:
     """
     Create simulated performances across a range of artificial coupling parameters for every phase correction model
     """
@@ -404,30 +412,27 @@ def generate_phase_correction_simulations(
             return all_sims
     # Define the parameters and leader combinations we want to create simulations for
     params = [
-        ('original', None),
-        ('democracy', None),
-        ('anarchy', None),
-        ('leadership', 'Drums'),
+        # ('parameter', 'leader', 'use_original_noise')
+        ('original', None, True),   # Original coupling parameters with original noise term
+        ('original', None, False),  # Original coupling parameters with modified noise term
+        ('democracy', None, False),     # Democracy - both musicians coupled to each other
+        ('anarchy', None, False),   # Anarchy - neither musician coupled to each other
+        ('leadership', 'Drums', False),     # Drums leadership - keys coupled to drums, drums not coupled to keys
     ]
     # Create an empty list to hold simulations in
     all_sims = []
     for pcm in mds:
-        # Get the raw data from our phase correction model
-        ke = pd.DataFrame([pcm.keys_dic])
-        dr = pd.DataFrame([pcm.drms_dic])
-        # Get the zoom array used in the performance
-        z = ke['zoom_arr'].iloc[0]
         # Iterate through each parameter and leader combo
-        for param, leader in params:
-            if logger is not None:
-                logger.info(f'... trial {ke["trial"].iloc[0]}, block {ke["block"].iloc[0]}, '
-                            f'latency {ke["latency"].iloc[0]}, jitter {ke["jitter"].iloc[0]}, '
-                            f'parameter {param}, leader {leader}')
+        for param, leader, orig_noise in params:
             # Initialise the simulation class
             sim = Simulation(
-                keys_pcm=ke, drms_pcm=dr, latency_array=z, num_simulations=num_simulations,
-                parameter=param, leader=leader, use_original_noise=False
+                pcm=pcm, num_simulations=num_simulations, parameter=param, leader=leader, use_original_noise=orig_noise
             )
+            # Log the current simulation being generated
+            if logger is not None:
+                logger.info(f'... trial {sim.keys_pcm["trial"].iloc[0]}, block {sim.keys_pcm["block"].iloc[0]}, '
+                            f'latency {sim.keys_pcm["latency"].iloc[0]}, jitter {sim.keys_pcm["jitter"].iloc[0]}, '
+                            f'parameter {sim.parameter}, leader {sim.leader}, original_noise {sim.use_original_noise}')
             # Create all simulations for this parameter/leader combination
             sim.create_all_simulations()
             # Append the simulation to our list
