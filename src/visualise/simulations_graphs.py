@@ -156,21 +156,20 @@ class BarPlotSimulationParameters(vutils.BasePlot):
     Creates a plot showing the simulation results per parameter, designed to look similar to fig 2.(d)
     in Jacoby et al. (2021).
     """
-    def __init__(self, raw: list, **kwargs):
+    def __init__(self, df: pd.DataFrame, **kwargs):
         super().__init__(**kwargs)
         self.key: dict = {'Original': 0, 'Democracy': 1, 'Anarchy': 2, 'Leadership': 3}
-        self.df = self._format_df(sims=raw)
+        self.df = self._format_df(df=df)
         self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=True, figsize=(18.8, 5))
         self.ax[1].set_yscale('log')
 
     @staticmethod
     def _format_df(
-            sims: list
+            df: pd.DataFrame
     ) -> pd.DataFrame:
         """
         Wrangles dataframe into form required for plotting.
         """
-        df = pd.DataFrame([sim.results_dic for sim in sims])
         # Fill our 'None' leader values with empty strings
         df['leader'] = df['leader'].fillna(value='').str.lower()
         # Format our parameter column by combining with leader column, replacing values with title case
@@ -333,21 +332,20 @@ class RegPlotSimulationComparisons(vutils.BasePlot):
     actual and simulated performances (with original coupling patterns).
     """
     def __init__(
-            self, sim_list: list, **kwargs
+            self, df: pd.DataFrame, **kwargs
     ):
         super().__init__(**kwargs)
         self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=False, sharey=False, figsize=(18.8, 9))
-        self.df = self._format_df(sim_list)
+        self.df = self._format_df(df)
 
     @staticmethod
     def _format_df(
-            sim_list: list
+            df: pd.DataFrame
     ) -> pd.DataFrame:
         """
         Extracts results data from each Simulation class instance and subsets to get original coupling simulations only.
         Results data is initialised when simulations are created, which makes this really fast.
         """
-        df = pd.DataFrame([sim.results_dic for sim in sim_list])
         return df[df['parameter'] == 'original']
 
     @vutils.plot_decorator
@@ -439,10 +437,11 @@ class RegPlotSimulationComparisons(vutils.BasePlot):
 def generate_simulations_plots(
     sims: list, output_dir: str,
 ) -> None:
+    df = pd.DataFrame([sim.results_dic for sim in sims])
     figures_output_dir = output_dir + '\\figures\\simulations_plots'
-    rp = RegPlotSimulationComparisons(sims, output_dir=figures_output_dir)
+    rp = RegPlotSimulationComparisons(df, output_dir=figures_output_dir)
     rp.create_plot()
-    bp = BarPlotSimulationParameters(sims, output_dir=figures_output_dir)
+    bp = BarPlotSimulationParameters(df, output_dir=figures_output_dir)
     bp.create_plot()
 
 

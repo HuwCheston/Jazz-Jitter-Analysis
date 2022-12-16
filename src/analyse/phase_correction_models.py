@@ -145,37 +145,50 @@ class PhaseCorrectionModel:
             self, asynchrony_col: str = 'asynchrony'
     ):
         """
-        Extract pairwise asynchrony as a float (in milliseconds, as standard for this unit)
-
-        Outside the control conditions -- where both participants received the same feedback! -- this
-        value probably doesn't mean that much, because participants heard different things from
-        each others performance due to the latency. What this value does give, however, is a sense
-        of whether both performers tried to match the delayed feedback they heard.
+        Extract pairwise asynchrony as a float (in milliseconds, as is standard for this unit in the literature)
 
         Method:
         ---
-        - Take the standard deviation of the asynchrony column from both nearest neighbour dataframes
-        - Square both standard deviations
-        - Calculate the mean of these squared standard deviation
-        - Take the square root of the mean (RMS = Root-Mean-Square)
-        - Multiply the result by 1000 to convert to milliseconds
+        -	Carry out the nearest-neighbour matching, and get a series of asynchrony values for both musicians
+            (I.e. keys -> drums with delay, drums -> keys with delay).
+        -	Square all of these values;
+        -	Get the overall mean (here we collapse both arrays down to a single value);
+        -	Take the square root of this mean.
         """
+        # Concatenate both arrays of asynchrony values together
         con = np.concatenate((self.keys_nn[asynchrony_col].to_numpy(), self.drms_nn[asynchrony_col].to_numpy()))
+        # Square all the asynchrony values, take the mean, then the square root, then convert to milliseconds
         return np.sqrt(np.nanmean(np.square(con))) * 1000
 
     def _extract_pairwise_asynchrony_with_std(
             self, asynchrony_col: str = 'asynchrony'
     ):
         """
+        Extract pairwise asynchrony using the standard deviation of the asynchrony
 
+        Method:
+        ---
+        -	Join both nearest-neighbour dataframes in order to match asynchrony values together;
+        -	Square all of these values;
+        -	Get the overall mean (here we collapse both arrays down to a single value);
+        -	Take the square root of this mean.
+        -   Repeat the join process with the other dataframe as left join, get the pairwise asynchrony again
+        -   Take the mean of both (this is to prevent issues with the dataframe join process)
         """
-        con = self.keys_nn.rename(columns={'my_onset': 'ons'}).merge(self.drms_nn.rename(columns={'their_onset': 'ons'}),
-                                                                     how='left', on='ons')
-        m1 = np.sqrt(np.nanmean(np.square(con[[f'{asynchrony_col}_x', f'{asynchrony_col}_y']].std(axis=1)))) * 1000
-        con = self.drms_nn.rename(columns={'my_onset': 'ons'}).merge(self.keys_nn.rename(columns={'their_onset': 'ons'}),
-                                                                     how='left', on='ons')
-        m2 = np.sqrt(np.nanmean(np.square(con[[f'{asynchrony_col}_x', f'{asynchrony_col}_y']].std(axis=1)))) * 1000
-        return np.mean([m1, m2])
+        means = []
+        # Iterate through both combinations of nearest neighbour dataframes
+        for le, r in zip([self.keys_nn, self.drms_nn], [self.drms_nn, self.keys_nn]):
+            # Copy the dataframes so we don't mess anything up internally with them
+            le = le.copy(deep=True)
+            r = r.copy(deep=True)
+            # Merge the dataframes together on their shared columns
+            con = le.rename(columns={'my_onset': 'o'}).merge(r.rename(columns={'their_onset', 'o'}), how='left', on='o')
+            # Append the pairwise asynchrony value
+            means.append(
+                np.sqrt(np.nanmean(np.square(con[[f'{asynchrony_col}_x', f'{asynchrony_col}_y']].std(axis=1)))) * 1000
+            )
+        # Calculate the mean of both values
+        return np.mean(means)
 
     def _match_onsets(
             self, live_arr: np.ndarray, delayed_arr: np.ndarray, zoom_arr: np.ndarray,

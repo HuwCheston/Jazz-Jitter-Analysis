@@ -958,6 +958,8 @@ def generate_phase_correction_plots(
     bar.create_plot()
     bar = BarPlot(df=df, output_dir=figures_output_dir, yvar='correction_self', ylabel='Self coupling', ylim=(-1, 1))
     bar.create_plot()
+    ap = ArrowPlotPhaseCorrection(df=df, output_dir=figures_output_dir)
+    ap.create_plot()
 
 
 if __name__ == '__main__':

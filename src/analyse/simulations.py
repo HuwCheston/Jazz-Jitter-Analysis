@@ -10,27 +10,33 @@ import src.analyse.analysis_utils as autils
 
 
 class Simulation:
+    """
+    Creates X number of simulated performances from two given phase correction models, the parameters of which depend
+    on the arguments passed. Current options are: 'original', 'democracy', 'anarchy', 'leadership' (must specify leader)
+    """
     def __init__(
-            self, keys_params, drms_params, latency_array, num_simulations: int = 1000, **kwargs
+            self, keys_pcm: pd.DataFrame, drms_pcm: pd.DataFrame,
+            latency_array: np.ndarray, num_simulations: int = 1000,
+            **kwargs
     ):
-        """
-
-        """
         # Default parameters
         self._resample_interval: timedelta = timedelta(seconds=1)  # Get mean of IOIs within this window
         # Check and generate our input data
         self.total_beats: int = 1000
         self.latency: np.array = self._append_timestamps_to_latency_array(latency_array)
         self.num_simulations: int = num_simulations
+        # Rolling window parameters -- should be the same as for the phase correction models
+        self._rolling_window_size: str = kwargs.get('rolling_window_size', '2s')   # 2 seconds = 2 beats at 120BPM
+        self._rolling_min_periods: int = kwargs.get('rolling_min_periods', 2)
         # Phase correction models
-        self._keys_pcm: pd.DataFrame = keys_params
-        self._drms_pcm: pd.DataFrame = drms_params
-        # Simulation parameters, in the form of numba dictionaries to be used inside a numba function
+        self._keys_pcm: pd.DataFrame = keys_pcm
+        self._drms_pcm: pd.DataFrame = drms_pcm
+        # Raw simulation parameters, which will be used to create the dictionaries used in the simulations.
         self.parameter: str = kwargs.get('parameter', 'original')
         self.leader: str = kwargs.get('leader', None)
         # Noise parameters for the simulation
-        self._use_original_noise: bool = kwargs.get('use_original_noise', False)    # Whether to use noise from model
         self.noise = kwargs.get('noise', 0.005)     # Default noise term, if original noise is not to be used
+        self.use_original_noise: bool = kwargs.get('use_original_noise', False)    # Whether to use noise from model
         # Musician parameters
         self.keys_params_raw: dict = self._get_raw_musician_parameters(init=self._keys_pcm)
         self.drms_params_raw: dict = self._get_raw_musician_parameters(init=self._drms_pcm)
@@ -134,7 +140,7 @@ class Simulation:
                 'intercept': 0,
             }
         # Update our dictionary with the required amount of noise
-        if self._use_original_noise:
+        if self.use_original_noise:
             output_data.update({'resid_std': input_data['resid_std']})
         else:
             output_data.update({'resid_std': self.noise})
@@ -227,10 +233,27 @@ class Simulation:
         # Drop rows with all zeros in
         df = df.loc[~(df == 0).all(axis=1)]
         # Convert my onset column to a timedelta
-        df['td'] = pd.to_timedelta([timedelta(seconds=val) for val in df['my_onset']])
+        idx = pd.to_timedelta([timedelta(seconds=val) for val in df['my_onset']])
         offset = timedelta(seconds=8 - df.iloc[0]['my_onset'])
-        # Set the index to our timedelta column, resample (default every second), and get mean
-        return df.set_index('td').resample(rule=self._resample_interval, offset=offset).mean()
+        # Set the index to our timedelta column
+        df = df.set_index(idx)
+        # Get our rolling IOI standard deviation values
+        df = self._get_rolling_standard_deviation_values(df)
+        # Resample to the desired frequency with offset, get the mean values, and interpolate to fill NaNs
+        return df.resample('1s', offset=offset).apply(np.nanmean).interpolate(limit_direction='backward')
+
+    def _get_rolling_standard_deviation_values(
+            self, df: pd.DataFrame, cols: tuple[str] = ('my_prev_ioi',)
+    ) -> pd.DataFrame:
+        # Create the rolling window with the desired window size
+        roll = df.rolling(
+            window=self._rolling_window_size, min_periods=self._rolling_min_periods, closed='both', on=df.index
+        )
+        # Iterate through the required columns
+        for col in cols:
+            # Extract the standard deviation and convert into milliseconds
+            df[f'{col}_std'] = roll[col].std(skipna=True) * 1000
+        return df
 
     @staticmethod
     def _get_average_var_for_one_simulation(
@@ -254,11 +277,11 @@ class Simulation:
 
         Method:
         ---
-        - For every simulation, zip the corresponding keys and drums performance together.
-        - Then, get the average IOI for every second across both keys and drums.
-            - This is straightforward, because we resampled to average IOI per second in _format_simulated_data
-        - Convert average IOI to average BPM by dividing by 60, then regress against elapsed seconds
-        - Extract the slope coefficient, take the median across all simulations, and return
+        -   For every simulation, zip the corresponding keys and drums performance together.
+        -   Then, get the average IOI for every second across both keys and drums.
+            -   This is straightforward, because we resampled to average IOI per second in _format_simulated_data
+        -   Convert average IOI to average BPM by dividing by 60, then regress against elapsed seconds
+        -   Extract the slope coefficient, take the median across all simulations, and return
         """
         coeffs = []
         # Iterate through every simulation individually
@@ -277,17 +300,39 @@ class Simulation:
         # Calculate the median tempo slope coefficient (robust to outliers!) from all simulations and return
         return np.nanmedian(pd.Series(coeffs).replace(-np.Inf, np.nan))
 
+    def get_average_ioi_variability(
+            self
+    ) -> float | None:
+        """
+        Returns the average tempo slope for all simulations.
+
+        Method:
+        ---
+        -   For every simulation, get the median IOI standard deviation value over the window size
+        -   Calculate the mean of all of these values.
+        """
+        return np.nanmean([
+            [s['my_prev_ioi_std'].median() for s in self.keys_simulations],
+            [s['my_prev_ioi_std'].median() for s in self.drms_simulations]
+        ])
+
     def get_average_pairwise_asynchrony(
             self
-    ) -> float:
+    ) -> float | None:
         """
         Gets the average pairwise asynchrony (in milliseconds!) across all simulated performances
         """
-        # Define the function for calculating pairwise async
-        # This is the root mean square of the standard deviation of the async
-        pw_async = lambda k_, d_: np.sqrt(np.mean(np.square([k_['asynchrony'].std(), d_['asynchrony'].std()]))) * 1000
+        def pw_async(keys, drms):
+            """
+            Function used to calculate the pairwise asynchrony for a single simulation, in milliseconds
+            """
+            # Concatenate the two asynchrony columns together
+            conc = np.concatenate((keys['asynchrony'].to_numpy(), drms['asynchrony'].to_numpy()))
+            # Square the values, take the mean, then the square root, then convert to miliseconds and return
+            return np.sqrt(np.nanmean(np.square(conc))) * 1000
+
         # Calculate the mean pairwise async across all performances
-        return np.mean([pw_async(k__, d__) for k__, d__ in zip(self.keys_simulations, self.drms_simulations)])
+        return np.nanmean([pw_async(k_, d_) for k_, d_ in zip(self.keys_simulations, self.drms_simulations)])
 
     def get_simulation_data_for_plotting(
             self, plot_individual: bool = True, plot_average: bool = True, var: str = 'my_next_ioi',
@@ -334,9 +379,13 @@ class Simulation:
             'jitter': self._keys_pcm["jitter"].iloc[0],
             'parameter': self.parameter,
             'leader': self.leader,
+            # Get metrics from the actual original performance on which this simulation was based
             'tempo_slope_original': self._keys_pcm['tempo_slope'].iloc[0],
+            'ioi_variability_original': np.mean([self._keys_pcm['ioi_std'].iloc[0], self._drms_pcm['ioi_std'].iloc[0]]),
             'asynchrony_original': self._keys_pcm['pw_asym'].iloc[0],
+            # Get summary metrics from all the simulated performances
             'tempo_slope_simulated': self.get_average_tempo_slope(),
+            'ioi_variability_simulated': self.get_average_ioi_variability(),
             'asynchrony_simulated': self.get_average_pairwise_asynchrony(),
         }
 
@@ -376,8 +425,8 @@ def generate_phase_correction_simulations(
                             f'parameter {param}, leader {leader}')
             # Initialise the simulation class
             sim = Simulation(
-                keys_params=ke, drms_params=dr, latency_array=z, num_simulations=num_simulations,
-                parameter=param, leader=leader, keys_nn=pcm.keys_nn, drms_nn=pcm.drms_nn, use_original_noise=False
+                keys_pcm=ke, drms_pcm=dr, latency_array=z, num_simulations=num_simulations,
+                parameter=param, leader=leader, use_original_noise=False
             )
             # Create all simulations for this parameter/leader combination
             sim.create_all_simulations()
