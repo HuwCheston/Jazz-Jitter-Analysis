@@ -231,7 +231,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         self.ax[2].set_ylabel('Asynchrony (RMS, ms)', labelpad=-5)
         # Apply joint formatting to both axes
         for ax in self.ax:
-            # Adjust width of each bar on the barplot
+            # Adjust width of each bar on the bar plot
             for patch in ax.patches:
                 cw = patch.get_width()
                 patch.set_width(0.35)
@@ -265,18 +265,18 @@ class RegPlotSlopeComparisons(vutils.BasePlot):
         super().__init__(**kwargs)
         # Define variables
         self.var = kwargs.get('var', 'tempo_slope')
+        self.original_noise = kwargs.get('original_noise', False)
         self.orig_var, self.sim_var = self.var + '_original', self.var + '_simulated'
         self.df = self._format_df(df)
 
-    @staticmethod
     def _format_df(
-            df: pd.DataFrame
+            self, df: pd.DataFrame
     ) -> pd.DataFrame:
         """
         Extracts results data from each Simulation class instance and subsets to get original coupling simulations only.
         Results data is initialised when simulations are created, which makes this really fast.
         """
-        return df[(df['parameter'] == 'original') & (df['original_noise'] == False)]
+        return df[(df['parameter'] == 'original') & (df['original_noise'] == self.original_noise)]
 
     @vutils.plot_decorator
     def create_plot(
@@ -289,7 +289,7 @@ class RegPlotSlopeComparisons(vutils.BasePlot):
         self._add_correlation_results()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\regplot_simulation_slope_comparison'
+        fname = f'{self.output_dir}\\regplot_simulation_slope_comparison_original_noise_{self.original_noise}'
         return self.g.fig, fname
 
     def _create_plot(
@@ -388,12 +388,45 @@ class RegPlotSlopeComparisons(vutils.BasePlot):
         self.g.fig.subplots_adjust(bottom=0.11, top=0.96, left=0.13, right=0.98,)
 
 
+class ArrowPlotParams(vutils.BasePlot):
+    """
+
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(9.4, 9.4), sharex=True)
+        means = [(1, 1), (0.1, 0.1), (2, 2), (0.1, 2)]
+        coupling = [('$α_i{_,}_j$', '$β_i{_,}_j$'), ('0', '0'),
+                    ('mean($α_i{_,}_j$, $β_i{_,}_j$)', 'mean($β_i{_,}_j$, $α_i{_,}_j$)'),
+                    ('mean($α_i{_,}_j$, $β_i{_,}_j$)', '0')]
+        balance = ['abs($α_i{_,}_j$, $β_i{_,}_j$)', '0', '0', 'mean($α_i{_,}_j$, $β_i{_,}_j$)']
+        for num, a, param in zip(range(0, 4), ax.flatten(), ['Original', 'Anarchy', 'Democracy', 'Leadership']):
+            a.set_title(param)
+            a.axis('off')
+            a.text(0.5, 0.05, f'$Balance$: {balance[num]}', ha='center', va='center')
+            for n_, col, x1, x2, y, text, rot, color in zip(range(0, 2), vutils.INSTR_CMAP, [0.05, 0.95], [0.95, 0.05],
+                                                            [0.7, 0.3, ], ['Keys (α)', 'Drums (β)'], (90, 270),
+                                                            ['#FFFFFF', vutils.BLACK]):
+                a.annotate('', xy=(x1, y), xycoords=a.transAxes, xytext=(x2, y), textcoords=a.transAxes,
+                           arrowprops=dict(edgecolor=vutils.BLACK, lw=1.5, facecolor=col, mutation_scale=1,
+                                           width=means[num][n_] * 5, shrink=0.1, headwidth=20))
+                a.text(0.5, y + 0.14, coupling[num][n_], ha='center', va='center')
+                a.add_patch(plt.Rectangle((x1 - 0.05, -0.08), width=0.1, height=1.1, clip_on=False, linewidth=3,
+                                          edgecolor=vutils.BLACK, transform=a.transAxes, facecolor=col))
+                a.text(x1, 0.49, text, rotation=rot, ha='center',
+                       va='center', fontsize=vutils.FONTSIZE + 3, color=color, )
+        plt.subplots_adjust(bottom=0.05, top=0.925, wspace=0.4, hspace=0.5)
+        plt.show()
+
+
 def generate_simulations_plots(
     sims: list, output_dir: str,
 ) -> None:
     df = pd.DataFrame([sim.results_dic for sim in sims])
     figures_output_dir = output_dir + '\\figures\\simulations_plots'
-    rp = RegPlotSlopeComparisons(df, output_dir=figures_output_dir)
+    rp = RegPlotSlopeComparisons(df, output_dir=figures_output_dir, original_noise=True)
+    rp.create_plot()
+    rp = RegPlotSlopeComparisons(df, output_dir=figures_output_dir, original_noise=False)
     rp.create_plot()
     bp = BarPlotSimulationParameters(df, output_dir=figures_output_dir)
     bp.create_plot()

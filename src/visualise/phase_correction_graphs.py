@@ -727,12 +727,12 @@ class RegPlotGrid(vutils.BasePlot):
                                     self.df.groupby('variable', sort=False)):
             # Create the scatter plot on the main axis
             sp = sns.scatterplot(
-                data=grp, x='coupling_balance', y='value', hue='latency', ax=a, palette=vutils.DUO_CMAP,
-                style='latency', s=250
+                data=grp, x='coupling_balance', y='value', hue='trial', ax=a, palette=vutils.DUO_CMAP,
+                style='trial', s=250, edgecolor=vutils.BLACK
             )
             # Create the kde plot on the marginal axis
             kp = sns.kdeplot(
-                data=grp, y='value', hue='latency', ax=m, palette=vutils.DUO_CMAP, legend=False, lw=2,
+                data=grp, y='value', hue='trial', ax=m, palette=vutils.DUO_CMAP, legend=False, lw=2,
                 multiple='stack', fill=True, common_grid=True, cut=0
             )
             # Set parameters of the kde plot now, as we have access to both it and the scatter plot
@@ -750,7 +750,7 @@ class RegPlotGrid(vutils.BasePlot):
         for m in self.marginal_ax.flatten()[:2]:
             # We can just use the last group and scatter plot here as the data is the same
             kp = sns.kdeplot(
-                data=grp, x='coupling_balance', hue='latency', ax=m, palette=vutils.DUO_CMAP, legend=False, lw=2,
+                data=grp, x='coupling_balance', hue='trial', ax=m, palette=vutils.DUO_CMAP, legend=False, lw=2,
                 multiple='stack', fill=True, common_grid=True,
             )
             kp.set(xticks=sp.get_xticks(), xticklabels=[], xlim=sp.get_xlim(), yticks=[], xlabel='', ylabel='')
@@ -855,13 +855,18 @@ class RegPlotGrid(vutils.BasePlot):
         Apply figure-level formatting to overall image
         """
         # Add in label to x axis
-        self.fig.supxlabel('Coupling balance', y=0.02)
+        self.fig.supxlabel('Absolute coupling balance', y=0.02)
         # Add in single legend, using attributes we saved when removing individual legends
-        leg = self.fig.legend(self.hand, self.lab, loc='upper center', ncol=1, title='Latency (ms)', frameon=False,
-                              bbox_to_anchor=(0.48, 1), markerscale=2, prop={'size': 20})
+        leg = self.fig.legend(
+            self.hand, self.lab, loc='center', ncol=1, title='Duo', frameon=False, prop={'size': 20},
+            markerscale=2, edgecolor=vutils.BLACK
+        )
+        for handle in leg.legendHandles:
+            handle.set_edgecolor(vutils.BLACK)
+            handle.set_sizes([200])
         plt.setp(leg.get_title(), fontsize=20)
         # Adjust subplot positioning a bit: this will affect marginal positions, so we'll change these later
-        self.fig.subplots_adjust(left=0.07, right=1.01, bottom=0.07, top=0.99, hspace=0.15, wspace=0.2)
+        self.fig.subplots_adjust(left=0.07, right=1.01, bottom=0.07, top=1.01, hspace=0.2, wspace=0.2)
 
 
 class ArrowPlotPhaseCorrection(vutils.BasePlot):
