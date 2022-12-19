@@ -390,33 +390,101 @@ class RegPlotSlopeComparisons(vutils.BasePlot):
 
 class ArrowPlotParams(vutils.BasePlot):
     """
-
+    Creates a plot showing the strength, direction, and balance of the coupling for each simulation parameter.
+    Designed to look somewhat similar to fig 2.(b) in Jacoby et al. (2021)
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        fig, ax = plt.subplots(nrows=4, ncols=1, figsize=(9.4, 9.4), sharex=True)
-        means = [(1, 1), (0.1, 0.1), (2, 2), (0.1, 2)]
-        coupling = [('$α_i{_,}_j$', '$β_i{_,}_j$'), ('0', '0'),
-                    ('mean($α_i{_,}_j$, $β_i{_,}_j$)', 'mean($β_i{_,}_j$, $α_i{_,}_j$)'),
-                    ('mean($α_i{_,}_j$, $β_i{_,}_j$)', '0')]
-        balance = ['abs($α_i{_,}_j$, $β_i{_,}_j$)', '0', '0', 'mean($α_i{_,}_j$, $β_i{_,}_j$)']
-        for num, a, param in zip(range(0, 4), ax.flatten(), ['Original', 'Anarchy', 'Democracy', 'Leadership']):
-            a.set_title(param)
-            a.axis('off')
-            a.text(0.5, 0.05, f'$Balance$: {balance[num]}', ha='center', va='center')
-            for n_, col, x1, x2, y, text, rot, color in zip(range(0, 2), vutils.INSTR_CMAP, [0.05, 0.95], [0.95, 0.05],
-                                                            [0.7, 0.3, ], ['Keys (α)', 'Drums (β)'], (90, 270),
-                                                            ['#FFFFFF', vutils.BLACK]):
-                a.annotate('', xy=(x1, y), xycoords=a.transAxes, xytext=(x2, y), textcoords=a.transAxes,
-                           arrowprops=dict(edgecolor=vutils.BLACK, lw=1.5, facecolor=col, mutation_scale=1,
-                                           width=means[num][n_] * 5, shrink=0.1, headwidth=20))
-                a.text(0.5, y + 0.14, coupling[num][n_], ha='center', va='center')
-                a.add_patch(plt.Rectangle((x1 - 0.05, -0.08), width=0.1, height=1.1, clip_on=False, linewidth=3,
-                                          edgecolor=vutils.BLACK, transform=a.transAxes, facecolor=col))
-                a.text(x1, 0.49, text, rotation=rot, ha='center',
-                       va='center', fontsize=vutils.FONTSIZE + 3, color=color, )
-        plt.subplots_adjust(bottom=0.05, top=0.925, wspace=0.4, hspace=0.5)
-        plt.show()
+        # Create the figure and axes for plotting
+        self.fig, self.ax = plt.subplots(nrows=4, ncols=1, figsize=(9.4, 9.4), sharex=True)
+        # Define the simulation parameters
+        self.params = [
+            'Original', 'Anarchy', 'Democracy', 'Leadership'
+        ]
+        # Instruments, with Greek letters for labelling
+        self.instruments = [
+            'Keys (α)', 'Drums (β)'
+        ]
+        # Ratios to scale arrow widths by - these are arbitrary!
+        self.means = [
+            (1, 1), (0.1, 0.1), (2, 2), (0.1, 2)
+        ]
+        # Coupling coefficients to place above each arrow
+        self.coupling = [
+            ('$β_i{_,}_j$', '$α_i{_,}_j$'),
+            ('0', '0'),
+            ('mean($α_i{_,}_j$, $β_i{_,}_j$)', 'mean($α_i{_,}_j$, $β_i{_,}_j$)'),
+            ('0', 'mean($α_i{_,}_j$, $β_i{_,}_j$)')
+        ]
+        # Equations for calculating overall coupling balance for each simulated parameter
+        self.balance = [
+            'abs($α_i{_,}_j$, $β_i{_,}_j$)', '0', '0', 'mean($α_i{_,}_j$, $β_i{_,}_j$)'
+        ]
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class to generate the plot and save in plot decorator
+        """
+        self._create_plot()
+        self._format_fig()
+        fname = f'{self.output_dir}\\arrowplot_simulation_params'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Creates each subplot
+        """
+        # Iterate through each ax and parameter (each row)
+        for num, ax, param in zip(range(0, 4), self.ax.flatten(), self.params):
+            # Add the title (parameter name) in
+            ax.set_title(param)
+            # Turn off the axis
+            ax.axis('off')
+            # Add the text showing the coupling balance equation
+            ax.text(0.5, 0.05, f'$Balance$: {self.balance[num]}', ha='center', va='center')
+            # Iterate through all the values we need to create plot features for each musician
+            for n_, col, col2, col3, x1, x2, y, text, rot, in zip(
+                    range(0, 2), vutils.INSTR_CMAP, vutils.INSTR_CMAP[::-1], [vutils.WHITE, vutils.BLACK],
+                    [0.025, 0.975], [0.975, 0.025], [0.7, 0.3, ], self.instruments, [90, 270],
+            ):
+                # Add in the arrow and scale by the width value
+                ax.annotate(
+                    '', xy=(x1, y), xycoords=ax.transAxes, xytext=(x2, y), textcoords=ax.transAxes,
+                    arrowprops=dict(
+                        edgecolor=vutils.BLACK, lw=1.5, facecolor=col2, mutation_scale=1,
+                        width=self.means[num][n_] * 5, shrink=0.1, headwidth=20
+                    )
+                )
+                # Add in th text showing the coupling coefficient
+                ax.text(
+                    0.5, y + 0.17, self.coupling[num][n_], ha='center', va='center'
+                )
+                # Add in the rectangle for the instrument name to go on
+                ax.add_patch(
+                    plt.Rectangle(
+                        (x1 - 0.05, -0.12), width=0.1, height=1.2, clip_on=False, linewidth=3,
+                        edgecolor=vutils.BLACK, transform=ax.transAxes, facecolor=col
+                    )
+                )
+                # Add in the text showing the instrument name, with correct color/rotation
+                ax.text(
+                    x1, 0.49, text, rotation=rot, ha='center', va='center',
+                    fontsize=vutils.FONTSIZE + 3, color=col3,
+                )
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Sets figure-level attributes
+        """
+        # Adjust the subplot positioning slightly
+        self.fig.subplots_adjust(bottom=0.1, top=0.9, left=0.1, right=0.9, wspace=0.4, hspace=0.5)
 
 
 def generate_simulations_plots(
@@ -430,6 +498,8 @@ def generate_simulations_plots(
     rp.create_plot()
     bp = BarPlotSimulationParameters(df, output_dir=figures_output_dir)
     bp.create_plot()
+    ap = ArrowPlotParams(output_dir=figures_output_dir)
+    ap.create_plot()
 
 
 if __name__ == '__main__':

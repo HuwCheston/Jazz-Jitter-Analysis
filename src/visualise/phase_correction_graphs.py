@@ -876,7 +876,7 @@ class ArrowPlotPhaseCorrection(vutils.BasePlot):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=5, figsize=(18.8, 2), sharex=True, sharey=True)
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=5, figsize=(18.8, 3.5), sharex=True, sharey=True)
 
     @vutils.plot_decorator
     def create_plot(
@@ -899,27 +899,50 @@ class ArrowPlotPhaseCorrection(vutils.BasePlot):
         # Iterate through each ax and duo
         for a, (idx, duo) in zip(self.ax.flatten(), self.df.groupby('trial')):
             # Get means and standard errors for the duo and sort
-            means = duo.groupby('instrument').mean().sort_index(ascending=False)['correction_partner']
-            sems = duo.groupby('instrument')['correction_partner'].sem().sort_index(ascending=False)
+            grp = duo.groupby('instrument')
+            means = grp.mean()['correction_partner']
+            sems = grp.sem()['correction_partner']
             # Add in the title showing the duo number
             a.set_title(f'Duo {idx}', y=0.9)
             # Add text showing the absolute coupling balance
-            a.text(0.5, 0, f'$Balance$: +{abs(means.iloc[0] - means.iloc[1]):.2f}', ha='center', va='center')
+            a.text(
+                0.5, 0.05, f'$Balance$: +{abs(means.iloc[0] - means.iloc[1]):.2f}', ha='center',
+                va='center', fontsize=vutils.FONTSIZE + 3
+            )
+            a.text(
+                0.5, -0.05, f'$Strength$: +{abs(means.iloc[0] + means.iloc[1]):.2f}', ha='center',
+                va='center', fontsize=vutils.FONTSIZE + 3
+            )
             # Turn the axis off
             a.axis('off')
-            # Iterate through colour, x values (x2), y values, and text
-            for col, x1, x2, y, text in zip(vutils.INSTR_CMAP, [0, 1], [1, 0], [0.65, 0.35, ], ['Keys', 'Drums']):
+            # Iterate through all colours, x values (x2), y values, and text
+            for col, col2, col3, x1, x2, y, text in zip(
+                    vutils.INSTR_CMAP, vutils.INSTR_CMAP[::-1], [vutils.WHITE, vutils.BLACK],
+                    [0, 1], [1, 0], [0.65, 0.35, ], ['Keys', 'Drums']
+            ):
                 # Create the arrow
-                a.annotate('', xy=(x1, y), xycoords=a.transAxes, xytext=(x2, y), textcoords=a.transAxes,
-                           arrowprops=dict(edgecolor=vutils.BLACK, lw=1.5, facecolor=col, mutation_scale=1,
-                                           width=means.iloc[x1] * 15, shrink=0.1, headwidth=20))
+                a.annotate(
+                    '', xy=(x1, y), xycoords=a.transAxes, xytext=(x2, y), textcoords=a.transAxes,
+                    arrowprops=dict(
+                        edgecolor=vutils.BLACK, lw=1.5, facecolor=col2, mutation_scale=1,
+                        width=means.iloc[x1] * 15, shrink=0.1, headwidth=20
+                    )
+                )
                 # Add in the mean and standard error
-                a.text(0.5, y + 0.14, f'{means.iloc[x1]:.2f} $({sems.iloc[x1]:.2f})$', ha='center', va='center')
+                a.text(
+                    0.5, y + 0.12, f'{means.iloc[x1]:.2f} $({sems.iloc[x1]:.2f})$', ha='center', va='center',
+                )
                 # Add in the rectangle and text showing the instrument and coupling direction
-                a.add_patch(plt.Rectangle((x1 - 0.1, 0.2), width=0.2, height=0.6, clip_on=False, linewidth=3,
-                                          edgecolor=vutils.BLACK, transform=a.transAxes, facecolor=col))
-                a.text(x1, 0.49, text, rotation=90 if x1 == 0 else 270, ha='center',
-                       va='center')
+                a.add_patch(
+                    plt.Rectangle(
+                        (x1 - 0.1, 0.175), width=0.2, height=0.65, clip_on=False, linewidth=3,
+                        edgecolor=vutils.BLACK, transform=a.transAxes, facecolor=col
+                    )
+                )
+                a.text(
+                    x1, 0.49, text, rotation=90 if x1 == 0 else 270, ha='center', va='center',
+                    color=col3, fontsize=vutils.FONTSIZE + 3
+                )
 
     def _format_fig(
             self
@@ -927,7 +950,7 @@ class ArrowPlotPhaseCorrection(vutils.BasePlot):
         """
         Adjusts figure-level parameters
         """
-        self.fig.subplots_adjust(right=0.95, left=0.05, wspace=0.4)
+        self.fig.subplots_adjust(right=0.95, left=0.05, top=0.925, bottom=0.125, wspace=0.4)
 
 
 def generate_phase_correction_plots(
