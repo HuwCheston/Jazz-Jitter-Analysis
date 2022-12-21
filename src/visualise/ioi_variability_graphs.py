@@ -121,9 +121,10 @@ class LinePlotLaggedLatency(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.var = kwargs.get('var', 'ioi_std_vs_jitter_partial_correlation')
+        self.quantiles: tuple[float] = kwargs.get('quantiles', (0.025, 0.975))
+        self.errorbar = kwargs.get('errorbar', 'sd')
         self.df = self._format_df()
         self.df = self._bootstrap_df()
-        self.quantiles: tuple[float] = kwargs.get('quantiles', (0.025, 0.975))
         self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
 
     @vutils.plot_decorator
@@ -137,7 +138,7 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Create filename and return to save
-        fname = f'{self.output_dir}\\lineplot_lagged_latency'
+        fname = f'{self.output_dir}\\lineplot_lagged_latency_{self.errorbar}'
         return self.fig, fname
 
     def _format_df(
@@ -181,10 +182,18 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         samples = [reshape.sample(frac=1, replace=True, random_state=n).mean(axis=0) for n in range(0, 1000)]
         # Combine all of our resampled dataframes together
         boot = pd.concat(samples, axis=1)
+        # TODO: use standard errors instead?
         # Extract the 2.5% and 97.5% quantile from our samples, as well as the actual mean
-        boot_low = boot.quantile(self.quantiles[0], axis=1).rename('low')
-        boot_mu = reshape.mean(axis=0).rename('mean')
-        boot_high = boot.quantile(self.quantiles[1], axis=1).rename('high')
+        if self.errorbar == 'ci':
+            boot_low = boot.quantile(self.quantiles[0], axis=1).rename('low')
+            boot_mu = reshape.mean(axis=0).rename('mean')
+            boot_high = boot.quantile(self.quantiles[1], axis=1).rename('high')
+        elif self.errorbar == 'sd':
+            boot_mu = reshape.mean(axis=0).rename('mean')
+            boot_low = (boot_mu - boot.std(axis=1)).rename('low')
+            boot_high = (boot_mu + boot.std(axis=1)).rename('high')
+        else:
+            return None
         # Concatenate all the dataframes together
         boot = pd.concat([boot_low, boot_mu, boot_high], axis=1).reset_index(drop=False)
         # Change the formatting of the jitter column to make plotting easier
@@ -251,7 +260,9 @@ def generate_tempo_stability_plots(
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\ioi_variability_plots'
-    lp = LinePlotLaggedLatency(df=df, output_dir=figures_output_dir)
+    lp = LinePlotLaggedLatency(df=df, output_dir=figures_output_dir, errorbar='sd')
+    lp.create_plot()
+    lp = LinePlotLaggedLatency(df=df, output_dir=figures_output_dir, errorbar='ci')
     lp.create_plot()
 
 

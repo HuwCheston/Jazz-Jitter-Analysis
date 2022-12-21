@@ -221,14 +221,16 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         Formats axes objects, setting ticks, labels etc.
         """
         # Apply formatting to tempo slope ax
-        self.ax[0].set(ylabel='Tempo slope (BPM/s)', xlabel='', ylim=(-0.75, 0.75))
+        self.ax[0].set_ylabel('Tempo slope (BPM/s', fontsize=vutils.FONTSIZE + 3)
+        self.ax[0].set(xlabel='', ylim=(-0.75, 0.75))
         self.ax[0].axhline(y=0, linestyle='-', color=vutils.BLACK, linewidth=2)
-        self.ax[1].set(ylabel='IOI variability (SD, ms)', xlabel='')
+        self.ax[1].set_ylabel('IOI variability (SD, ms)', fontsize=vutils.FONTSIZE + 3)
+        self.ax[1].set(xlabel='')
         # Apply formatting to async ax
         t = [1, 10, 100, 1000, 10000]
         self.ax[2].set_yscale('log')
         self.ax[2].set(xlabel='', ylim=(1, 10000), yticks=t, yticklabels=t)
-        self.ax[2].set_ylabel('Asynchrony (RMS, ms)', labelpad=-5)
+        self.ax[2].set_ylabel('Asynchrony (RMS, ms)', fontsize=vutils.FONTSIZE + 3, labelpad=-2)
         # Apply joint formatting to both axes
         for ax in self.ax:
             # Adjust width of each bar on the bar plot
@@ -487,11 +489,230 @@ class ArrowPlotParams(vutils.BasePlot):
         self.fig.subplots_adjust(bottom=0.1, top=0.9, left=0.1, right=0.9, wspace=0.4, hspace=0.5)
 
 
+class DistPlotParams(vutils.BasePlot):
+    """
+    Creates seperate kernel density plots for each duo showing distribution of asynchrony and tempo
+    slope values for each parameter. Demonstrates similarity e.g. between duo 1/3 and democracy parameter,
+    2/5 and leadership parameter.
+    """
+
+    def __init__(self, df: pd.DataFrame, **kwargs):
+        super().__init__(**kwargs)
+        self.df = self._format_df(df)
+        self.fig, self.ax = plt.subplots(
+            nrows=2, ncols=5, figsize=(18.8, 5), sharex=False, sharey=False,
+            gridspec_kw={'height_ratios': [1.5, 1]}
+        )
+        self.colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+        self.params = ['democracy', 'leadership', 'anarchy', 'original']
+
+    @staticmethod
+    def _format_df(
+            df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Coerces dataframe into correct format
+        """
+        return df[(df['original_noise'] == False)]
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class to generate plot and save in decorator
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\distplot_simulation_params'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Creates plots in matplotlib
+        """
+        # Iterate through each trial
+        for i, g in self.df.groupby('trial'):
+            # Group in order to get mean values for one condition and parameter
+            g = g.groupby(by=['parameter', 'latency', 'jitter']).mean().reset_index(drop=False)
+            # Iterate through parameter, color, ax, and text position
+            for param, color, n_, xy, in zip(
+                    self.params, [vutils.BLACK, vutils.BLACK, vutils.BLACK, self.colors[i - 1]],
+                    [1, 1, 0, 1], [(-0.55, 320), (0, 450), (0.35, 2600), (0, 0)]
+            ):
+                # Create the kde plot for this parameter
+                sns.kdeplot(
+                    data=g[(g['parameter'] == param)], x='tempo_slope_simulated', y='asynchrony_simulated',
+                    ax=self.ax[n_, i - 1], fill=False if param == 'original' else True,
+                    alpha=1 if param == 'original' else vutils.ALPHA, levels=5, legend=None,
+                    color=color, clip=((-1, 1), (0, 3000)),
+                )
+                # Add the text in for this parameter
+                self.ax[n_, i - 1].text(
+                    *xy, param.title() if param != 'original' else '',
+                    ha='center', va='center', fontsize=vutils.FONTSIZE - 3
+                )
+
+    def _format_ax(
+            self
+    ) -> None:
+        """
+        Format axis-level properties
+        """
+        # Iterate through each ax
+        for num in range(0, 5):
+            # Break the ax
+            vutils.break_axis(ax1=self.ax[0, num], ax2=self.ax[1, num])
+            # Iterate through each row, axis y limit, and title
+            for n_, lim, tit in zip(
+                    range(0, 2), [(2000, 3000), (0, 500)], [f'Duo {num + 1}', ''],
+            ):
+                # Create x and y ticks
+                xticks = np.linspace(-1, 1, 5, dtype=float)
+                yticks = np.linspace(lim[0], lim[1], int(((lim[1] - lim[0]) / 250) + 1), dtype=int)
+                # Set axis properties
+                self.ax[n_, num].set(
+                    ylabel='', xlabel='', title=tit, xlim=(-1, 1), xticks=xticks if n_ == 1 else [], ylim=lim,
+                    yticks=yticks, xticklabels=xticks if n_ == 1 else [],  yticklabels=yticks if num == 0 else []
+                )
+                # Set tick and axis width parameters
+                self.ax[n_, num].tick_params(width=3, which='major')
+                plt.setp(self.ax[n_, num].spines.values(), linewidth=2)
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Format figure-level properties
+        """
+        # Add axis labels
+        self.fig.supxlabel('Tempo slope (BPM/s)', y=0.03,)
+        self.fig.supylabel('Asynchrony (RMS, ms)', x=0.01,)
+        # Adjust subplot positioning slightly. Use hspace to adjust positioning between broken axis
+        self.fig.subplots_adjust(left=0.07, right=0.98, bottom=0.175, top=0.9, wspace=0.15, hspace=0.2)
+
+
+class DistPlotAverage(vutils.BasePlot):
+    """
+    Plots mean tempo slope and asynchrony of simulations with letters showing the coupling parameters used
+    """
+
+    def __init__(self, df: pd.DataFrame, **kwargs):
+        super().__init__(**kwargs)
+        self.df = df
+        # Define the conditions we wish to plot data for -- defaults to all 90 ms conditions
+        self.conditions = kwargs.get('conditions', [(0, 0), (90, 0), (90, 0.5), (90, 1)])
+        # Markers used for plotting anarchy/democracy/leadership parameters
+        self.param_markers = ["$A$", "$D$", "$L$"]
+        # Markers used for plotting individual duo results
+        self.duo_markers = ["$1$", "$2$", "$3$", "$4$", "$5$"]
+        # Initialise subplots -- always two rows, and as many columns as we have conditions to plot
+        self.fig, self.ax = plt.subplots(
+            nrows=2, ncols=len(self.conditions), figsize=(18.8, 6), sharex=False, sharey=False,
+            gridspec_kw={'height_ratios': [0.5, 1.5]}
+        )
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class to generate and save the plot in decorator
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\distplot_simulation_params_average'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Create each plot individually
+        """
+        for y, (lat, jit) in zip(range(0, 5), self.conditions):
+            # Subset to get required condition
+            condition = self.df[(self.df['latency'] == lat) & (self.df['jitter'] == jit)]
+            # Plot anarchy, democracy, leadership results
+            for n_, (i, g) in enumerate(condition[condition['trial'] == 0].groupby('parameter')):
+                # Define which row of plots the markers should be placed on
+                x = 0 if i == 'anarchy' else 1
+                self.ax[x, y].scatter(
+                    g['tempo_slope_simulated'], g['asynchrony_simulated'], marker=self.param_markers[n_],
+                    s=250, color=vutils.BLACK, label=i.title() if y == 0 else None, zorder=10
+                )
+            # Plot results from each duo
+            for i, g in condition[condition['trial'] != 0].groupby('trial'):
+                i = int(i)
+                self.ax[1, y].scatter(
+                    g['tempo_slope_simulated'], g['asynchrony_simulated'], marker=self.duo_markers[i - 1],
+                    s=250, label=f'Duo {i}' if y == 0 else None, zorder=1
+                )
+
+    def _format_ax(
+            self
+    ) -> None:
+        """
+        Format axis-level attributes
+        """
+        # Iterate through each column of plots and latency/jitter combination
+        for y, (lat, jit) in zip(range(0, len(self.conditions)), self.conditions):
+            # Break the axis with our utility function
+            vutils.break_axis(self.ax[0, y], self.ax[1, y])
+            # Define the axis title
+            tit = f'Latency: {lat}ms\nJitter: {jit}x' if y == 0 else f'{lat}ms\n{jit}x'
+            # Set parameters for both rows of plots
+            self.ax[0, y].set(
+                xlim=(-1, 1), xticks=[], yticks=[2600], title=tit, ylim=(2250, 3000)
+            )
+            self.ax[1, y].set(
+                ylim=(0, 175), xlim=(-0.75, 0.75), xticks=np.linspace(-0.5, 0.5, 3), yticks=np.linspace(0, 150, 4)
+            )
+            # Set parameters for any plots where latency was applied
+            if lat != 0:
+                # Add in a shaded area showing the 'impossible' asynchrony values (below the minimum latency)
+                self.ax[1, y].axhspan(
+                    ymin=0, ymax=lat, alpha=0.1, hatch='/', fc=vutils.BLACK, ec=vutils.BLACK, lw=3, ls='--'
+                )
+                self.ax[1, y].annotate(f'Baseline', (0.5, lat + 7), ha='center', va='center', alpha=vutils.ALPHA)
+            # Apply the same formatting to all plots
+            for x in range(0, 2):
+                # Remove y tick labels on all but the first column of plots
+                if y != 0:
+                    self.ax[x, y].set(yticklabels=[])
+                # Add in a vertical line at 0 tempo slope
+                self.ax[x, y].axvline(x=0, linewidth=3, color=vutils.BLACK, alpha=0.1, ls='--')
+                # Adjust tick and axis width slightly
+                self.ax[x, y].tick_params(width=3, axis='both', pad=7.5, which='major')
+                plt.setp(self.ax[x, y].spines.values(), linewidth=2)
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Set figure-level attributes
+        """
+        # Add in axis labels
+        self.fig.supxlabel('Tempo slope (BPM/s)')
+        self.fig.supylabel('Asynchrony (RMS, ms)', x=0.01)
+        # Add in legend
+        self.fig.legend(loc='center right', frameon=False, title='Simulation')
+        # Adjust plot spacing a bit -- hspace adjusts broken axis
+        self.fig.subplots_adjust(bottom=0.15, top=0.85, left=0.075, right=0.86, wspace=0.1, hspace=0.2)
+
+
 def generate_simulations_plots(
-    sims: list, output_dir: str,
+    sims: list, sims_avg: list, output_dir: str,
 ) -> None:
     df = pd.DataFrame([sim.results_dic for sim in sims])
+    df_avg = pd.DataFrame([sim.results_dic for sim in sims_avg])
     figures_output_dir = output_dir + '\\figures\\simulations_plots'
+    dp = DistPlotParams(df, output_dir=figures_output_dir)
+    dp.create_plot()
     rp = RegPlotSlopeComparisons(df, output_dir=figures_output_dir, original_noise=True)
     rp.create_plot()
     rp = RegPlotSlopeComparisons(df, output_dir=figures_output_dir, original_noise=False)
@@ -500,10 +721,13 @@ def generate_simulations_plots(
     bp.create_plot()
     ap = ArrowPlotParams(output_dir=figures_output_dir)
     ap.create_plot()
+    dp = DistPlotAverage(df=df_avg, output_dir=figures_output_dir)
+    dp.create_plot()
 
 
 if __name__ == '__main__':
     raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", "phase_correction_sims.p")
+    raw_av = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", "phase_correction_sims_average.p")
     # Default location to save plots
     output = r"C:\Python Projects\jazz-jitter-analysis\reports"
-    generate_simulations_plots(raw, output)
+    generate_simulations_plots(raw, raw_av, output)

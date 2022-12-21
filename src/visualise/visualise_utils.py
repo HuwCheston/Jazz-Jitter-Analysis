@@ -240,3 +240,25 @@ def get_significance_asterisks(
         return '*'
     else:
         return ''
+
+
+def break_axis(
+        ax1: plt.Axes, ax2: plt.Axes, d: float = 0.015
+) -> None:
+    """
+    Add a vertical breaks into two axis to show change in scale
+    """
+    # Create kwargs dictionary for ax 1
+    kwargs = dict(transform=ax1.transAxes, color=BLACK, clip_on=False)
+    # Turn off bottom spine
+    ax1.spines['bottom'].set_visible(False)
+    # Plot diagonal lines to show axis break
+    ax1.plot((1 - d, 1 + d), (-d, +d), **kwargs)
+    ax1.plot((-d, +d), (-d, +d), **kwargs)
+    # Update kwargs dictionary for second axis
+    kwargs.update(transform=ax2.transAxes)
+    # Turn off top spine
+    ax2.spines['top'].set_visible(False)
+    # Plot diagonal lines to show axis break
+    ax2.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)
+    ax2.plot((-d, d), (1 - d, 1 + d), **kwargs)

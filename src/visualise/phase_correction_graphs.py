@@ -626,6 +626,7 @@ class RegPlotGrid(vutils.BasePlot):
         super().__init__(**kwargs)
         # Define plotting attributes
         self.lw = kwargs.get('lw', 5)   # Width of plotted lines
+        self.error_bar = kwargs.get('errorbar', 'sd')
         self.ci_frac: float = kwargs.get('ci_frac', 0.66666667)     # Fraction of data to use in lowess curve
         self.ci_it: int = kwargs.get('ci_int', 3)   # Iterations to use in lowess curve
         self.n_boot: int = kwargs.get('n_boot', 1000)   # Number of bootstraps
@@ -742,10 +743,11 @@ class RegPlotGrid(vutils.BasePlot):
                 self._add_lowess(ax=a, grp=grp)
             # Else, add a standard linear regression line
             else:
-                sns.regplot(
-                    data=grp, x='coupling_balance', y='value', ax=a, scatter=False, ci=95, n_boot=self.n_boot,
-                    scatter_kws={'alpha': vutils.ALPHA}, color=vutils.BLACK, line_kws={'lw': self.lw},
-                )
+                self._add_regression(ax=a, grp=grp)
+                # sns.regplot(
+                #     data=grp, x='coupling_balance', y='value', ax=a, scatter=False, x_ci='sd',
+                #     scatter_kws={'alpha': vutils.ALPHA}, color=vutils.BLACK, line_kws={'lw': self.lw},
+                # )
         # Create the first row of marginal plots, showing distribution of coupling balance
         for m in self.marginal_ax.flatten()[:2]:
             # We can just use the last group and scatter plot here as the data is the same
@@ -754,6 +756,41 @@ class RegPlotGrid(vutils.BasePlot):
                 multiple='stack', fill=True, common_grid=True,
             )
             kp.set(xticks=sp.get_xticks(), xticklabels=[], xlim=sp.get_xlim(), yticks=[], xlabel='', ylabel='')
+
+    def _add_regression(
+            self, ax: plt.Axes, grp: pd.DataFrame
+    ) -> None:
+        def regress(
+                x: pd.Series, y: pd.Series
+        ):
+            x = sm.add_constant(x)
+            fit = sm.OLS(y, x).fit()
+            return tuple(fit.params.to_list())
+
+        def create_slope(
+                x, intercept_mod: int | float = 0, slope_mod: int | float = 0, y_prefix: str = ''
+        ):
+            return pd.DataFrame(
+                x, [(act_intercept + intercept_mod) + (act_slope + slope_mod) * val for val in x]
+            ).reset_index(drop=False).rename(columns={'index': f'y_{y_prefix}',  0: f'x'})
+
+        act_intercept, act_slope = regress(grp['coupling_balance'], grp['value'])
+        res = []
+        for n in range(0, self.n_boot):
+            boot = grp.sample(frac=1, replace=True, random_state=n).reset_index(drop=True)
+            boot_regress = regress(boot['coupling_balance'], boot['value'])
+            res.append(boot_regress)
+        std_intercept, std_slope = pd.DataFrame(res, columns=['intercept', 'slope']).std()
+        act = create_slope(x=grp['coupling_balance'].to_list())
+        high = create_slope(
+            x=grp['coupling_balance'].to_list(), slope_mod=std_slope, intercept_mod=std_intercept, y_prefix='high'
+        )
+        low = create_slope(
+            x=grp['coupling_balance'].to_list(), slope_mod=-std_slope, intercept_mod=-std_intercept, y_prefix='low'
+        )
+        conc = pd.concat([act['x'], low['y_low'], high['y_high']], axis=1).sort_values('x').reset_index(drop=True)
+        ax.plot(act['x'], act['y_'], color=vutils.BLACK, lw=self.lw)
+        ax.fill_between(conc['x'], conc['y_low'], conc['y_high'], color=vutils.BLACK, alpha=0.2)
 
     def _add_lowess(
             self, ax: plt.Axes, grp: pd.DataFrame, add_hline: bool = True
@@ -783,16 +820,24 @@ class RegPlotGrid(vutils.BasePlot):
             res_y.append(sm_y)
         # Format the resampled dataframes
         fmt = lambda d: pd.DataFrame(d).transpose().reset_index(drop=True)
-        fmt_x = fmt(res_x)
         fmt_y = fmt(res_y)
-        # Extract the quantiles: median x value, 0.05 and 0.95 quantiles from y
-        x_5 = fmt_x.quantile(0.5, axis=1)
-        y_05 = fmt_y.quantile(0.025, axis=1)
-        y_95 = fmt_y.quantile(0.975, axis=1)
-        conc = pd.concat([x_5, y_05, y_95], axis=1)
-        conc.iloc[0:-5] = conc.iloc[0:-5].rolling(10, min_periods=1).mean()
-        # Fill between the quantiles
-        ax.fill_between(conc[0.500], conc[0.025], conc[0.975], color=vutils.BLACK, alpha=0.2)
+        # Extract the quantiles: median x value, 0.025 and 0.975 quantiles from y
+        if self.error_bar == 'ci':
+            # Get the 2.5 and 97.5 percentiles, row-wise
+            y_025 = fmt_y.quantile(0.025, axis=1)
+            y_975 = fmt_y.quantile(0.975, axis=1)
+            conc = pd.concat([pd.Series(act_y), y_025, y_975], axis=1)
+            conc.iloc[0:-5] = conc.iloc[0:-5].rolling(10, min_periods=1).mean()
+            # Fill between the quantiles
+            ax.fill_between(conc[0.500], conc[0.025], conc[0.975], color=vutils.BLACK, alpha=0.2)
+        elif self.error_bar == 'sd':
+            # Get the standard deviation of the bootstrap dataframe and concatenate against the original
+            conc = pd.concat([pd.Series(act_y), fmt_y.std(axis=1)], axis=1, keys=['act', 'se'])
+            # Add and subtract the standard error to the original values
+            conc['high'] = conc['act'] + conc['se']
+            conc['low'] = conc['act'] - conc['se']
+            # Fill between +/- 1 standard error
+            ax.fill_between(act_x, conc['low'], conc['high'], color=vutils.BLACK, alpha=0.2)
         # Add horizontal line at y=0 if required
         if add_hline:
             ax.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK, linewidth=self.lw)
@@ -855,7 +900,7 @@ class RegPlotGrid(vutils.BasePlot):
         Apply figure-level formatting to overall image
         """
         # Add in label to x axis
-        self.fig.supxlabel('Absolute coupling balance', y=0.02)
+        self.fig.supxlabel('Absolute coupling asymmetry', y=0.02)
         # Add in single legend, using attributes we saved when removing individual legends
         leg = self.fig.legend(
             self.hand, self.lab, loc='center', ncol=1, title='Duo', frameon=False, prop={'size': 20},

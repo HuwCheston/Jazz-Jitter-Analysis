@@ -18,7 +18,7 @@ class Simulation:
     Number of simulations defaults to 500, the same number in Jacoby et al. (2021).
     """
     def __init__(
-            self, pcm: PhaseCorrectionModel, num_simulations: int = 500, **kwargs
+            self, pcm: PhaseCorrectionModel | pd.DataFrame, num_simulations: int = 500, **kwargs
     ):
         # Default parameters
         self._resample_interval: timedelta = timedelta(seconds=1)  # Get mean of IOIs within this window
@@ -29,8 +29,12 @@ class Simulation:
         self._rolling_window_size: str = kwargs.get('rolling_window_size', '2s')   # 2 seconds = 2 beats at 120BPM
         self._rolling_min_periods: int = kwargs.get('rolling_min_periods', 2)
         # Get the raw data from our phase correction model
-        self.keys_pcm = pd.DataFrame([pcm.keys_dic])
-        self.drms_pcm = pd.DataFrame([pcm.drms_dic])
+        if isinstance(pcm, PhaseCorrectionModel):
+            self.keys_pcm = pd.DataFrame([pcm.keys_dic])
+            self.drms_pcm = pd.DataFrame([pcm.drms_dic])
+        elif isinstance(pcm, pd.DataFrame):
+            self.keys_pcm = pcm[pcm['instrument'] == 'Keys']
+            self.drms_pcm = pcm[pcm['instrument'] != 'Keys']
         # Get the zoom array used in the performance
         self.latency: np.ndarray = self._append_timestamps_to_latency_array(self.keys_pcm['zoom_arr'].iloc[0])
         # Raw simulation parameters, which will be used to create the dictionaries used in the simulations.
@@ -273,7 +277,7 @@ class Simulation:
         )
 
     def get_average_tempo_slope(
-            self
+            self, func=np.nanmean, **kwargs
     ) -> float | None:
         """
         Returns the average tempo slope for all simulations.
@@ -301,10 +305,10 @@ class Simulation:
             # Extract the tempo slope coefficient and append to list
             coeffs.append(md.params[1])
         # Calculate the median tempo slope coefficient (robust to outliers!) from all simulations and return
-        return np.nanmedian(pd.Series(coeffs).replace(-np.Inf, np.nan))
+        return func(pd.Series(coeffs).replace(-np.Inf, np.nan), **kwargs)
 
     def get_average_ioi_variability(
-            self
+            self, func=np.nanmean, **kwargs
     ) -> float | None:
         """
         Returns the average tempo slope for all simulations.
@@ -314,13 +318,13 @@ class Simulation:
         -   For every simulation, get the median IOI standard deviation value over the window size
         -   Calculate the mean of all of these values.
         """
-        return np.nanmean([
+        return func([
             [s['my_prev_ioi_std'].median() for s in self.keys_simulations],
             [s['my_prev_ioi_std'].median() for s in self.drms_simulations]
-        ])
+        ], **kwargs)
 
     def get_average_pairwise_asynchrony(
-            self
+            self, func=np.nanmean, **kwargs
     ) -> float | None:
         """
         Gets the average pairwise asynchrony (in milliseconds!) across all simulated performances
@@ -335,7 +339,7 @@ class Simulation:
             return np.sqrt(np.nanmean(np.square(conc))) * 1000
 
         # Calculate the mean pairwise async across all performances
-        return np.nanmean([pw_async(k_, d_) for k_, d_ in zip(self.keys_simulations, self.drms_simulations)])
+        return func([pw_async(k_, d_) for k_, d_ in zip(self.keys_simulations, self.drms_simulations)], **kwargs)
 
     def get_simulation_data_for_plotting(
             self, plot_individual: bool = True, plot_average: bool = True, var: str = 'my_next_ioi',
@@ -392,14 +396,23 @@ class Simulation:
             'ioi_variability_original': np.mean([self.keys_pcm['ioi_std'].iloc[0], self.drms_pcm['ioi_std'].iloc[0]]),
             'asynchrony_original': self.keys_pcm['pw_asym'].iloc[0],
             # Summary metrics from all the simulated performances
-            'tempo_slope_simulated': self.get_average_tempo_slope(),
+            'tempo_slope_simulated_raw': self.get_average_tempo_slope(func=lambda x: x),    # raw values
+            'tempo_slope_simulated': self.get_average_tempo_slope(),  # average
+            'tempo_slope_simulated_std': self.get_average_tempo_slope(func=np.nanstd),  # standard deviation
+            'tempo_slope_simulated_ci': self.get_average_tempo_slope(func=np.nanpercentile, q=[2.5, 97.5]),     # 95% ci
+            'ioi_variability_simulated_raw': self.get_average_ioi_variability(func=lambda x: x),
             'ioi_variability_simulated': self.get_average_ioi_variability(),
+            'ioi_variability_simulated_std': self.get_average_ioi_variability(func=np.nanstd),
+            'ioi_variability_simulated_ci': self.get_average_ioi_variability(func=np.nanpercentile, q=[2.5, 97.5]),
+            'asynchrony_simulated_raw': self.get_average_pairwise_asynchrony(func=lambda x: x),
             'asynchrony_simulated': self.get_average_pairwise_asynchrony(),
+            'asynchrony_simulated_std': self.get_average_pairwise_asynchrony(func=np.nanstd),
+            'asynchrony_simulated_ci': self.get_average_pairwise_asynchrony(func=np.nanpercentile, q=[2.5, 97.5]),
         }
 
 
-def generate_phase_correction_simulations(
-        mds: pd.DataFrame, output_dir: str, logger=None, force_rebuild: bool = False, num_simulations: int = 100
+def generate_phase_correction_simulations_individual(
+        mds: pd.DataFrame, output_dir: str, logger=None, force_rebuild: bool = False, num_simulations: int = 500
 ) -> list[Simulation]:
     """
     Create simulated performances across a range of artificial coupling parameters for every phase correction model
@@ -442,10 +455,83 @@ def generate_phase_correction_simulations(
     return all_sims
 
 
+def generate_phase_correction_simulations_average(
+        mds: pd.DataFrame, output_dir: str, logger=None, force_rebuild: bool = False, num_simulations: int = 500
+) -> list[Simulation]:
+    """
+    Create simulated performances across a range of artificial coupling parameters for every phase correction model
+    """
+    def grouper(g):
+        return g.groupby('instrument', as_index=False).agg(
+            {
+                'trial': 'mean', 'block': 'mean', 'latency': 'mean', 'jitter': 'mean', 'tempo_slope': 'mean',
+                'ioi_std': 'mean', 'pw_asym': 'mean', 'zoom_arr': 'first', 'intercept': 'mean',
+                'correction_partner': 'mean', 'correction_self': 'mean', 'resid_std': 'mean'
+            }
+        )
+
+    # Try and load the models from the disk to save time, unless we're forcing them to rebuild anyway
+    if not force_rebuild:
+        all_sims = autils.load_from_disc(output_dir, filename='phase_correction_sims_average.p')
+        # If we've successfully loaded models, return these straight away
+        if all_sims is not None:
+            return all_sims
+    # Create the dataframe
+    df = pd.concat(
+        [pd.concat([pd.DataFrame([pcm.keys_dic]), pd.DataFrame([pcm.drms_dic])]) for pcm in mds]
+    ).reset_index(drop=True)
+    # Create an empty list to hold simulations in
+    all_sims = []
+    params = [
+        # ('parameter', 'leader', 'use_original_noise')
+        ('democracy', None, False),  # Democracy - both musicians coupled to each other
+        ('anarchy', None, False),  # Anarchy - neither musician coupled to each other
+        ('leadership', 'Drums', False),  # Drums leadership - keys coupled to drums, drums not coupled to keys
+    ]
+    # Average simulations -- arbitrary coupling parameters
+    for idx, grp in df.groupby(by=['latency', 'jitter']):
+        pcm = grouper(grp)
+        pcm['trial'] = 0
+        for param, leader, orig_noise in params:
+            # Initialise the simulation class
+            sim = Simulation(
+                pcm=pcm, num_simulations=num_simulations, parameter=param, leader=leader, use_original_noise=orig_noise
+            )
+            # Log the current simulation being generated
+            if logger is not None:
+                logger.info(f'... trial AVG, block AVG, '
+                            f'latency {sim.keys_pcm["latency"].iloc[0]}, jitter {sim.keys_pcm["jitter"].iloc[0]}, '
+                            f'parameter {sim.parameter}, leader {sim.leader}, original_noise {sim.use_original_noise}')
+            # Create all simulations
+            sim.create_all_simulations()
+            # Append the simulation to our list
+            all_sims.append(sim)
+    # Original simulations -- original coupling parameters
+    for idx, grp in df.groupby(by=['trial', 'latency', 'jitter']):
+        pcm = grouper(grp)
+        sim = Simulation(
+            pcm=pcm, num_simulations=num_simulations, parameter='original', leader=None, use_original_noise=False
+        )
+        # Log the current simulation being generated
+        if logger is not None:
+            logger.info(f'... trial {sim.keys_pcm["trial"].iloc[0]}, block {sim.keys_pcm["block"].iloc[0]}, '
+                        f'latency {sim.keys_pcm["latency"].iloc[0]}, jitter {sim.keys_pcm["jitter"].iloc[0]}, '
+                        f'parameter {sim.parameter}, leader {sim.leader}, original_noise {sim.use_original_noise}')
+        # Create all simulations
+        sim.create_all_simulations()
+        # Append the simulation to our list
+        all_sims.append(sim)
+    # Pickle the result -- this will be quite large, depending on the number of simulations!
+    pickle.dump(all_sims, open(f"{output_dir}\\phase_correction_sims_average.p", "wb"))
+    return all_sims
+
+
 if __name__ == '__main__':
     # Default location for phase correction models
     raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename="phase_correction_mds.p")
     # Default location to save output simulations
     output = r"C:\Python Projects\jazz-jitter-analysis\models"
     # Generate simulations and pickle
-    sims = generate_phase_correction_simulations(mds=raw, output_dir=output, force_rebuild=True)
+    sims = generate_phase_correction_simulations_average(mds=raw, output_dir=output, force_rebuild=True)
+    # Generate simulations and pickle
+    sims = generate_phase_correction_simulations_individual(mds=raw, output_dir=output, force_rebuild=True)
