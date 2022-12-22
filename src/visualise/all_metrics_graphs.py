@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import scipy.stats as stats
+import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -24,6 +25,9 @@ class PairPlotAllVariables(vutils.BasePlot):
         )
         self._jitter_success: bool = kwargs.get('jitter_success', True)
         self._abs_slope: bool = kwargs.get('abs_slope', True)
+        self.error_bar: str = kwargs.get('error_bar', 'sd')
+        self.n_boot: int = kwargs.get('n_boot', 1000)
+        self.percentiles: tuple[float] = kwargs.get('percentiles', (2.5, 97.5))
         self.vars: list[str] = kwargs.get('vars', ['tempo_slope', 'ioi_std', 'pw_asym', 'success'])
         self.df: pd.DataFrame = self._format_df()
         self.counter: int = 0
@@ -80,6 +84,57 @@ class PairPlotAllVariables(vutils.BasePlot):
         # Increment the counter by one for the next plot
         self.counter += 1
 
+    def reg_plot(self, *args, **kwargs):
+        def regress(
+                g: pd.DataFrame
+        ) -> np.ndarray:
+            # Coerce x variable into correct form and add constant
+            x = sm.add_constant(g['x'].to_list())
+            # Coerce y into correct form
+            y = g['y'].to_list()
+            # Fit the model, predicting y from x
+            md = sm.OLS(y, x).fit()
+            # Return predictions made using our x vector
+            return md.predict(x_vec)
+
+        x_, y_ = args
+        grp = pd.concat([x_, y_], axis=1)
+        grp.columns = ['x', 'y']
+        # Create the vector of x values we'll use when making predictions
+        x_vec = sm.add_constant(
+            np.linspace(x_.min(), x_.max(), len(x_))
+        )
+        # Create model predictions for a regression fitted on our actual data
+        act_predict = regress(grp)
+        # Create bootstrapped regression predictions
+        res = [regress(grp.sample(frac=1, replace=True, random_state=n)) for n in range(0, self.n_boot)]
+        # Create empty variable to hold concatenated dataframe so we don't get warnings
+        conc = None
+        # Convert bootstrapped predictions to dataframe and get standard deviation for each x value
+        if self.error_bar == 'ci':
+            # Convert bootstrapped predictions to dataframe and get required percentiles for each x value
+            boot_res = (
+                pd.DataFrame(res)
+                  .transpose()
+                  .apply(np.nanpercentile, axis=1, q=self.percentiles)
+                  .apply(pd.Series)
+                  .rename(columns={0: 'low', 1: 'high'})
+            )
+            # Concatenate bootstrapped standard errors with original predictions
+            # No need to add error terms to our original data, we just plot the percentiles
+            conc = pd.concat([pd.Series(x_vec[:, 1]).rename('x'), pd.Series(act_predict).rename('y'), boot_res], axis=1)
+        elif self.error_bar == 'sd':
+            # Convert bootstrapped predictions to dataframe and get standard deviation for each x value
+            boot_res = pd.DataFrame(res).transpose().std(axis=1).rename('sd')
+            # Concatenate bootstrapped standard errors with original predictions
+            conc = pd.concat([pd.Series(x_vec[:, 1]).rename('x'), pd.Series(act_predict).rename('y'), boot_res], axis=1)
+            # Get confidence intervals by adding and subtracting error to original y values
+            conc['high'] = conc['y'] + conc['sd']
+            conc['low'] = conc['y'] - conc['sd']
+        # Plot the resulting data
+        plt.plot(conc['x'], conc['y'], color=vutils.RED, lw=5)
+        plt.fill_between(conc['x'], conc['high'], conc['low'], color=vutils.RED, alpha=0.2)
+
     # noinspection PyUnusedLocal
     @staticmethod
     def _reg_coef(
@@ -121,9 +176,9 @@ class PairPlotAllVariables(vutils.BasePlot):
             sns.histplot, color=vutils.BLACK, alpha=vutils.ALPHA, stat='count', bins=7, kde=True, line_kws={'lw': 5, }
         )
         # Map a scatter plot to the lower plots
-        g.map_lower(sns.scatterplot, s=100, edgecolor=vutils.BLACK, facecolor='#FFFFFF', marker='o', linewidth=2)
-        # Map a regression line of best fit to the lower plots
-        g.map_lower(sns.regplot, scatter=False, color='#FF0000', ci=None, line_kws={'linewidth': 5})
+        g.map_lower(sns.scatterplot, s=100, edgecolor=vutils.BLACK, facecolor=vutils.WHITE, marker='o', linewidth=2)
+        # Map a regression line of best fit with bootstrapped confidence intervals to the lower plots
+        g.map_lower(self.reg_plot)
         # Map the variable titles to the diagonal plots
         g.map_diag(self._add_label_to_diag)
         # Map the regression coefficients to the upper plots
