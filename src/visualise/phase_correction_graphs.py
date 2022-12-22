@@ -626,7 +626,8 @@ class RegPlotGrid(vutils.BasePlot):
         super().__init__(**kwargs)
         # Define plotting attributes
         self.lw = kwargs.get('lw', 5)   # Width of plotted lines
-        self.error_bar = kwargs.get('errorbar', 'sd')
+        self.error_bar: str = kwargs.get('errorbar', 'sd')  # Type of error bar to plot: either sd or ci
+        self.percentiles: tuple[float] = kwargs.get('percentiles', [2.5, 97.5])
         self.ci_frac: float = kwargs.get('ci_frac', 0.66666667)     # Fraction of data to use in lowess curve
         self.ci_it: int = kwargs.get('ci_int', 3)   # Iterations to use in lowess curve
         self.n_boot: int = kwargs.get('n_boot', 1000)   # Number of bootstraps
@@ -712,7 +713,7 @@ class RegPlotGrid(vutils.BasePlot):
         self._format_fig()
         # Format the marginal axes after the figure, otherwise this will affect their position
         self._format_marginal_ax()
-        fname = f'{self.output_dir}\\regplot_grid'
+        fname = f'{self.output_dir}\\regplot_grid_{self.error_bar}'
         return self.fig, fname
 
     def _create_plot(
@@ -744,10 +745,6 @@ class RegPlotGrid(vutils.BasePlot):
             # Else, add a standard linear regression line
             else:
                 self._add_regression(ax=a, grp=grp)
-                # sns.regplot(
-                #     data=grp, x='coupling_balance', y='value', ax=a, scatter=False, x_ci='sd',
-                #     scatter_kws={'alpha': vutils.ALPHA}, color=vutils.BLACK, line_kws={'lw': self.lw},
-                # )
         # Create the first row of marginal plots, showing distribution of coupling balance
         for m in self.marginal_ax.flatten()[:2]:
             # We can just use the last group and scatter plot here as the data is the same
@@ -760,37 +757,56 @@ class RegPlotGrid(vutils.BasePlot):
     def _add_regression(
             self, ax: plt.Axes, grp: pd.DataFrame
     ) -> None:
+        """
+        Adds in a linear regression fit to a single plot with bootstrapped confidence intervals
+        """
+
         def regress(
-                x: pd.Series, y: pd.Series
-        ):
-            x = sm.add_constant(x)
-            fit = sm.OLS(y, x).fit()
-            return tuple(fit.params.to_list())
+                g: pd.DataFrame
+        ) -> np.ndarray:
+            # Coerce x variable into correct form and add constant
+            x = sm.add_constant(g['coupling_balance'].to_list())
+            # Coerce y into correct form
+            y = g['value'].to_list()
+            # Fit the model, predicting y from x
+            md = sm.OLS(y, x).fit()
+            # Return predictions made using our x vector
+            return md.predict(x_vec)
 
-        def create_slope(
-                x, intercept_mod: int | float = 0, slope_mod: int | float = 0, y_prefix: str = ''
-        ):
-            return pd.DataFrame(
-                x, [(act_intercept + intercept_mod) + (act_slope + slope_mod) * val for val in x]
-            ).reset_index(drop=False).rename(columns={'index': f'y_{y_prefix}',  0: f'x'})
-
-        act_intercept, act_slope = regress(grp['coupling_balance'], grp['value'])
-        res = []
-        for n in range(0, self.n_boot):
-            boot = grp.sample(frac=1, replace=True, random_state=n).reset_index(drop=True)
-            boot_regress = regress(boot['coupling_balance'], boot['value'])
-            res.append(boot_regress)
-        std_intercept, std_slope = pd.DataFrame(res, columns=['intercept', 'slope']).std()
-        act = create_slope(x=grp['coupling_balance'].to_list())
-        high = create_slope(
-            x=grp['coupling_balance'].to_list(), slope_mod=std_slope, intercept_mod=std_intercept, y_prefix='high'
+        # Create the vector of x values we'll use when making predictions
+        x_vec = sm.add_constant(
+            np.linspace(grp['coupling_balance'].min(), grp['coupling_balance'].max(), len(grp['coupling_balance']))
         )
-        low = create_slope(
-            x=grp['coupling_balance'].to_list(), slope_mod=-std_slope, intercept_mod=-std_intercept, y_prefix='low'
-        )
-        conc = pd.concat([act['x'], low['y_low'], high['y_high']], axis=1).sort_values('x').reset_index(drop=True)
-        ax.plot(act['x'], act['y_'], color=vutils.BLACK, lw=self.lw)
-        ax.fill_between(conc['x'], conc['y_low'], conc['y_high'], color=vutils.BLACK, alpha=0.2)
+        # Create model predictions for a regression fitted on our actual data
+        act_predict = regress(grp)
+        # Create bootstrapped regression predictions
+        res = [regress(grp.sample(frac=1, replace=True, random_state=n)) for n in range(0, self.n_boot)]
+        # Create empty variable to hold concatenated dataframe so we don't get warnings
+        conc = None
+        # Convert bootstrapped predictions to dataframe and get standard deviation for each x value
+        if self.error_bar == 'ci':
+            # Convert bootstrapped predictions to dataframe and get required percentiles for each x value
+            boot_res = (
+                pd.DataFrame(res)
+                  .transpose()
+                  .apply(np.nanpercentile, axis=1, q=self.percentiles)
+                  .apply(pd.Series)
+                  .rename(columns={0: 'low', 1: 'high'})
+            )
+            # Concatenate bootstrapped standard errors with original predictions
+            # No need to add error terms to our original data, we just plot the percentiles
+            conc = pd.concat([pd.Series(x_vec[:, 1]).rename('x'), pd.Series(act_predict).rename('y'), boot_res], axis=1)
+        elif self.error_bar == 'sd':
+            # Convert bootstrapped predictions to dataframe and get standard deviation for each x value
+            boot_res = pd.DataFrame(res).transpose().std(axis=1).rename('sd')
+            # Concatenate bootstrapped standard errors with original predictions
+            conc = pd.concat([pd.Series(x_vec[:, 1]).rename('x'), pd.Series(act_predict).rename('y'), boot_res], axis=1)
+            # Get confidence intervals by adding and subtracting error to original y values
+            conc['high'] = conc['y'] + conc['sd']
+            conc['low'] = conc['y'] - conc['sd']
+        # Plot the resulting data
+        ax.plot(conc['x'], conc['y'], color=vutils.BLACK, lw=self.lw)
+        ax.fill_between(conc['x'], conc['high'], conc['low'], color=vutils.BLACK, alpha=0.2)
 
     def _add_lowess(
             self, ax: plt.Axes, grp: pd.DataFrame, add_hline: bool = True
@@ -821,23 +837,30 @@ class RegPlotGrid(vutils.BasePlot):
         # Format the resampled dataframes
         fmt = lambda d: pd.DataFrame(d).transpose().reset_index(drop=True)
         fmt_y = fmt(res_y)
+        # Create empty variable so we don't get errors
+        conc = None
         # Extract the quantiles: median x value, 0.025 and 0.975 quantiles from y
         if self.error_bar == 'ci':
-            # Get the 2.5 and 97.5 percentiles, row-wise
-            y_025 = fmt_y.quantile(0.025, axis=1)
-            y_975 = fmt_y.quantile(0.975, axis=1)
-            conc = pd.concat([pd.Series(act_y), y_025, y_975], axis=1)
-            conc.iloc[0:-5] = conc.iloc[0:-5].rolling(10, min_periods=1).mean()
-            # Fill between the quantiles
-            ax.fill_between(conc[0.500], conc[0.025], conc[0.975], color=vutils.BLACK, alpha=0.2)
+            # Get the upper and lower percentiles, row-wise
+            y_025 = fmt_y.quantile(self.percentiles[0] / 100, axis=1)
+            y_975 = fmt_y.quantile(self.percentiles[1] / 100, axis=1)
+            # Concatenate the dataframes together
+            conc = pd.concat(
+                [pd.Series(act_x).rename('x'), pd.Series(act_y).rename('y'), y_025.rename('low'), y_975.rename('high')],
+                axis=1
+            )
         elif self.error_bar == 'sd':
             # Get the standard deviation of the bootstrap dataframe and concatenate against the original
-            conc = pd.concat([pd.Series(act_y), fmt_y.std(axis=1)], axis=1, keys=['act', 'se'])
+            conc = pd.concat(
+                [pd.Series(act_x).rename('x'), pd.Series(act_y).rename('y'), fmt_y.std(axis=1).rename('std')], axis=1
+            )
             # Add and subtract the standard error to the original values
-            conc['high'] = conc['act'] + conc['se']
-            conc['low'] = conc['act'] - conc['se']
-            # Fill between +/- 1 standard error
-            ax.fill_between(act_x, conc['low'], conc['high'], color=vutils.BLACK, alpha=0.2)
+            conc['high'] = conc['y'] + conc['std']
+            conc['low'] = conc['y'] - conc['std']
+        # Apply some smoothing to the error bar
+        conc.iloc[0:-5] = conc.iloc[0:-5].rolling(10, min_periods=1).mean()
+        # Shade error bar in plot
+        ax.fill_between(conc['x'], conc['low'], conc['high'], color=vutils.BLACK, alpha=0.2)
         # Add horizontal line at y=0 if required
         if add_hline:
             ax.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK, linewidth=self.lw)
@@ -848,6 +871,8 @@ class RegPlotGrid(vutils.BasePlot):
         """
         Applies axes-level formatting to main plots
         """
+        # Set IOI variability y limit, as this has a tendency to change depending on which error bar type is used
+        self.main_ax[1].set(ylim=(10, 70))
         # Iterate through main axes and labels
         for num, (ax, lab) in enumerate(zip(self.main_ax.flatten(), self.xlabs)):
             # Store our handles and labels here so we can refer to them later
@@ -1025,7 +1050,9 @@ def generate_phase_correction_plots(
     )
     pg.create_plot()
     # Create regression plots
-    rp = RegPlotGrid(df=df, output_dir=figures_output_dir)
+    rp = RegPlotGrid(df=df, output_dir=figures_output_dir, errorbar='ci')
+    rp.create_plot()
+    rp = RegPlotGrid(df=df, output_dir=figures_output_dir, errorbar='sd')
     rp.create_plot()
     bar = BarPlot(df=df, output_dir=figures_output_dir)
     bar.create_plot()
