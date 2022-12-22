@@ -3,6 +3,7 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 import scipy.stats as stats
+import statsmodels.api as sm
 
 import src.visualise.visualise_utils as vutils
 import src.analyse.analysis_utils as autils
@@ -267,6 +268,9 @@ class RegPlotSlopeComparisons(vutils.BasePlot):
         super().__init__(**kwargs)
         # Define variables
         self.var = kwargs.get('var', 'tempo_slope')
+        self.n_boot: int = kwargs.get('n_boot', vutils.N_BOOT)
+        self.error_bar: str = kwargs.get('error_bar', 'sd')
+        self.percentiles: tuple[float] = kwargs.get('percentile', (2.5, 97.5))
         self.original_noise = kwargs.get('original_noise', False)
         self.orig_var, self.sim_var = self.var + '_original', self.var + '_simulated'
         self.df = self._format_df(df)
@@ -308,18 +312,68 @@ class RegPlotSlopeComparisons(vutils.BasePlot):
         # Map a scatter plot onto the main ax
         sns.scatterplot(
             data=self.df, x=self.sim_var, y=self.orig_var, s=100, hue='trial', palette=vutils.DUO_CMAP,
-            edgecolor=vutils.BLACK, style='trial', ax=g.ax_joint
+            edgecolor=vutils.BLACK, style='trial', ax=g.ax_joint, markers=vutils.DUO_MARKERS
         )
         # Map a regression plot onto the main ax
-        sns.regplot(
-            data=self.df, x=self.sim_var, y=self.orig_var, scatter=False, color=vutils.BLACK, n_boot=1000,
-            ax=g.ax_joint, truncate=False, line_kws={'linewidth': 3}
-        )
+        self._add_regression(ax=g.ax_joint, grp=self.df)
         # Map KDE plots onto the marginal ax
         g.plot_marginals(
             sns.kdeplot, lw=2, multiple='layer', fill=False, common_grid=True, cut=0, common_norm=True
         )
         return g
+
+    def _add_regression(
+            self, ax: plt.Axes, grp: pd.DataFrame,
+    ) -> None:
+        """
+        Adds in a linear regression fit to a single plot with bootstrapped confidence intervals
+        """
+        def regress(
+                g: pd.DataFrame
+        ) -> np.ndarray:
+            # Coerce x variable into correct form and add constant
+            x = sm.add_constant(g[self.sim_var].to_list())
+            # Coerce y into correct form
+            y = g[self.orig_var].to_list()
+            # Fit the model, predicting y from x
+            md = sm.OLS(y, x).fit()
+            # Return predictions made using our x vector
+            return md.predict(x_vec)
+
+        # Create the vector of x values we'll use when making predictions
+        x_vec = sm.add_constant(
+            np.linspace(*ax.get_xlim(), len(grp[self.sim_var]))
+        )
+        # Create model predictions for a regression fitted on our actual data
+        act_predict = regress(grp)
+        # Create bootstrapped regression predictions
+        res = [regress(grp.sample(frac=1, replace=True, random_state=n)) for n in range(0, self.n_boot)]
+        # Create empty variable to hold concatenated dataframe so we don't get warnings
+        conc = None
+        # Convert bootstrapped predictions to dataframe and get standard deviation for each x value
+        if self.error_bar == 'ci':
+            # Convert bootstrapped predictions to dataframe and get required percentiles for each x value
+            boot_res = (
+                pd.DataFrame(res)
+                  .transpose()
+                  .apply(np.nanpercentile, axis=1, q=self.percentiles)
+                  .apply(pd.Series)
+                  .rename(columns={0: 'low', 1: 'high'})
+            )
+            # Concatenate bootstrapped standard errors with original predictions
+            # No need to add error terms to our original data, we just plot the percentiles
+            conc = pd.concat([pd.Series(x_vec[:, 1]).rename('x'), pd.Series(act_predict).rename('y'), boot_res], axis=1)
+        elif self.error_bar == 'sd':
+            # Convert bootstrapped predictions to dataframe and get standard deviation for each x value
+            boot_res = pd.DataFrame(res).transpose().std(axis=1).rename('sd')
+            # Concatenate bootstrapped standard errors with original predictions
+            conc = pd.concat([pd.Series(x_vec[:, 1]).rename('x'), pd.Series(act_predict).rename('y'), boot_res], axis=1)
+            # Get confidence intervals by adding and subtracting error to original y values
+            conc['high'] = conc['y'] + conc['sd']
+            conc['low'] = conc['y'] - conc['sd']
+        # Plot the resulting data
+        ax.plot(conc['x'], conc['y'], color=vutils.BLACK, lw=3)
+        ax.fill_between(conc['x'], conc['high'], conc['low'], color=vutils.BLACK, alpha=0.2)
 
     def _add_correlation_results(
             self
@@ -448,7 +502,7 @@ class ArrowPlotParams(vutils.BasePlot):
             # Turn off the axis
             ax.axis('off')
             # Add the text showing the coupling balance equation
-            ax.text(0.5, 0.05, f'$Balance$: {self.balance[num]}', ha='center', va='center')
+            ax.text(0.5, 0.05, f'$Asymmetry$: {self.balance[num]}', ha='center', va='center')
             # Iterate through all the values we need to create plot features for each musician
             for n_, col, col2, col3, x1, x2, y, text, rot, in zip(
                     range(0, 2), vutils.INSTR_CMAP, vutils.INSTR_CMAP[::-1], [vutils.WHITE, vutils.BLACK],
@@ -500,10 +554,8 @@ class DistPlotParams(vutils.BasePlot):
         super().__init__(**kwargs)
         self.df = self._format_df(df)
         self.fig, self.ax = plt.subplots(
-            nrows=2, ncols=5, figsize=(18.8, 5), sharex=False, sharey=False,
-            gridspec_kw={'height_ratios': [1.5, 1]}
+            nrows=2, ncols=5, figsize=(18.8, 5), sharex=False, sharey=False, gridspec_kw={'height_ratios': [1.5, 1]}
         )
-        self.colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
         self.params = ['democracy', 'leadership', 'anarchy', 'original']
 
     @staticmethod
@@ -540,7 +592,7 @@ class DistPlotParams(vutils.BasePlot):
             g = g.groupby(by=['parameter', 'latency', 'jitter']).mean().reset_index(drop=False)
             # Iterate through parameter, color, ax, and text position
             for param, color, n_, xy, in zip(
-                    self.params, [vutils.BLACK, vutils.BLACK, vutils.BLACK, self.colors[i - 1]],
+                    self.params, [vutils.BLACK, vutils.BLACK, vutils.BLACK, vutils.DUO_CMAP[i - 1]],
                     [1, 1, 0, 1], [(-0.55, 320), (0, 450), (0.35, 2600), (0, 0)]
             ):
                 # Create the kde plot for this parameter
@@ -607,8 +659,6 @@ class DistPlotAverage(vutils.BasePlot):
         self.conditions = kwargs.get('conditions', [(0, 0), (90, 0), (90, 0.5), (90, 1)])
         # Markers used for plotting anarchy/democracy/leadership parameters
         self.param_markers = ["$A$", "$D$", "$L$"]
-        # Markers used for plotting individual duo results
-        self.duo_markers = ["$1$", "$2$", "$3$", "$4$", "$5$"]
         # Initialise subplots -- always two rows, and as many columns as we have conditions to plot
         self.fig, self.ax = plt.subplots(
             nrows=2, ncols=len(self.conditions), figsize=(18.8, 6), sharex=False, sharey=False,
@@ -635,6 +685,7 @@ class DistPlotAverage(vutils.BasePlot):
         Create each plot individually
         """
         for y, (lat, jit) in zip(range(0, 5), self.conditions):
+
             # Subset to get required condition
             condition = self.df[(self.df['latency'] == lat) & (self.df['jitter'] == jit)]
             # Plot anarchy, democracy, leadership results
@@ -642,15 +693,47 @@ class DistPlotAverage(vutils.BasePlot):
                 # Define which row of plots the markers should be placed on
                 x = 0 if i == 'anarchy' else 1
                 self.ax[x, y].scatter(
-                    g['tempo_slope_simulated'], g['asynchrony_simulated'], marker=self.param_markers[n_],
-                    s=250, color=vutils.BLACK, label=i.title() if y == 0 else None, zorder=10
+                    g['tempo_slope_simulated'], g['asynchrony_simulated'], marker='*',
+                    s=150, color=vutils.BLACK, label=None, zorder=10
                 )
+                if lat != 0:
+                    if i == 'democracy':
+                        y_pad = -30
+                    elif i == 'anarchy':
+                        y_pad = 100
+                    else:
+                        y_pad = 10
+                    self.ax[x, y].annotate(
+                        i.title(), xy=(g['tempo_slope_simulated'], g['asynchrony_simulated']),
+                        xytext=(g['tempo_slope_simulated'], g['asynchrony_simulated'] + y_pad),
+                        arrowprops=dict(arrowstyle="-", color='black', lw=2), ha='left', va='bottom'
+                    )
+                else:
+                    if i == 'leadership':
+                        y_pad = 20
+                        x_pad = 0.1
+                    elif i == 'anarchy':
+                        y_pad = 75
+                        x_pad = 0
+                    else:
+                        y_pad = 20
+                        x_pad = -0.6
+                    self.ax[x, y].annotate(
+                        i.title(), xy=(g['tempo_slope_simulated'], g['asynchrony_simulated']),
+                        xytext=(g['tempo_slope_simulated'] + x_pad, g['asynchrony_simulated'] + y_pad),
+                        arrowprops=dict(arrowstyle="-", color='black', lw=2), ha='left', va='bottom'
+                    )
             # Plot results from each duo
             for i, g in condition[condition['trial'] != 0].groupby('trial'):
                 i = int(i)
+                if i == 2 and y == 2:
+                    g['tempo_slope_simulated'] += 0.05
+                elif i == 3 and y == 2:
+                    g['tempo_slope_simulated'] -= 0.05
                 self.ax[1, y].scatter(
-                    g['tempo_slope_simulated'], g['asynchrony_simulated'], marker=self.duo_markers[i - 1],
-                    s=250, label=f'Duo {i}' if y == 0 else None, zorder=1
+                    g['tempo_slope_simulated'], g['asynchrony_simulated'], marker=vutils.DUO_MARKERS[i - 1],
+                    s=150, edgecolor=vutils.BLACK, facecolor=vutils.DUO_CMAP[i - 1],
+                    label=i if y == 0 else None, zorder=1
                 )
 
     def _format_ax(
@@ -670,7 +753,7 @@ class DistPlotAverage(vutils.BasePlot):
                 xlim=(-1, 1), xticks=[], yticks=[2600], title=tit, ylim=(2250, 3000)
             )
             self.ax[1, y].set(
-                ylim=(0, 175), xlim=(-0.75, 0.75), xticks=np.linspace(-0.5, 0.5, 3), yticks=np.linspace(0, 150, 4)
+                ylim=(0, 175), xlim=(-0.7, 0.7), xticks=np.linspace(-0.5, 0.5, 3), yticks=np.linspace(0, 150, 4)
             )
             # Set parameters for any plots where latency was applied
             if lat != 0:
@@ -678,7 +761,7 @@ class DistPlotAverage(vutils.BasePlot):
                 self.ax[1, y].axhspan(
                     ymin=0, ymax=lat, alpha=0.1, hatch='/', fc=vutils.BLACK, ec=vutils.BLACK, lw=3, ls='--'
                 )
-                self.ax[1, y].annotate(f'Baseline', (0.5, lat + 7), ha='center', va='center', alpha=vutils.ALPHA)
+                self.ax[1, y].annotate(f'Baseline', (0.45, lat + 7), ha='center', va='center', alpha=vutils.ALPHA)
             # Apply the same formatting to all plots
             for x in range(0, 2):
                 # Remove y tick labels on all but the first column of plots
@@ -700,9 +783,9 @@ class DistPlotAverage(vutils.BasePlot):
         self.fig.supxlabel('Tempo slope (BPM/s)')
         self.fig.supylabel('Asynchrony (RMS, ms)', x=0.01)
         # Add in legend
-        self.fig.legend(loc='center right', frameon=False, title='Simulation')
+        self.fig.legend(loc='center right', frameon=False, title='Duo')
         # Adjust plot spacing a bit -- hspace adjusts broken axis
-        self.fig.subplots_adjust(bottom=0.15, top=0.85, left=0.075, right=0.86, wspace=0.1, hspace=0.2)
+        self.fig.subplots_adjust(bottom=0.15, top=0.85, left=0.075, right=0.935, wspace=0.1, hspace=0.2)
 
 
 def generate_simulations_plots(

@@ -26,6 +26,7 @@ RED = '#FF0000'
 OFFSET = 8
 VIDEO_FPS = 30
 CBAR_BINS = np.linspace(-0.5, 0.3, 9, endpoint=True)
+N_BOOT = 1000
 
 # Define the colour palettes
 # Function used to shade a color map by given alpha value (can be used in color bars etc)
@@ -33,8 +34,10 @@ alpha_func = lambda pal: ListedColormap(np.c_[pal.colors, np.full(len(pal.colors
 SLOPES_CMAP = alpha_func(color_palette('vlag_r', as_cmap=True))     # Used for plotting tempo slopes
 INSTR_CMAP = ['#9933ff', '#00ff00']     # Palette used for plotting data that contrasts against slopes color map
 LINE_CMAP = ['#1f77b4', '#ff7f0e']     # Original matplotlib colour palette used for manual plotting
-DUO_CMAP = 'tab10'
-JITTER_CMAP = ['#FF0000', '#00FF00', '#0000FF']
+DUO_CMAP = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']      # Colour palette used for duos
+DUO_MARKERS = ['o', 'X', 's', 'P', 'D']     # Marker cycle used for duos
+JITTER_CMAP = ['#FF0000', '#00FF00', '#0000FF']     # Colour palette used for different jitter levels
+JITTER_MARKERS = ['o', 's', '^']    # Marker cycle used for jitter levels
 
 
 def plot_decorator(plotter: callable):

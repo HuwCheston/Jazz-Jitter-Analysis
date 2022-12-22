@@ -123,6 +123,7 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         self.var = kwargs.get('var', 'ioi_std_vs_jitter_partial_correlation')
         self.quantiles: tuple[float] = kwargs.get('quantiles', (0.025, 0.975))
         self.errorbar = kwargs.get('errorbar', 'sd')
+        self.n_boot: int = kwargs.get('n_boot', vutils.N_BOOT)
         self.df = self._format_df()
         self.df = self._bootstrap_df()
         self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
@@ -179,7 +180,7 @@ class LinePlotLaggedLatency(vutils.BasePlot):
                                       aggfunc=func)
         # Create a list of new dataframes by resampling with replacement (frac=1 means returned df is 100% of length of
         # original). Mean function is used to get the row-wise mean of coefficients, i.e. across musicians, not lag
-        samples = [reshape.sample(frac=1, replace=True, random_state=n).mean(axis=0) for n in range(0, 1000)]
+        samples = [reshape.sample(frac=1, replace=True, random_state=n).mean(axis=0) for n in range(0, self.n_boot)]
         # Combine all of our resampled dataframes together
         boot = pd.concat(samples, axis=1)
         # TODO: use standard errors instead?
@@ -208,7 +209,7 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         """
         return sns.lineplot(
             data=self.df, hue='jitter', x='lag', y='mean', errorbar=None, palette=vutils.JITTER_CMAP,
-            lw=3, ax=self.ax, style='jitter', markers=['o', 's', '^'], markersize=10
+            lw=3, ax=self.ax, style='jitter', markers=vutils.JITTER_MARKERS, markersize=10
         )
 
     def _format_ax(

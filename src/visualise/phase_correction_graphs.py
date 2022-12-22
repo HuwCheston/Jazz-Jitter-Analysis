@@ -439,10 +439,10 @@ class RegPlot(vutils.BasePlot):
         for num, var in enumerate(self.xvars):
             _ = sns.scatterplot(
                 data=self.df, x='coupling_balance', y=var, hue='trial', s=100, style='trial',
-                palette=vutils.DUO_CMAP, ax=self.ax[num], legend=None if num == 1 else True
+                markers=vutils.DUO_MARKERS, palette=vutils.DUO_CMAP, ax=self.ax[num], legend=None if num == 1 else True
             )
             _ = sns.regplot(
-                data=self.df, x='coupling_balance', y=var, x_ci=95, n_boot=100, scatter=None, lowess=True,
+                data=self.df, x='coupling_balance', y=var, x_ci=95, n_boot=vutils.N_BOOT, scatter=None, lowess=True,
                 truncate=True, color=vutils.BLACK, ax=self.ax[num], line_kws={'linewidth': 3},
             )
 
@@ -450,7 +450,7 @@ class RegPlot(vutils.BasePlot):
         for a, lab in zip(self.ax.flatten(), self.xlabs):
             a.tick_params(width=3, )
             plt.setp(a.spines.values(), linewidth=2)
-            a.set(xlabel='Coupling balance', ylabel=lab)
+            a.set(xlabel='Coupling asymmetry', ylabel=lab)
             a.axhline(y=0, linestyle='-', alpha=0.3, color=vutils.BLACK, lw=3)
 
     def _format_fig(self):
@@ -630,7 +630,7 @@ class RegPlotGrid(vutils.BasePlot):
         self.percentiles: tuple[float] = kwargs.get('percentiles', [2.5, 97.5])
         self.ci_frac: float = kwargs.get('ci_frac', 0.66666667)     # Fraction of data to use in lowess curve
         self.ci_it: int = kwargs.get('ci_int', 3)   # Iterations to use in lowess curve
-        self.n_boot: int = kwargs.get('n_boot', 1000)   # Number of bootstraps
+        self.n_boot: int = kwargs.get('n_boot', vutils.N_BOOT)   # Number of bootstraps
         self.hand, self.lab = None, None    # Empty variables that will be used to hold handles and labels of legend
         # Define variables to plot, both as they appear in the raw dataframe and the labels that should be on the plot
         self.xvars: list[str] = kwargs.get('xvars', ['tempo_slope', 'ioi_std', 'pw_asym', 'success'])
@@ -730,7 +730,7 @@ class RegPlotGrid(vutils.BasePlot):
             # Create the scatter plot on the main axis
             sp = sns.scatterplot(
                 data=grp, x='coupling_balance', y='value', hue='trial', ax=a, palette=vutils.DUO_CMAP,
-                style='trial', s=250, edgecolor=vutils.BLACK
+                style='trial', s=250, markers=vutils.DUO_MARKERS, edgecolor=vutils.BLACK
             )
             # Create the kde plot on the marginal axis
             kp = sns.kdeplot(
@@ -760,7 +760,6 @@ class RegPlotGrid(vutils.BasePlot):
         """
         Adds in a linear regression fit to a single plot with bootstrapped confidence intervals
         """
-
         def regress(
                 g: pd.DataFrame
         ) -> np.ndarray:
@@ -976,7 +975,7 @@ class ArrowPlotPhaseCorrection(vutils.BasePlot):
             a.set_title(f'Duo {idx}', y=0.9)
             # Add text showing the absolute coupling balance
             a.text(
-                0.5, 0.05, f'$Balance$: +{abs(means.iloc[0] - means.iloc[1]):.2f}', ha='center',
+                0.5, 0.05, f'$Asymmetry$: +{abs(means.iloc[0] - means.iloc[1]):.2f}', ha='center',
                 va='center', fontsize=vutils.FONTSIZE + 3
             )
             a.text(

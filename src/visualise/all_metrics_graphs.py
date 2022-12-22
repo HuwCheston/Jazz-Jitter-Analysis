@@ -26,7 +26,7 @@ class PairPlotAllVariables(vutils.BasePlot):
         self._jitter_success: bool = kwargs.get('jitter_success', True)
         self._abs_slope: bool = kwargs.get('abs_slope', True)
         self.error_bar: str = kwargs.get('error_bar', 'sd')
-        self.n_boot: int = kwargs.get('n_boot', 1000)
+        self.n_boot: int = kwargs.get('n_boot', vutils.N_BOOT)
         self.percentiles: tuple[float] = kwargs.get('percentiles', (2.5, 97.5))
         self.vars: list[str] = kwargs.get('vars', ['tempo_slope', 'ioi_std', 'pw_asym', 'success'])
         self.df: pd.DataFrame = self._format_df()
