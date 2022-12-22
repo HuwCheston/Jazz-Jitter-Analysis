@@ -706,7 +706,7 @@ class DistPlotAverage(vutils.BasePlot):
                     self.ax[x, y].annotate(
                         i.title(), xy=(g['tempo_slope_simulated'], g['asynchrony_simulated']),
                         xytext=(g['tempo_slope_simulated'], g['asynchrony_simulated'] + y_pad),
-                        arrowprops=dict(arrowstyle="-", color='black', lw=2), ha='left', va='bottom'
+                        arrowprops=dict(arrowstyle="-", color='black', lw=2, alpha=vutils.ALPHA), ha='left', va='bottom'
                     )
                 else:
                     if i == 'leadership':
@@ -721,7 +721,7 @@ class DistPlotAverage(vutils.BasePlot):
                     self.ax[x, y].annotate(
                         i.title(), xy=(g['tempo_slope_simulated'], g['asynchrony_simulated']),
                         xytext=(g['tempo_slope_simulated'] + x_pad, g['asynchrony_simulated'] + y_pad),
-                        arrowprops=dict(arrowstyle="-", color='black', lw=2), ha='left', va='bottom'
+                        arrowprops=dict(arrowstyle="-", color='black', lw=2, alpha=vutils.ALPHA), ha='left', va='bottom'
                     )
             # Plot results from each duo
             for i, g in condition[condition['trial'] != 0].groupby('trial'):

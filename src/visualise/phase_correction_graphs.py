@@ -4,6 +4,7 @@ import statsmodels.api as sm
 from statsmodels.nonparametric.smoothers_lowess import lowess as sm_lowess
 from statistics import mean
 from matplotlib import animation, pyplot as plt
+from matplotlib.patches import ConnectionPatch
 import seaborn as sns
 
 import src.analyse.analysis_utils as autils
@@ -1022,6 +1023,129 @@ class ArrowPlotPhaseCorrection(vutils.BasePlot):
         self.fig.subplots_adjust(right=0.95, left=0.05, top=0.925, bottom=0.125, wspace=0.4)
 
 
+class ArrowPlotModelExplanation(vutils.BasePlot):
+    """
+    Generates a graphic that explains how the model works. Good luck understanding the code!
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=5, figsize=(9.4, 5), sharex=True, sharey=True)
+        self.points1 = [[0.5, 0.65], [0.45, 0.65], [0.5, 0.65], [0.53, 0.65], [0.48, 0.65]]
+        self.points2 = [[0.55, 0.35], [0.53, 0.35], [0.49, 0.35], [0.55, 0.35], [0.59, 0.35]]
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class to generate the plot and save in decorator
+        """
+        self._create_plot()
+        self._format_fig()
+        fname = f'{self.output_dir}\\arrowplot_model_explanation'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Create the plot
+        """
+        # Iterate through each ax
+        for n, a in enumerate(self.ax.flatten()):
+            a.axis('off')
+            if n == 0:
+                a.text(1.1, 0.69, s=f'$I_{{k{n - 1}}}^{{1, 1}}$', ha='center', va='center',
+                       fontsize=vutils.FONTSIZE - 3)
+            elif n == 1:
+                a.text(1.1, 0.69, s=f'$I_{{k}}^{{1, 1}}$', ha='center', va='center', fontsize=vutils.FONTSIZE - 3)
+            elif n == 2:
+                a.text(1.1, 0.69, s=f'$I_{{k+{n - 1}}}^{{1, 1}}$', ha='center', va='center',
+                       fontsize=vutils.FONTSIZE - 3)
+            a.axvline(x=0.5, ymin=0.3, ymax=0.7, lw=3, color=vutils.BLACK, alpha=vutils.ALPHA, zorder=5)
+            a.add_patch(
+                plt.Rectangle(
+                    (0.25, 0.3), width=0.5, height=0.4, clip_on=False, linewidth=3, alpha=0.2,
+                    edgecolor=vutils.BLACK, transform=a.transAxes, facecolor=vutils.BLACK, zorder=1
+                )
+            )
+            a.annotate("", xytext=[self.points2[n][0] - 0.075, self.points2[n][1] - 0.04],
+                       xy=[self.points2[n][0] + 0.325, self.points2[n][1] - 0.04],
+                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=135,angleB=45", lw=3))
+            if n == 0:
+                a.text(self.points2[n][0] + 0.1, self.points2[n][1] - 0.1, s=f'$d_{{k{n - 1}}}$', ha='center',
+                       va='center', fontsize=vutils.FONTSIZE - 3)
+            elif n == 1:
+                a.text(self.points2[n][0] + 0.1, self.points2[n][1] - 0.1, s=f'$d_{{k}}$', ha='center', va='center',
+                       fontsize=vutils.FONTSIZE - 3)
+            elif n == 2:
+                a.text(self.points2[n][0] + 0.1, self.points2[n][1] - 0.1, s=f'$d_{{k+{n - 1}}}$', ha='center',
+                       va='center', fontsize=vutils.FONTSIZE - 3)
+            a.scatter(*self.points1[n], color=vutils.INSTR_CMAP[0], s=750, edgecolor=vutils.BLACK, zorder=10, lw=2)
+            a.scatter(*self.points2[n], color=vutils.INSTR_CMAP[1], s=750, edgecolor=vutils.BLACK, zorder=10,
+                      alpha=vutils.ALPHA, ls='dashed', lw=2)
+            self.points2[n][0] += 0.25
+            a.scatter(*self.points2[n], color=vutils.INSTR_CMAP[1], s=750, edgecolor=vutils.BLACK, zorder=10, lw=2)
+            a.set_xlim(0, 1)
+            a.set_ylim(0, 1)
+        for a1 in range(0, 5):
+            self.points1[a1][0] -= 0.125
+            self.points2[a1][0] -= 0.125
+            con = ConnectionPatch(
+                xyA=[self.points1[a1][0] - 0.05, self.points1[a1][1]],
+                xyB=[self.points2[a1][0] - 0.05, self.points2[a1][1]],
+                coordsA='data', coordsB='data', axesA=self.ax[a1],
+                axesB=self.ax[a1], zorder=1000000, lw=3, arrowstyle='->',
+            )
+            self.ax[a1].add_artist(con)
+            if a1 < 4:
+                con = ConnectionPatch(
+                    xyA=self.points1[a1], xyB=self.points1[a1 + 1],
+                    coordsA='data', coordsB='data', axesA=self.ax[a1],
+                    axesB=self.ax[a1 + 1], lw=3, arrowstyle='->',
+                )
+                self.ax[a1].add_artist(con)
+
+    def _format_fig(self):
+        self.fig.text(
+            0.17, 0.55, 'Live\ninstrument', fontsize=vutils.FONTSIZE, va='center', ha='right',
+            color=vutils.INSTR_CMAP[0]
+        )
+        self.fig.text(0.17, 0.25, 'Delayed\ninstrument', fontsize=vutils.FONTSIZE, va='center', ha='right',
+                      color=vutils.INSTR_CMAP[1])
+        self.fig.text(0.6, 0.03, 'Time', fontsize=vutils.FONTSIZE, va='center', ha='center', color=vutils.BLACK,
+                      rotation=0)
+        self.ax[0].arrow(0.45, 0.2, 5.75, 0, clip_on=False, transform=self.ax[0].transAxes, lw=3, head_width=0.03,
+                         head_length=0.1, facecolor=vutils.BLACK)
+        self.ax[0].annotate(f'$I_{{k-1}}^{{1, 1}}-I_{{k}}^{{1, 1}}$ ', xy=(1.70, 0.75), xytext=(1.70, 0.8),
+                            xycoords='axes fraction',
+                            fontsize=vutils.FONTSIZE, ha='center', va='bottom',
+                            bbox=dict(boxstyle='square', fc='white', ls='-', lw=0),
+                            arrowprops=dict(arrowstyle='-[, widthB=3.26, lengthB=0.6', lw=2.0))
+        self.ax[1].annotate(f'$I_{{k}}^{{1, 1}}-I_{{k+1}}^{{1, 1}}$ ', xy=(1.70, 0.75), xytext=(1.70, 0.8),
+                            xycoords='axes fraction',
+                            fontsize=vutils.FONTSIZE, ha='center', va='bottom',
+                            bbox=dict(boxstyle='square', fc='white', ls='-', lw=3),
+                            arrowprops=dict(arrowstyle='-[, widthB=3.26, lengthB=0.6', lw=2.0, ))
+        self.ax[1].annotate(f'$α^{{1, 1}}$', xy=(1.1, 0.95), xytext=(1.1, 0.95), xycoords='axes fraction',
+                            fontsize=vutils.FONTSIZE + 3, ha='center', va='bottom',
+                            bbox=dict(boxstyle='square', fc='white'),
+                            arrowprops=dict(arrowstyle='-[, widthB=3.26, lengthB=1.45', lw=4.0))
+        self.ax[1].arrow(0.45, 0.955, 0.1, 0, lw=0, clip_on=False, head_width=0.05, head_length=0.15,
+                         facecolor=vutils.BLACK)
+        self.ax[1].arrow(1.45, 0.955, 0.1, 0, lw=0, clip_on=False, head_width=0.05, head_length=0.15,
+                         facecolor=vutils.BLACK)
+        self.ax[1].arrow(1.45, 0.5, 0, 0.25, lw=4, head_width=0.1, head_length=0.025, clip_on=False,
+                         facecolor=vutils.BLACK)
+        self.ax[1].arrow(0.7, 0.5, 0.2, 0, lw=4, clip_on=False, head_width=0.025, head_length=0.1,
+                         facecolor=vutils.BLACK)
+        self.ax[1].annotate(f'$α^{{1, 2}}$', xy=(1.1, 0.95), xytext=(1.1, 0.5), fontsize=vutils.FONTSIZE + 3,
+                            xycoords='axes fraction', bbox=dict(boxstyle='square', facecolor=vutils.WHITE),
+                            zorder=100000)
+        self.ax[1].text(0.65, 0.515, s=f'$I_{{k}}^{{1, 2}}$', ha='center', va='center', fontsize=vutils.FONTSIZE - 3)
+        self.fig.subplots_adjust(bottom=-0.15, top=0.95, right=0.99, left=0.15, wspace=0.4)
+
+
 def generate_phase_correction_plots(
     mds: list, output_dir: str,
 ) -> None:
@@ -1058,6 +1182,8 @@ def generate_phase_correction_plots(
     bar = BarPlot(df=df, output_dir=figures_output_dir, yvar='correction_self', ylabel='Self coupling', ylim=(-1, 1))
     bar.create_plot()
     ap = ArrowPlotPhaseCorrection(df=df, output_dir=figures_output_dir)
+    ap.create_plot()
+    ap = ArrowPlotModelExplanation(output_dir=figures_output_dir)
     ap.create_plot()
 
 
