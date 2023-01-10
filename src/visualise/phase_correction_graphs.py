@@ -20,8 +20,9 @@ class PairGrid(vutils.BasePlot):
         self.xvar: str = kwargs.get('xvar', 'correction_partner_onset')
         self.xlim: tuple = kwargs.get('xlim', (-1.5, 1.5))
         self.xlabel: str = kwargs.get('xlabel', None)
+        self.average: bool = kwargs.get('average', True)
         self.cvar: str = kwargs.get('cvar', 'tempo_slope')
-        self.clabel: str = kwargs.get('clabel', 'Tempo\nslope\n(BPM/s)\n\n')
+        self.clabel: str = kwargs.get('clabel', 'Tempo slope\n(BPM/s)\n\n')
         # If we've passed our dataframe
         if self.df is not None:
             self.df = self._format_df()
@@ -36,12 +37,16 @@ class PairGrid(vutils.BasePlot):
         self._format_pairgrid_ax()
         self._format_pairgrid_fig()
         fname = f'{self.output_dir}\\pairgrid_condition_vs_{self.xvar}_vs_{self.cvar}'
+        if self.average:
+            fname += '_average'
         return self.g.fig, fname
 
     def _format_df(self) -> pd.DataFrame:
         """
         Formats dataframe by adding abbreviation column
         """
+        if self.average:
+            self.df = self.df.groupby(['trial', 'latency', 'jitter', 'instrument']).mean().reset_index(drop=False)
         self.df['abbrev'] = self.df['latency'].astype('str') + 'ms/' + round(self.df['jitter'], 1).astype('str') + 'x'
         return self.df.sort_values(by=['latency', 'jitter'])
 
@@ -52,7 +57,7 @@ class PairGrid(vutils.BasePlot):
         return sns.catplot(
             data=self.df, x=self.xvar, y='abbrev', row='block', col='trial', hue='instrument', sharex=True, sharey=True,
             hue_order=['Keys', 'Drums'], palette=vutils.INSTR_CMAP, kind='strip', height=5.5, marker='o', aspect=0.62,
-            s=100, jitter=False, dodge=False
+            s=125, jitter=False, dodge=False
         )
 
     def _format_pairgrid_ax(self):
@@ -60,28 +65,46 @@ class PairGrid(vutils.BasePlot):
         Formats each axes within a pairgrid
         """
         # Add the reference line first or it messes up the plot titles
-        self.g.refline(x=0, alpha=1, linestyle='-', color=vutils.BLACK)
-        for num in range(0, 5):
-            ax1 = self.g.axes[0, num]
-            ax2 = self.g.axes[1, num]
-            # When we want different formatting for each row
-            ax1.set_title(f'Repeat 1\nDuo {num + 1}' if num == 2 else f'\nDuo {num + 1}', fontsize=vutils.FONTSIZE + 3)
-            ax1.set(ylabel='', xlim=self.xlim, )
-            ax1.tick_params(bottom=False)
-            ax2.set_title(f'Repeat 2' if num == 2 else '', fontsize=vutils.FONTSIZE + 3)
-            ax2.set(ylabel='', xlabel='', xlim=self.xlim)
-            # When we want the same formatting for both rows
-            for x, ax in enumerate([ax1, ax2]):
-                # Disable the grid
-                ax.xaxis.grid(False)
-                ax.yaxis.grid(True)
+        self.g.refline(x=0, alpha=1, linestyle='-', lw=3, color=vutils.BLACK)
+        if self.average:
+            self.g.refline(y=12.5, alpha=1, linestyle='-', lw=3, color=vutils.BLACK)
+            for num in range(0, 5):
+                ax = self.g.axes[0, num]
+                ax.set_title(f'Duo {num + 1}', fontsize=vutils.FONTSIZE + 3)
+                ax.set(ylabel='', xlim=self.xlim, ylim=(12.5, -0.5), xlabel='')
+                ax.tick_params(width=3, )
+                ax.yaxis.grid(lw=2, alpha=vutils.ALPHA)
                 # Add the span, shaded according to tempo slope
                 d = self.df[
-                    (self.df['trial'] == num + 1) & (self.df['block'] == x + 1) & (self.df['instrument'] == 'Keys')
+                    (self.df['trial'] == num + 1) & (self.df['instrument'] == 'Keys')
                 ].sort_values(['latency', 'jitter'])[self.cvar]
                 for n in range(0, 13):
                     coef = vutils.SLOPES_CMAP(self.norm(d.iloc[n]))
                     ax.axhspan(n - 0.5, n + 0.5, facecolor=coef)
+        else:
+            for num in range(0, 5):
+                ax1 = self.g.axes[0, num]
+                ax2 = self.g.axes[1, num]
+                # When we want different formatting for each row
+                ax1.set_title(
+                    f'Repeat 1\nDuo {num + 1}' if num == 2 else f'\nDuo {num + 1}', fontsize=vutils.FONTSIZE + 3
+                )
+                ax1.set(ylabel='', xlim=self.xlim, )
+                ax1.tick_params(bottom=False)
+                ax2.set_title(f'Repeat 2' if num == 2 else '', fontsize=vutils.FONTSIZE + 3)
+                ax2.set(ylabel='', xlabel='', xlim=self.xlim)
+                # When we want the same formatting for both rows
+                for x, ax in enumerate([ax1, ax2]):
+                    # Disable the grid
+                    ax.xaxis.grid(False)
+                    ax.yaxis.grid(True)
+                    # Add the span, shaded according to tempo slope
+                    d = self.df[
+                        (self.df['trial'] == num + 1) & (self.df['block'] == x + 1) & (self.df['instrument'] == 'Keys')
+                    ].sort_values(['latency', 'jitter'])[self.cvar]
+                    for n in range(0, 13):
+                        coef = vutils.SLOPES_CMAP(self.norm(d.iloc[n]))
+                        ax.axhspan(n - 0.5, n + 0.5, facecolor=coef)
 
     def _format_pairgrid_fig(self) -> None:
         """
@@ -89,18 +112,28 @@ class PairGrid(vutils.BasePlot):
         """
         # Format the figure
         self.g.despine(left=True, bottom=True)
-        self.g.fig.supxlabel(self.xlabel, x=0.505, y=0.05)
-        self.g.fig.supylabel('Condition', x=0.01)
+        self.g.fig.supxlabel(self.xlabel, x=0.505, y=0.01 if self.average else 0.05)
+        self.g.fig.supylabel('Condition (latency/jitter)', x=0.01)
         # Add the color bar
-        position = self.g.fig.add_axes([0.94, 0.2, 0.01, 0.6])
-        self.g.fig.colorbar(vutils.create_scalar_cbar(norm=self.norm), cax=position, ticks=vutils.CBAR_BINS)
-        position.text(0.0, 0.3, self.clabel, fontsize=vutils.FONTSIZE + 3)  # Super hacky way to add a title...
-        # Add the legend
-        sns.move_legend(
-            self.g, loc='lower center', ncol=2, title=None, frameon=False, markerscale=1.5, fontsize=vutils.FONTSIZE + 3
-        )
-        # Adjust the plot spacing
-        self.g.fig.subplots_adjust(bottom=0.12, top=0.93, wspace=0.15, left=0.11, right=0.93)
+        if self.average:
+            position = self.g.fig.add_axes([0.9, 0.1, 0.01, 0.4])
+            sns.move_legend(
+                self.g, loc='right', ncol=1, title='Instrument', frameon=False, markerscale=2,
+                fontsize=vutils.FONTSIZE + 3, bbox_to_anchor=(1.0, 0.8),
+            )
+            self.g.fig.subplots_adjust(bottom=0.14, top=0.9, wspace=0.17, left=0.11, right=0.885)
+            position.text(0, 0.16, self.clabel, fontsize=vutils.FONTSIZE)
+        else:
+            position = self.g.fig.add_axes([0.94, 0.2, 0.01, 0.6])
+            sns.move_legend(
+                self.g, loc='lower center', ncol=2, title=None, frameon=False, markerscale=1.5,
+                fontsize=vutils.FONTSIZE + 3
+            )
+            self.g.fig.subplots_adjust(bottom=0.12, top=0.93, wspace=0.15, left=0.11, right=0.93)
+            position.text(0.0, 0.3, self.clabel, fontsize=vutils.FONTSIZE + 3)
+        cb = self.g.fig.colorbar(vutils.create_scalar_cbar(norm=self.norm), cax=position, ticks=vutils.CBAR_BINS)
+        cb.outline.set_linewidth(1.5)
+        cb.ax.tick_params(width=3)
 
 
 class BoxPlot(vutils.BasePlot):
@@ -1167,9 +1200,15 @@ def generate_phase_correction_plots(
     # Create box plot
     bp = BoxPlot(df=df, output_dir=figures_output_dir, yvar='correction_partner', ylim=(-0.2, 1.5))
     bp.create_plot()
-    # Create pair grid
+    # Create pair grids
+    pg_a = PairGrid(
+        df=df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(0, 1.25),
+        xlabel='Average coupling to partner', average=True
+    )
+    pg_a.create_plot()
     pg = PairGrid(
-        df=df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(-0.5, 1.5), xlabel='Coupling constant'
+        df=df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(0, 1.5),
+        xlabel='Coupling to partner', average=False
     )
     pg.create_plot()
     # Create regression plots
