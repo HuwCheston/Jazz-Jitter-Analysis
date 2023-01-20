@@ -19,8 +19,9 @@ class BarPlotInterpolatedIOIs(vutils.BasePlot):
 
     def _format_df(self):
         # Group the dataframe and get the sum
-        fmt = self.df.groupby(by=['trial', 'instrument']).sum()[['total_beats', 'interpolated_beats']]
+        fmt = self.df.groupby(by=['trial', 'instrument']).sum()
         # Create the percentage columns
+        fmt['total_beats'] = fmt['total_beats'] - fmt['asynchrony_na'] - fmt['repeat_notes']
         fmt['total_raw'] = fmt['total_beats'] - fmt['interpolated_beats']
         fmt['percent_interpolated'] = (fmt['interpolated_beats'] / fmt['total_beats']) * 100
         fmt['percent_raw'] = 100 - fmt['percent_interpolated']
@@ -38,10 +39,10 @@ class BarPlotInterpolatedIOIs(vutils.BasePlot):
     def _format_plot(self):
         self.ax.tick_params(width=3, )
         self.ax.set(ylabel='', xlabel='',)
-        self.fig.supxlabel('Duo', y=0.02)
-        self.fig.supylabel('Total IOIs', x=0.01)
+        self.fig.supxlabel('Duo', y=0.02, x=0.46)
+        self.fig.supylabel('Total onsets', x=0.01)
         plt.setp(self.ax.spines.values(), linewidth=2)
-        self.fig.subplots_adjust(bottom=0.15, top=0.95, left=0.14, right=0.8)
+        self.fig.subplots_adjust(bottom=0.15, top=0.95, left=0.12, right=0.775)
 
     def _format_ax(self):
         # Add invisible data to add another legend for instrument

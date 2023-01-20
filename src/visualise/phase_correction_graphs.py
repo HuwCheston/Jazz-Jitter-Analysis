@@ -6,7 +6,13 @@ from statistics import mean
 from matplotlib import animation, pyplot as plt
 from matplotlib.patches import ConnectionPatch
 import seaborn as sns
+import scipy.stats as stats
+import statsmodels.stats.multicomp as mc
+import warnings
+from itertools import combinations
+from statsmodels.stats.multitest import multipletests
 
+from src.analyse.phase_correction_models import PhaseCorrectionModel
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
 
@@ -669,7 +675,9 @@ class RegPlotGrid(vutils.BasePlot):
         # Define variables to plot, both as they appear in the raw dataframe and the labels that should be on the plot
         self.xvars: list[str] = kwargs.get('xvars', ['tempo_slope', 'ioi_std', 'pw_asym', 'success'])
         self.xlabs: list[str] = kwargs.get(
-            'xlab', ['Tempo slope (BPM/s)', 'IOI variability (SD, ms)', 'Asynchrony (RMS, ms)', 'Self-reported success']
+            'xlab', [
+                'Tempo slope (BPM/s)', 'Timing irregularity (SD, ms)', 'Asynchrony (RMS, ms)', 'Self-reported success'
+            ]
         )
         # Format the dataframe
         self.df = self._format_df()
@@ -958,7 +966,7 @@ class RegPlotGrid(vutils.BasePlot):
         Apply figure-level formatting to overall image
         """
         # Add in label to x axis
-        self.fig.supxlabel('Absolute coupling asymmetry', y=0.02)
+        self.fig.supxlabel('Coupling asymmetry', y=0.02)
         # Add in single legend, using attributes we saved when removing individual legends
         leg = self.fig.legend(
             self.hand, self.lab, loc='center', ncol=1, title='Duo', frameon=False, prop={'size': 20},
@@ -1179,8 +1187,229 @@ class ArrowPlotModelExplanation(vutils.BasePlot):
         self.fig.subplots_adjust(bottom=-0.15, top=0.95, right=0.99, left=0.15, wspace=0.4)
 
 
+class BarPlotCouplingStrengthAsymmetry(vutils.BasePlot):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.df = self._format_df()
+        self.vars = kwargs.get('vars', ['coupling_strength', 'coupling_asymmetry'])
+        self.fig, self.ax = plt.subplots(nrows=4, ncols=2, sharex=True, sharey=True, figsize=(18.8, 10))
+
+    def _format_df(self):
+        gps = ['trial', 'latency', 'jitter']
+        cols = gps + ['coupling_asymmetry', 'coupling_strength']
+        tot_correction = lambda grp: grp.iloc[1]['correction_partner'] + grp.iloc[0]['correction_partner']
+        abs_correction = lambda grp: abs(grp.iloc[1]['correction_partner'] - grp.iloc[0]['correction_partner'])
+        df_f = self.df.groupby(['trial', 'instrument', 'latency', 'jitter']).mean().reset_index()
+        return pd.DataFrame(
+            [[*i, abs_correction(g), tot_correction(g)] for i, g in df_f.groupby(gps)], columns=cols
+        )
+
+    @vutils.plot_decorator
+    def create_plot(self):
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\barplot_coupling_strength_asymmetry'
+        return self.fig, fname
+
+    def _create_plot(self):
+        for var, col in zip(self.vars, range(0, len(self.vars))):
+            li = [1, 0.3, 0.3, 0.3, 0.3]
+            comp = mc.MultiComparison(self.df[var], self.df['trial'])
+            tab, _, a2 = comp.allpairtest(stats.ttest_ind, method="bonf")
+            a2 = pd.DataFrame(a2)
+            for i in range(1, 5):
+                df_plot = self.df.copy(deep=True)
+                df_plot.loc[df_plot['trial'] < i, var] = np.nan
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    g = sns.barplot(
+                        data=df_plot, x='trial', y=var, palette=vutils.DUO_CMAP, errorbar=('ci', 95),
+                        errcolor=vutils.BLACK, errwidth=2, edgecolor=vutils.BLACK, lw=2, estimator=np.mean,
+                        n_boot=vutils.N_BOOT, seed=1, capsize=0.1, width=0.4, ax=self.ax[i - 1, col],
+                    )
+                for bar, alpha in zip(g.containers[0], li):
+                    bar.set_alpha(alpha)
+                li.insert(i, li.pop(i - 1))
+                g.set_title(var.split('_')[-1].title() if i == 1 else '')
+                y = 1.1 + (i * 0.1)
+                for idx, row in a2[a2['group1'] == i].iterrows():
+                    pval = vutils.get_significance_asterisks(row['pval_corr'])
+                    g.text(x=(((row['group2'] - 1) + (i - 1)) / 2) - 0.1, y=y - 0.05, s=pval, fontsize=vutils.FONTSIZE)
+                    g.plot([i - 1, row['group2'] - 1], [y, y], color=vutils.BLACK, lw=2)
+                    g.plot([i - 1, i - 1], [y, y - 0.04], color=vutils.BLACK)
+                    g.plot([row['group2'] - 1, row['group2'] - 1], [y, y - 0.04], color=vutils.BLACK)
+                    y += 0.2
+
+    def _format_ax(self):
+        for ax in self.ax.flatten():
+            ax.set(xlabel='', ylabel='', ylim=(0, 2))
+            ax.tick_params(width=3, which='major')
+            ax.tick_params(width=0, which='minor')
+            plt.setp(ax.spines.values(), linewidth=2)
+
+    def _format_fig(self):
+        self.fig.supxlabel('Duo')
+        self.fig.supylabel('Coupling', x=0.01)
+        self.fig.subplots_adjust(top=0.925, bottom=0.075, right=0.95, left=0.05, wspace=0.05, hspace=0.15)
+
+
+class PointPlotCouplingStrengthAsymmetry(vutils.BasePlot):
+    """
+    Creates a plot showing the mean differences between coupling and strength
+    for each pair of duos, with confidence intervals obtained via bootstrapping
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=(18.8, 5.52))
+        self.df = self._format_df()
+        self.boot_df = self._generate_bootstraps()
+
+    def _format_df(
+            self
+    ) -> pd.DataFrame:
+        """
+        Coerces dataframe into correct format for plotting
+        """
+        # Define grouper and column variables
+        gps = ['trial', 'latency', 'jitter']
+        cols = gps + ['coupling_asymmetry', 'coupling_strength']
+        # Define functions for extracting total and absolute correction difference
+        tot_correction = lambda grp: grp.iloc[1]['correction_partner'] + grp.iloc[0]['correction_partner']
+        abs_correction = lambda grp: abs(grp.iloc[1]['correction_partner'] - grp.iloc[0]['correction_partner'])
+        # Group to get the average correction per duo, instrument and condition
+        df_f = self.df.groupby(['trial', 'instrument', 'latency', 'jitter']).mean().reset_index()
+        # Return the absolute and total correction for each condition
+        return pd.DataFrame(
+            [[*i, abs_correction(g), tot_correction(g)] for i, g in df_f.groupby(gps)], columns=cols
+        )
+
+    def _generate_bootstraps(
+            self,
+    ) -> pd.DataFrame:
+        """
+        Generate bootstrapped confidence intervals for the mean difference in coupling
+        across all duos.
+        """
+        res = []
+        # Iterate through both variables
+        for v, nu in zip(['coupling_strength', 'coupling_asymmetry'], range(0, 2)):
+            # Iterate through every combination of duos
+            for g1, g2 in combinations(self.df['trial'].drop_duplicates().to_list(), 2):
+                # Subset dataframe to get just the variable and duos we want
+                a1 = self.df[self.df['trial'] == g1][v]
+                a2 = self.df[self.df['trial'] == g2][v]
+                # Get the actual mean difference
+                mea = a1.mean() - a2.mean()
+                # Bootstrap the means for each duo
+                m1 = np.array([a1.sample(frac=1, replace=True, random_state=n).mean() for n in range(0, vutils.N_BOOT)])
+                m2 = np.array([a2.sample(frac=1, replace=True, random_state=n).mean() for n in range(0, vutils.N_BOOT)])
+                # Get the mean difference for each bootstrap iteration
+                diff = np.subtract(m1, m2)
+                # Get our upper and lower quantiles
+                low = np.quantile(diff, 0.025)
+                high = np.quantile(diff, 0.975)
+                # Compute our t-test and extract our p-value
+                _, p = stats.ttest_rel(a1, a2)
+                # Append the results to our list
+                res.append((f'{g1} – {g2}', low, high, mea, v, p))
+        # Convert the list to a dataframe
+        df = pd.DataFrame(res, columns=['group', 'low', 'high', 'mean', 'variable', 'pval'])
+        # Generate our column of asterisks after correcting our p-values
+        df['ast'] = self._format_pvals(df=df)
+        return df
+
+    @staticmethod
+    def _format_pvals(
+            df: pd.DataFrame
+    ) -> list:
+        """
+        Format our t-test p-values by correcting them and converting into asterisks
+        """
+        # Correct our p-values using bonferroni correction
+        rejected, p_adjusted, _, alpha_corrected = multipletests(
+            df['pval'], alpha=0.05, method='bonferroni', is_sorted=False, returnsorted=False
+        )
+        # Convert p-values to asterisks
+        return [vutils.get_significance_asterisks(p) for p in p_adjusted]
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the plot to generate the figure, format, and save in decorator
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        # Save the plot
+        fname = f'{self.output_dir}\\pointplot_coupling_asymmetry_strength'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Creates the scatter and line plots
+        """
+        # Iterate through both variables and axis
+        for v, ax in zip(['coupling_strength', 'coupling_asymmetry'], self.ax.flatten()):
+            # Subset the bootstrapped data for just the variable we want
+            sub = self.boot_df[self.boot_df['variable'] == v].reset_index(drop=True)
+            # Create the scatter plot of actual means
+            sns.scatterplot(
+                data=sub, y='group', x='mean', ax=ax, s=125, zorder=100,
+                edgecolor=vutils.BLACK, lw=2, marker='o'
+            )
+            # Set the title (do this now, while we have the variable names)
+            ax.set_title(v.replace('_', ' ').capitalize(), y=0.995)
+            # Iterate through each row
+            for idx, row in sub.iterrows():
+                # Add our t-test asterisks above the mean
+                ax.text(row['mean'], idx - 0.1, row['ast'], fontsize=vutils.FONTSIZE)
+                # Draw a horizontal line to act as a grid
+                ax.hlines(y=idx, xmin=-1, xmax=1, color=vutils.BLACK, alpha=0.2, lw=2, zorder=-1)
+                # Draw our 95% confidence intervals around our actual mean
+                ax.hlines(y=idx, xmin=row['low'], xmax=row['high'], lw=3, color=vutils.BLACK, zorder=10)
+                # Add vertical brackets to our confidence intervals
+                for var in ['low', 'high']:
+                    ax.vlines(x=row[var], ymin=idx - 0.2, lw=3, ymax=idx + 0.2, color=vutils.BLACK, zorder=-1)
+
+    def _format_ax(
+            self
+    ) -> None:
+        """
+        Formats axis level objects
+        """
+        # Iterate through both axis
+        for ax in self.ax.flatten():
+            # Remove labels and set axis limits
+            ax.set(xlabel='', ylabel='', xlim=(-0.9, 0.9))
+            # Set tick and axis width slightly
+            plt.setp(ax.spines.values(), linewidth=2)
+            ax.tick_params(axis='both', width=3)
+            # Add in a vertical line at 0 (no significant difference between duos)
+            ax.axvline(x=0, color=vutils.BLACK, ls='--', lw=2, alpha=0.8)
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Formats figure-level objects
+        """
+        # Remove the top and bottom spines
+        sns.despine(left=False, bottom=False)
+        # Add in the axis labels
+        self.fig.supxlabel('Difference between means')
+        self.fig.supylabel('Duos', x=0.01)
+        # Adjust the subplot positioning slightly
+        self.fig.subplots_adjust(left=0.07, right=0.95, bottom=0.15, top=0.9, wspace=0.1)
+
+
 def generate_phase_correction_plots(
-    mds: list, output_dir: str,
+    mds: list[PhaseCorrectionModel], output_dir: str,
 ) -> None:
     """
 
@@ -1220,15 +1449,21 @@ def generate_phase_correction_plots(
     bar.create_plot()
     bar = BarPlot(df=df, output_dir=figures_output_dir, yvar='correction_self', ylabel='Self coupling', ylim=(-1, 1))
     bar.create_plot()
+    bp = BarPlotCouplingStrengthAsymmetry(df=df, output_dir=figures_output_dir)
+    bp.create_plot()
     ap = ArrowPlotPhaseCorrection(df=df, output_dir=figures_output_dir)
     ap.create_plot()
     ap = ArrowPlotModelExplanation(output_dir=figures_output_dir)
     ap.create_plot()
+    pp = PointPlotCouplingStrengthAsymmetry(df=df, output_dir=figures_output_dir)
+    pp.create_plot()
 
 
 if __name__ == '__main__':
     # Default location for phase correction models
-    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p')
+    raw: list[PhaseCorrectionModel] = autils.load_from_disc(
+        r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p'
+    )
     # Default location to save plots
     output = r"C:\Python Projects\jazz-jitter-analysis\reports"
     # Generate phase correction plots from models

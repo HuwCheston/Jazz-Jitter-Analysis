@@ -34,27 +34,31 @@ class PhaseCorrectionModel:
         # The cleaned data, before dataframe conversion
         self.keys_raw: dict = c1_keys
         self.drms_raw: dict = c2_drms
+        # Number of raw onsets below IOI threshold that were removed
         # The raw data converted into dataframe format
-        self.keys_df: pd.DataFrame = self._generate_df(c1_keys)
-        self.drms_df: pd.DataFrame = self._generate_df(c2_drms)
+        self.keys_df, keys_onsets_below_thresh = self._generate_df(c1_keys)
+        self.drms_df, drms_onsets_below_thresh = self._generate_df(c2_drms)
         # The nearest neighbour models, matching live and delayed onsets together
         self._contamination = self._get_contamination_value_from_json(default=kwargs.get('contamination', None))
-        self.keys_nn: pd.DataFrame = self._match_onsets(
+        self.keys_nn, keys_ioi_filter_nans = self._match_onsets(
             live_arr=self.keys_df['my_onset'].to_numpy(dtype=np.float64),
             delayed_arr=self.drms_df['my_onset'].to_numpy(dtype=np.float64),
             zoom_arr=self.keys_raw['zoom_array'],
         )
-        self.drms_nn: pd.DataFrame = self._match_onsets(
+        self.drms_nn, drms_ioi_filter_nans = self._match_onsets(
             live_arr=self.drms_df['my_onset'].to_numpy(dtype=np.float64),
             delayed_arr=self.keys_df['my_onset'].to_numpy(dtype=np.float64),
             zoom_arr=self.drms_raw['zoom_array'],
         )
+        # Calculate total number of filtered onsets:
+        self.keys_filtered_onsets = keys_onsets_below_thresh + keys_ioi_filter_nans
+        self.drms_filtered_onsets = drms_onsets_below_thresh + drms_ioi_filter_nans
         # The phase correction models
         self.keys_md = self._create_phase_correction_model(self.keys_nn)
         self.drms_md = self._create_phase_correction_model(self.drms_nn)
         # The summary dictionaries, which can be appended to a dataframe of all performances
-        self.keys_dic = self._create_summary_dictionary(c1_keys, self.keys_md, self.keys_nn)
-        self.drms_dic = self._create_summary_dictionary(c2_drms, self.drms_md, self.drms_nn)
+        self.keys_dic = self._create_summary_dictionary(c1_keys, self.keys_md, self.keys_nn, self.keys_filtered_onsets)
+        self.drms_dic = self._create_summary_dictionary(c2_drms, self.drms_md, self.drms_nn, self.drms_filtered_onsets)
 
     def _get_contamination_value_from_json(
             self, default: float = None
@@ -95,8 +99,8 @@ class PhaseCorrectionModel:
         return perf_df
 
     def _generate_df(
-            self, data: list, threshold: float = 0.2
-    ) -> pd.DataFrame:
+            self, data: list, threshold: float = 0.25
+    ) -> tuple[pd.DataFrame, int]:
         """
         Create dataframe, append zoom array, and add a column with our delayed onsets.
         This latter column replicates the performance as it would have been heard by our partner.
@@ -115,7 +119,8 @@ class PhaseCorrectionModel:
         df['latency'] = df['latency'].bfill().ffill()
         # Add the latency column (divided by 1000 to convert from ms to sec) to the onset column
         df['my_onset_delayed'] = (df['my_onset'] + df['latency'])
-        return df
+        # Return the dataframe, as well as the number of IOI values we've dropped that are below our threshold
+        return df, len(temp)
 
     def _extract_tempo_slope(
             self
@@ -191,7 +196,7 @@ class PhaseCorrectionModel:
         return np.mean(means)
 
     def _match_onsets(
-            self, live_arr: np.ndarray, delayed_arr: np.ndarray, zoom_arr: np.ndarray,
+            self, live_arr: np.ndarray, delayed_arr: np.ndarray, zoom_arr: np.ndarray
     ) -> pd.DataFrame:
         """
         For a single performer, matches each of their live onsets with the closest delayed onset from their partner.
@@ -404,13 +409,15 @@ class PhaseCorrectionModel:
         # Extract inter-onset intervals
         df['my_prev_ioi'] = df['my_onset'].diff()
         df['their_prev_ioi'] = df['their_onset'].diff()
-        df = self._iqr_filter(df, 'my_prev_ioi',)
+        df = self._iqr_filter(df, 'my_prev_ioi')
+        # Add the number of onsets our IQR filter has discarded to the total
+        discarded_onsets = df['my_prev_ioi'][1:].isna().sum()
         # Shift to get next IOI
         df['my_next_ioi'] = df['my_prev_ioi'].shift(-1)
         # Extract difference of IOIs
         df['my_next_ioi_diff'] = df['my_next_ioi'].diff()
         df['my_prev_ioi_diff'] = df['my_prev_ioi'].diff()
-        return df
+        return df, discarded_onsets
 
     def _get_rolling_coefficients(
             self, nn_df: pd.DataFrame, func=None, ind_var: str = 'latency', dep_var: str = 'my_prev_ioi',
@@ -523,7 +530,7 @@ class PhaseCorrectionModel:
         return smf.ols(self._model, data=df.dropna(), missing='drop').fit()
 
     def _create_summary_dictionary(
-            self, c, md, nn,
+            self, c, md, nn, rn,
     ):
         """
         Creates a dictionary of summary statistics, used when analysing all models.
@@ -538,9 +545,11 @@ class PhaseCorrectionModel:
             # Raw data, including latency and MIDI arrays, used for creating tempo slope graphs
             'raw_beats': [c['midi_bpm']],
             'zoom_arr': c['zoom_array'],
-            # Beat metadata: total number of beats and number requiring interpolation
-            'total_beats': autils.extract_interpolated_beats(c)[0],
-            'interpolated_beats': autils.extract_interpolated_beats(c)[1],
+            # Cleaning metadata
+            'total_beats': autils.extract_interpolated_beats(c)[0],     # Raw number of beats from the performance
+            'interpolated_beats': autils.extract_interpolated_beats(c)[1],  # Beats that required interpolation
+            'repeat_notes': rn,     # Number of IOIs below our threshold that we removed
+            'asynchrony_na': nn['asynchrony'].isna().sum(),     # Number of removed nearest neighbour matches
             # Summary variables: tempo slope, ioi variability, asynchrony, self-reported success
             'tempo_slope': self._extract_tempo_slope().params.loc['my_onset'],
             'ioi_std': self._get_rolling_standard_deviation_values(nn_df=nn)['my_prev_ioi_std'].median(),
@@ -551,13 +560,12 @@ class PhaseCorrectionModel:
             # IOI variability related additional variables
             'my_prev_ioi_diff_mean': nn['my_prev_ioi_diff'].mean(),
             'my_next_ioi_diff_mean': nn['my_next_ioi_diff'].mean(),
-            'ioi_std_vs_jitter_coefficients': self._get_rolling_coefficients(nn_df=nn),
+            # 'ioi_std_vs_jitter_coefficients': self._get_rolling_coefficients(nn_df=nn),
             'ioi_std_vs_jitter_partial_correlation': self._get_rolling_coefficients(
                 nn_df=nn, func=self._partial_corr_shifted_rolling_variables
             ),
             # Asynchrony related additional variables
             'asynchrony_mean': nn['asynchrony'].mean(),
-            'asynchrony_na': nn['asynchrony'].isna().sum(),
             'pw_asym_raw': self._extract_pairwise_asynchrony(asynchrony_col='asynchrony_raw'),
             'pw_asym_std': self._extract_pairwise_asynchrony_with_standard_deviations(),
             'pw_asym_raw_std': self._extract_pairwise_asynchrony_with_standard_deviations(
@@ -575,6 +583,10 @@ class PhaseCorrectionModel:
             'resid_std': np.std(md.resid),
             'resid_len': len(md.resid),
             'rsquared': md.rsquared,
+            'aic': md.aic,
+            'bic': md.bic,
+            'log-likelihood': md.llf,
+            # Model comparison variables
         }
 
 

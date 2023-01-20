@@ -26,7 +26,7 @@ RED = '#FF0000'
 OFFSET = 8
 VIDEO_FPS = 30
 CBAR_BINS = np.linspace(-0.5, 0.3, 9, endpoint=True)
-N_BOOT = 1000
+N_BOOT = 10000
 
 # Define the colour palettes
 # Function used to shade a color map by given alpha value (can be used in color bars etc)

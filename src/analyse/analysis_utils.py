@@ -259,10 +259,14 @@ def extract_interpolated_beats(
     Extracts the number of beats in the performance that required interpolation in REAPER. This was usually due to a
     performer 'pushing' ahead a crotchet beat by a swung quaver, or due to an implied metric modulation.
     """
-
+    # Create our zoom array
+    za = c['zoom_array']
+    zarr = np.c_[za, np.linspace(8, 8 + (len(za) * 0.75), num=len(za), endpoint=False)]
+    # Extract the timestamp marking the end of a performance
+    endpoint = zarr[:, 1][-1] + 0.75
     # Define the sorter function
-    sorter = lambda s: sorted([i[0] for i in c[s]])
-    # Generate an array showing if a note from the cleaned array is in the raw array
+    sorter = lambda s: sorted([i[0] for i in c[s] if i[0] <= endpoint])
+    # Generate an array showing if a note from the cleaned array is in the raw array and occurred before the end
     arr = np.isin(sorter('midi_bpm'), sorter('midi_raw'))
     # Extract the number of notes from the cleaned array that are also in the raw array
     in_raw = len(np.where(arr)[0])

@@ -5,6 +5,7 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from src.analyse.phase_correction_models import PhaseCorrectionModel
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
 
@@ -20,7 +21,7 @@ class PairPlotAllVariables(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.labels: list[str] = kwargs.get(
-            'labels', ['Absolute slope\n(BPM/s)', 'IOI variability\n(SD, ms)',
+            'labels', ['Tempo slope\n(BPM/s)', 'Timing\nirregularity\n(SD, ms)',
                        'Asynchrony\n(RMS, ms)', 'Self-reported\nsuccess']
         )
         self._jitter_success: bool = kwargs.get('jitter_success', True)
@@ -78,8 +79,9 @@ class PairPlotAllVariables(vutils.BasePlot):
         # Get the required label from our list
         s = self.labels[self.counter]
         # Add the label to the upper centre of the diagonal plot
+        y = 0.85 if self.counter != 1 else 0.8
         ax.annotate(
-            s, xy=(0.97, 0.85), transform=ax.transAxes, xycoords='axes fraction', va='center', ha='right', fontsize=30
+            s, xy=(0.97, y), transform=ax.transAxes, xycoords='axes fraction', va='center', ha='right', fontsize=30
         )
         # Increment the counter by one for the next plot
         self.counter += 1
@@ -230,7 +232,7 @@ class PairPlotAllVariables(vutils.BasePlot):
 
 
 def generate_all_metrics_plots(
-    mds: list, output_dir: str,
+    mds: list[PhaseCorrectionModel], output_dir: str,
 ) -> None:
     """
 
@@ -242,7 +244,7 @@ def generate_all_metrics_plots(
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\all_metrics_plots'
 
-    pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir)
+    pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir, error_bar='ci')
     pp.create_plot()
 
 
