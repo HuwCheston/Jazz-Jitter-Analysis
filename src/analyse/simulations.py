@@ -9,11 +9,17 @@ import statsmodels.formula.api as smf
 import src.analyse.analysis_utils as autils
 from src.analyse.phase_correction_models import PhaseCorrectionModel
 
+# Define the objects we can import from this file into others
+__all__ = [
+    'generate_phase_correction_simulations_for_coupling_parameters',
+    'generate_phase_correction_simulations_for_individual_conditions',
+    'Simulation'
+]
+
 
 class Simulation:
     """
-    Creates X number of simulated performances from two given phase correction models, the parameters of which depend
-    on the arguments passed. Current options are: 'original', 'democracy', 'anarchy', 'leadership' (must specify leader)
+    Creates X number of simulated performances from two given phase correction models.
 
     Number of simulations defaults to 500, the same number in Jacoby et al. (2021).
     """
@@ -39,9 +45,8 @@ class Simulation:
         self.latency: np.ndarray = self._append_timestamps_to_latency_array(self.keys_pcm['zoom_arr'].iloc[0])
         # Raw simulation parameters, which will be used to create the dictionaries used in the simulations.
         self.parameter: str = kwargs.get('parameter', 'original')
-        self.leader: str = kwargs.get('leader', None)
         # Noise parameters for the simulation
-        self.noise = kwargs.get('noise', 0.005)     # Default noise term, if original noise is not to be used
+        self.noise = kwargs.get('noise', autils.CONSTANT_RESID_NOISE)     # Default noise term
         self.use_original_noise: bool = kwargs.get('use_original_noise', False)    # Whether to use noise from model
         # Musician parameters
         self.keys_params_raw: dict = self._get_raw_musician_parameters(init=self.keys_pcm)
@@ -106,51 +111,12 @@ class Simulation:
         Modifies a simulated musician's parameters according to the given simulation type
         """
         # Used to get the mean of a particular coefficient across both musicians
-        mean = lambda s: np.mean([self.keys_params_raw[s], self.drms_params_raw[s]])
-        output_data = {}
-        # Original coupling: uses coefficients, intercept from the model itself
-        if self.parameter == 'original':
-            output_data = {
-                'correction_self': input_data['correction_self'],
-                'correction_partner': input_data['correction_partner'],
-                'intercept': input_data['intercept'],
-            }
-        # Democracy: uses mean coefficients and intercepts from across the duo
-        elif self.parameter == 'democracy':
-            output_data = {
-                'correction_self': mean('correction_self'),
-                'correction_partner': mean('correction_partner'),
-                'intercept': 0,
-            }
-        # Leadership: simulation specification differs according to whether instrument is leading or following
-        elif self.parameter == 'leadership':
-            # Leader: no correction to follower, all other parameters set to means
-            if input_data['instrument'].lower() == self.leader.lower():
-                output_data = {
-                    'correction_self': -abs(mean('correction_self')),
-                    'correction_partner': 0,
-                    'intercept': 0,
-                }
-            # Follower: corrects to leader by mean correction across duo, all other parameters set to 0
-            else:
-                output_data = {
-                    'correction_self': -abs(mean('correction_self')),
-                    'correction_partner': mean('correction_partner'),
-                    'intercept': 0,
-                }
-        # Anarchy: neither musician corrects to each other, all other coefficients set to their mean
-        elif self.parameter == 'anarchy':
-            output_data = {
-                'correction_self': -abs(mean('correction_self')),
-                'correction_partner': 0,
-                'intercept': 0,
-            }
-        # Update our dictionary with the required amount of noise
-        if self.use_original_noise:
-            output_data.update({'resid_std': input_data['resid_std']})
-        else:
-            output_data.update({'resid_std': self.noise})
-        return output_data
+        return {
+            'correction_self': input_data['correction_self'],
+            'correction_partner': input_data['correction_partner'],
+            'intercept': input_data['intercept'],
+            'resid_std': input_data['resid_std'] if self.use_original_noise else self.noise
+        }
 
     @staticmethod
     def _convert_musician_parameters_dict_to_numba(
@@ -387,7 +353,6 @@ class Simulation:
             'jitter': self.keys_pcm["jitter"].iloc[0],
             # Simulation metadata
             'parameter': self.parameter,
-            'leader': self.leader,
             'original_noise': self.use_original_noise,
             'keys_parameters': self.keys_params_raw,
             'drums_parameters': self.drms_params_raw,
@@ -411,11 +376,24 @@ class Simulation:
         }
 
 
-def generate_phase_correction_simulations_individual(
-        mds: pd.DataFrame, output_dir: str, logger=None, force_rebuild: bool = False, num_simulations: int = 500
+def _log_simulation(
+    sim: Simulation, logger=None,
+) -> None:
+    """
+    Helper function to log metadata for a particular simulation in our GUI, if we've passed a logger function
+    """
+    if logger is not None:
+        logger.info(f'... trial {sim.keys_pcm["trial"].iloc[0]}, block {sim.keys_pcm["block"].iloc[0]}, '
+                    f'latency {sim.keys_pcm["latency"].iloc[0]}, jitter {sim.keys_pcm["jitter"].iloc[0]}, '
+                    f'parameter {sim.parameter}, original_noise {sim.use_original_noise}')
+
+
+def generate_phase_correction_simulations_for_individual_conditions(
+        mds: list[PhaseCorrectionModel], output_dir: str, logger=None, force_rebuild: bool = False,
+        num_simulations: int = autils.NUM_SIMULATIONS
 ) -> list[Simulation]:
     """
-    Create simulated performances across a range of artificial coupling parameters for every phase correction model
+    Create simulated performances using the coupling within every individual performance.
     """
     # Try and load the models from the disk to save time, unless we're forcing them to rebuild anyway
     if not force_rebuild:
@@ -423,46 +401,32 @@ def generate_phase_correction_simulations_individual(
         # If we've successfully loaded models, return these straight away
         if all_sims is not None:
             return all_sims
-    # Define the parameters and leader combinations we want to create simulations for
-    params = [
-        # ('parameter', 'leader', 'use_original_noise')
-        ('original', None, True),   # Original coupling parameters with original noise term
-        ('original', None, False),  # Original coupling parameters with modified noise term
-        ('democracy', None, False),     # Democracy - both musicians coupled to each other
-        ('anarchy', None, False),   # Anarchy - neither musician coupled to each other
-        ('leadership', 'Drums', False),     # Drums leadership - keys coupled to drums, drums not coupled to keys
-    ]
     # Create an empty list to hold simulations in
     all_sims = []
     for pcm in mds:
-        # Iterate through each parameter and leader combo
-        for param, leader, orig_noise in params:
-            # Initialise the simulation class
-            sim = Simulation(
-                pcm=pcm, num_simulations=num_simulations, parameter=param, leader=leader, use_original_noise=orig_noise
-            )
-            # Log the current simulation being generated
-            if logger is not None:
-                logger.info(f'... trial {sim.keys_pcm["trial"].iloc[0]}, block {sim.keys_pcm["block"].iloc[0]}, '
-                            f'latency {sim.keys_pcm["latency"].iloc[0]}, jitter {sim.keys_pcm["jitter"].iloc[0]}, '
-                            f'parameter {sim.parameter}, leader {sim.leader}, original_noise {sim.use_original_noise}')
-            # Create all simulations for this parameter/leader combination
-            sim.create_all_simulations()
-            # Append the simulation to our list
-            all_sims.append(sim)
+        # Initialise the simulation class
+        sim = Simulation(
+            pcm=pcm, num_simulations=num_simulations, parameter='original', leader=None, use_original_noise=True
+        )
+        _log_simulation(sim, logger)
+        # Create all simulations for this parameter/leader combination
+        sim.create_all_simulations()
+        # Append the simulation to our list
+        all_sims.append(sim)
     # Pickle the result -- this will be quite large, depending on the number of simulations!
     pickle.dump(all_sims, open(f"{output_dir}\\phase_correction_sims.p", "wb"))
     return all_sims
 
 
-def generate_phase_correction_simulations_average(
-        mds: pd.DataFrame, output_dir: str, logger=None, force_rebuild: bool = False, num_simulations: int = 500
+def generate_phase_correction_simulations_for_coupling_parameters(
+        mds: list[PhaseCorrectionModel], output_dir: str, logger=None, force_rebuild: bool = False,
+        num_simulations: int = autils.NUM_SIMULATIONS
 ) -> list[Simulation]:
     """
     Create simulated performances across a range of artificial coupling parameters for every phase correction model
     """
-    def grouper(g):
-        return g.groupby('instrument', as_index=False).agg(
+    def grouper(gr):
+        return gr.groupby('instrument', as_index=False).agg(
             {
                 'trial': 'mean', 'block': 'mean', 'latency': 'mean', 'jitter': 'mean', 'tempo_slope': 'mean',
                 'ioi_std': 'mean', 'pw_asym': 'mean', 'zoom_arr': 'first', 'intercept': 'mean',
@@ -480,48 +444,58 @@ def generate_phase_correction_simulations_average(
     df = pd.concat(
         [pd.concat([pd.DataFrame([pcm.keys_dic]), pd.DataFrame([pcm.drms_dic])]) for pcm in mds]
     ).reset_index(drop=True)
-    # Create an empty list to hold simulations in
+    # Create an empty list to hold our simulations
     all_sims = []
-    params = [
-        # ('parameter', 'leader', 'use_original_noise')
-        ('democracy', None, False),  # Democracy - both musicians coupled to each other
-        ('anarchy', None, False),  # Anarchy - neither musician coupled to each other
-        ('leadership', 'Drums', False),  # Drums leadership - keys coupled to drums, drums not coupled to keys
-    ]
-    # Average simulations -- arbitrary coupling parameters
+    # Iterate through each condition
     for idx, grp in df.groupby(by=['latency', 'jitter']):
-        pcm = grouper(grp)
-        pcm['trial'] = 0
-        for param, leader, orig_noise in params:
-            # Initialise the simulation class
+        # Create the grouped phase correction model, across all trials
+        pcm_a = grouper(grp)
+        # Iterate through each duo
+        for i, g in grp.groupby('trial'):
+            # Create the grouped model, averaging performance of each duo for one condition over both sessions
+            pcm_o = grouper(g)
+            # Set our intercepts to 0
+            pcm_o['intercept'] = 0
+            # Set our noise to our constant
+            # Set our self-coupling to the average self-coupling over all duos
+            pcm_o['correction_self'] = pcm_a['correction_self']
+            # Create the simulation object
             sim = Simulation(
-                pcm=pcm, num_simulations=num_simulations, parameter=param, leader=leader, use_original_noise=orig_noise
+                pcm=pcm_o, num_simulations=num_simulations, parameter='original', leader=None, use_original_noise=False
             )
-            # Log the current simulation being generated
-            if logger is not None:
-                logger.info(f'... trial AVG, block AVG, '
-                            f'latency {sim.keys_pcm["latency"].iloc[0]}, jitter {sim.keys_pcm["jitter"].iloc[0]}, '
-                            f'parameter {sim.parameter}, leader {sim.leader}, original_noise {sim.use_original_noise}')
-            # Create all simulations
+            # Log the current duo and condition in our GUI, if we've passed a logger
+            _log_simulation(sim, logger)
+            # Create all simulations and append the simulation object to our list
             sim.create_all_simulations()
-            # Append the simulation to our list
             all_sims.append(sim)
-    # Original simulations -- original coupling parameters
-    for idx, grp in df.groupby(by=['trial', 'latency', 'jitter']):
-        pcm = grouper(grp)
-        sim = Simulation(
-            pcm=pcm, num_simulations=num_simulations, parameter='original', leader=None, use_original_noise=False
+        # Set our intercepts to 0 and our trial metadata to 0 (helpful when logging)
+        pcm_a['intercept'] = 0
+        pcm_a['trial'] = 0
+        # Create our anarchy model: both coupling coefficients set to 0
+        anarchy_md = pcm_a.copy()
+        anarchy_md['correction_partner'] = 0
+        # Create our democracy model: both coupling coefficients set to their means
+        democracy_md = pcm_a.copy()
+        democracy_md['correction_partner'] = democracy_md['correction_partner'].mean()
+        # Create our leadership model: drums coupling set to 0, keys coupling set to mean
+        leadership_md = pcm_a.copy()
+        leadership_md['correction_partner'] = np.where(
+            leadership_md['instrument'] == 'Drums', 0,
+            leadership_md[leadership_md['instrument'] == 'Keys']['correction_partner']
         )
-        # Log the current simulation being generated
-        if logger is not None:
-            logger.info(f'... trial {sim.keys_pcm["trial"].iloc[0]}, block {sim.keys_pcm["block"].iloc[0]}, '
-                        f'latency {sim.keys_pcm["latency"].iloc[0]}, jitter {sim.keys_pcm["jitter"].iloc[0]}, '
-                        f'parameter {sim.parameter}, leader {sim.leader}, original_noise {sim.use_original_noise}')
-        # Create all simulations
-        sim.create_all_simulations()
-        # Append the simulation to our list
-        all_sims.append(sim)
-    # Pickle the result -- this will be quite large, depending on the number of simulations!
+        # Iterate over all of our paradigm models
+        for md, param in zip([anarchy_md, democracy_md, leadership_md],
+                             ['anarchy', 'democracy', 'leadership']):
+            # Create our simulation
+            sim = Simulation(
+                pcm=md, num_simulations=num_simulations, parameter=param, leader=None, use_original_noise=False
+            )
+            # Log the current simulation in our GUI
+            _log_simulation(sim, logger)
+            # Create the simulation and append to our list
+            sim.create_all_simulations()
+            all_sims.append(sim)
+    # Pickle the result -- this can be quite large, if we're creating lots of simulations!
     pickle.dump(all_sims, open(f"{output_dir}\\phase_correction_sims_average.p", "wb"))
     return all_sims
 
@@ -531,7 +505,11 @@ if __name__ == '__main__':
     raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename="phase_correction_mds.p")
     # Default location to save output simulations
     output = r"C:\Python Projects\jazz-jitter-analysis\models"
-    # Generate simulations and pickle
-    sims = generate_phase_correction_simulations_average(mds=raw, output_dir=output, force_rebuild=True)
-    # Generate simulations and pickle
-    sims = generate_phase_correction_simulations_individual(mds=raw, output_dir=output, force_rebuild=True)
+    # Generate simulations using coupling parameters and pickle
+    generate_phase_correction_simulations_for_coupling_parameters(
+        mds=raw, output_dir=output, force_rebuild=True
+    )
+    # Generate simulations for each individual performance and pickle
+    generate_phase_correction_simulations_for_individual_conditions(
+        mds=raw, output_dir=output, force_rebuild=True
+    )
