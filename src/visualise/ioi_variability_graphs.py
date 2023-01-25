@@ -6,6 +6,11 @@ import matplotlib.pyplot as plt
 import src.visualise.visualise_utils as vutils
 import src.analyse.analysis_utils as autils
 
+# Define the objects we can import from this file into others
+__all__ = [
+    'generate_tempo_stability_plots'
+]
+
 
 class HeatmapLaggedLatency(vutils.BasePlot):
     """

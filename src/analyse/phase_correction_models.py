@@ -12,6 +12,12 @@ from datetime import timedelta
 
 import src.analyse.analysis_utils as autils
 
+# Define the objects we can import from this file into others
+__all__ = [
+    'generate_phase_correction_models',
+    'PhaseCorrectionModel'
+]
+
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', 500)
 np.set_printoptions(suppress=True)

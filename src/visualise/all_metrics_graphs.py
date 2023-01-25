@@ -4,10 +4,16 @@ import scipy.stats as stats
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import seaborn as sns
+from stargazer.stargazer import Stargazer
+import statsmodels.formula.api as smf
 
 from src.analyse.phase_correction_models import PhaseCorrectionModel
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
+
+__all__ = [
+    'generate_all_metrics_plots'
+]
 
 
 class PairPlotAllVariables(vutils.BasePlot):
@@ -86,7 +92,12 @@ class PairPlotAllVariables(vutils.BasePlot):
         # Increment the counter by one for the next plot
         self.counter += 1
 
-    def reg_plot(self, *args, **kwargs):
+    def reg_plot(
+            self, *args, **_
+    ) -> None:
+        """
+        Adds a regression line with bootstrapped confidence intervals to a plot
+        """
         def regress(
                 g: pd.DataFrame
         ) -> np.ndarray:
@@ -231,6 +242,105 @@ class PairPlotAllVariables(vutils.BasePlot):
         self.g.figure.subplots_adjust(wspace=0.15, hspace=0.15, top=0.97, bottom=0.05, left=0.05, right=0.97)
 
 
+class RegressionTableAllMetrics:
+
+    def __init__(self, df: pd.DataFrame, output_dir: str):
+        self.df = self._format_df(df)
+        self.model_list = self._generate_models()
+        self.output_dir = output_dir
+
+    def create_tables(self):
+        for k, v in self.model_list.items():
+            tab = self._output_regression_table(v)
+            with open(f"{self.output_dir}\\regress_{k}.html", "w") as f:
+                f.write(tab.render_html())
+
+    @staticmethod
+    def _format_df(
+            df: pd.DataFrame
+    ) -> pd.DataFrame:
+        return (
+            df.groupby(['trial', 'latency', 'jitter', 'instrument'])
+              .mean(numeric_only=False)
+              .reset_index(drop=False)
+        )
+
+    def _generate_models(
+            self,
+    ) -> dict:
+        res = {
+            'ioi_std': [],
+            'pw_asym': [],
+            'success': [],
+            'tempo_slope': []
+        }
+        for idx, grp in self.df.groupby('trial'):
+            for var in ['ioi_std', 'pw_asym', 'success']:
+                md = smf.ols(f'{var}~C(latency)+C(jitter)+C(instrument)', data=grp).fit()
+                res[var].append(md)
+            avg = grp.groupby(['latency', 'jitter']).mean().reset_index(drop=False)
+            md = smf.ols(f'tempo_slope~C(latency)+C(jitter)', data=avg).fit()
+            res['tempo_slope'].append(md)
+        return res
+
+    @staticmethod
+    def _get_cov_names(
+            out, name: str
+    ) -> list[str]:
+        k = lambda x: float(x.partition('T.')[2].partition(']')[0])
+        # Try and sort the values by integers within the string
+        try:
+            return [o for o in sorted([i for i in out.cov_names if name in i], key=k)]
+        # If there are no integers in the string, return unsorted
+        except ValueError:
+            return [i for i in out.cov_names if name in i]
+
+    @staticmethod
+    def _format_cov_names(
+            i: str, ext: str = ''
+    ) -> str:
+        # If we've defined a non-default reference category the stats models output looks weird, so catch this
+        if ':' in i:
+            lm = lambda s: s.split('C(')[1].split(')')[0].title() + ' (' + s.split('[T.')[1].split(']')[0] + ')'
+            return lm(i.split(':')[0]) + ': ' + lm(i.split(':')[1])
+        if 'Treatment' in i:
+            return i.split('C(')[1].split(')')[0].title().split(',')[0] + ' (' + i.split('[T.')[1].replace(']', ')')
+        else:
+            base = i.split('C(')[1].split(')')[0].title() + ' ('
+            return base + i.split('C(')[1].split(')')[1].title().replace('[T.', '').replace(']', '') + ext + ')'
+
+    def _output_regression_table(
+            self, mds: list,
+    ) -> Stargazer:
+        """
+        Create a nicely formatted regression table from a list of regression models ordered by trial, and output to html
+        """
+
+        # Create the stargazer object from our list of models
+        out = Stargazer(mds)
+        # Get the original co-variate names
+        l_o, j_o, i_o, int_o = (self._get_cov_names(out, i) for i in ['latency', 'jitter', 'instrument', 'Intercept'])
+        orig = [item for sublist in [l_o, j_o, i_o, int_o] for item in sublist]
+        # Format the original co-variate names so they look nice
+        lat_fm = [self._format_cov_names(s, 'ms') for s in l_o]
+        jit_fm = [self._format_cov_names(s, 'x') for s in j_o]
+        instr_fm = [self._format_cov_names(s) for s in i_o]
+        form = [item for sublist in [lat_fm, jit_fm, instr_fm, int_o] for item in sublist]
+        # Format the stargazer object
+        out.custom_columns([f'Duo {i}' for i in range(1, len(mds) + 1)], [1 for _ in range(1, len(mds) + 1)])
+        out.show_model_numbers(False)
+        out.covariate_order(orig)
+        out.rename_covariates(dict(zip(orig, form)))
+        _ = out.dependent_variable
+        out.dependent_variable = ' ' + out.dependent_variable.replace('_', ' ').title()
+        # If we're removing some statistics from the bottom of our table
+        out.show_adj_r2 = False
+        out.show_residual_std_err = False
+        out.show_f_statistic = False
+        out.significance_levels([0.05, 0.01, 0.001])
+        return out
+
+
 def generate_all_metrics_plots(
     mds: list[PhaseCorrectionModel], output_dir: str,
 ) -> None:
@@ -246,6 +356,8 @@ def generate_all_metrics_plots(
 
     pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir, error_bar='ci')
     pp.create_plot()
+    rt = RegressionTableAllMetrics(df, output_dir=figures_output_dir)
+    rt.create_tables()
 
 
 if __name__ == '__main__':

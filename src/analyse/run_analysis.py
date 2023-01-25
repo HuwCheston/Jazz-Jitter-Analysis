@@ -4,11 +4,9 @@ import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
-# TODO: fix imports here to use __all__ instead, so that we don't import packages like numpy, pandas etc
 import src.analyse.analysis_utils as autils
-from src.analyse.phase_correction_models import generate_phase_correction_models
-from src.analyse.simulations import generate_phase_correction_simulations_individual, \
-    generate_phase_correction_simulations_average
+from src.analyse.phase_correction_models import *
+from src.analyse.simulations import *
 
 
 @click.command()
@@ -36,19 +34,19 @@ def main(
     mds = generate_phase_correction_models(data, logger=logger, output_dir=output_filepath, force_rebuild=False)
     logger.info(f'... models generated!')
 
-    # CREATE INDIVIDUAL SIMULATIONS #
-    logger.info(f'Generating average phase correction simulations...')
-    sims_avg = generate_phase_correction_simulations_average(
-        mds, output_dir=output_filepath, logger=logger, force_rebuild=False
+    # CREATE SIMULATIONS WITH COUPLING PARAMETERS - ANARCHY, DEMOCRACY ETC. #
+    logger.info(f'Generating phase correction simulations with coupling parameters...')
+    generate_phase_correction_simulations_for_coupling_parameters(
+        mds, output_dir=output_filepath, logger=logger, force_rebuild=False, num_simulations=autils.NUM_SIMULATIONS
     )
-    logger.info(f'... simulations generated!')
+    logger.info(f'... simulations with parameters generated!')
 
-    # CREATE INDIVIDUAL SIMULATIONS #
-    logger.info(f'Generating individual phase correction simulations...')
-    sims = generate_phase_correction_simulations_individual(
-        mds, output_dir=output_filepath, logger=logger, force_rebuild=False
+    # CREATE SIMULATIONS USING ORIGINAL COUPLING FROM EACH PERFORMANCE #
+    logger.info(f'Generating original phase correction simulations...')
+    generate_phase_correction_simulations_for_individual_conditions(
+        mds, output_dir=output_filepath, logger=logger, force_rebuild=False, num_simulations=autils.NUM_SIMULATIONS
     )
-    logger.info(f'... simulations generated!')
+    logger.info(f'... original simulations generated!')
 
 
 if __name__ == '__main__':

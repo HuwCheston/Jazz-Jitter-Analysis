@@ -12,6 +12,8 @@ import collections
 import warnings
 
 WINDOW_SIZE = 6
+NUM_SIMULATIONS = 500
+CONSTANT_RESID_NOISE = 0.005
 
 
 def test_stationary(

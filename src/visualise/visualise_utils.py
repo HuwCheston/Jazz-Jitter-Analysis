@@ -10,9 +10,8 @@ import pandas as pd
 import functools
 
 
-# Define constants
-from stargazer.stargazer import Stargazer
 
+# Define constants
 WIDTH = 6.2677165
 HEIGHT = 10.446194166666666666666666666667
 ASPECT = 0.6
@@ -143,62 +142,6 @@ def get_yrange(data, min_off: int = -OFFSET, max_off: int = -OFFSET) -> tuple:
         min([d[-1]['bpm_rolling'].min() for d in data]) + min_off,
         max([d[-1]['bpm_rolling'].max() for d in data]) + max_off
     )
-
-
-def output_regression_table(
-        mds: list, output_dir: str, verbose_footer: bool = False
-) -> None:
-    """
-    Create a nicely formatted regression table from a list of regression models ordered by trial, and output to html.
-    """
-
-    def get_cov_names(name: str) -> list[str]:
-        k = lambda x: float(x.partition('T.')[2].partition(']')[0])
-        # Try and sort the values by integers within the string
-        try:
-            return [o for o in sorted([i for i in out.cov_names if name in i], key=k)]
-        # If there are no integers in the string, return unsorted
-        except ValueError:
-            return [i for i in out.cov_names if name in i]
-
-    def format_cov_names(i: str, ext: str = '') -> str:
-        # If we've defined a non-default reference category the stats models output looks weird, so catch this
-        if ':' in i:
-            lm = lambda s: s.split('C(')[1].split(')')[0].title() + ' (' + s.split('[T.')[1].split(']')[0] + ')'
-            return lm(i.split(':')[0]) + ': ' + lm(i.split(':')[1])
-        if 'Treatment' in i:
-            return i.split('C(')[1].split(')')[0].title().split(',')[0] + ' (' + i.split('[T.')[1].replace(']', ')')
-        else:
-            base = i.split('C(')[1].split(')')[0].title() + ' ('
-            return base + i.split('C(')[1].split(')')[1].title().replace('[T.', '').replace(']', '') + ext + ')'
-
-    # Create the stargazer object from our list of models
-    out = Stargazer(mds)
-    # Get the original co-variate names
-    l_o, j_o, i_o, int_o = (get_cov_names(i) for i in ['latency', 'jitter', 'instrument', 'Intercept'])
-    orig = [item for sublist in [l_o, j_o, i_o, int_o] for item in sublist]
-    # Format the original co-variate names so they look nice
-    lat_fm = [format_cov_names(s, 'ms') for s in l_o]
-    jit_fm = [format_cov_names(s, 'x') for s in j_o]
-    instr_fm = [format_cov_names(s) for s in i_o]
-    form = [item for sublist in [lat_fm, jit_fm, instr_fm, int_o] for item in sublist]
-    # Format the stargazer object
-    out.custom_columns([f'Duo {i}' for i in range(1, len(mds) + 1)], [1 for _ in range(1, len(mds) + 1)])
-    out.show_model_numbers(False)
-    out.covariate_order(orig)
-    out.rename_covariates(dict(zip(orig, form)))
-    t = out.dependent_variable
-    out.dependent_variable = ' ' + out.dependent_variable.replace('_', ' ').title()
-    # If we're removing some statistics from the bottom of our table
-    if not verbose_footer:
-        out.show_adj_r2 = False
-        out.show_residual_std_err = False
-        out.show_f_statistic = False
-    # Create the output folder
-    fold = create_output_folder(output_dir)
-    # Render to html and write the result
-    with open(f"{fold}\\regress_{t}.html", "w") as f:
-        f.write(out.render_html())
 
 
 class BasePlot:

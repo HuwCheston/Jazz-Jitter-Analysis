@@ -8,6 +8,12 @@ import statsmodels.api as sm
 import src.visualise.visualise_utils as vutils
 import src.analyse.analysis_utils as autils
 
+# Define the objects we can import from this file into others
+__all__ = [
+    'generate_plots_for_simulations_with_coupling_parameters',
+    'generate_plots_for_individual_performance_simulations'
+]
+
 
 class LinePlotAllParameters(vutils.BasePlot):
     """
@@ -788,12 +794,11 @@ class DistPlotAverage(vutils.BasePlot):
         self.fig.subplots_adjust(bottom=0.15, top=0.85, left=0.075, right=0.935, wspace=0.1, hspace=0.2)
 
 
-def generate_simulations_plots(
-    sims: list, sims_avg: list, output_dir: str,
+def generate_plots_for_individual_performance_simulations(
+    sims: list, output_dir: str,
 ) -> None:
-    df = pd.DataFrame([sim.results_dic for sim in sims])
-    df_avg = pd.DataFrame([sim.results_dic for sim in sims_avg])
     figures_output_dir = output_dir + '\\figures\\simulations_plots'
+    df = pd.DataFrame([sim.results_dic for sim in sims])
     dp = DistPlotParams(df, output_dir=figures_output_dir)
     dp.create_plot()
     rp = RegPlotSlopeComparisons(df, output_dir=figures_output_dir, original_noise=True)
@@ -804,6 +809,13 @@ def generate_simulations_plots(
     bp.create_plot()
     ap = ArrowPlotParams(output_dir=figures_output_dir)
     ap.create_plot()
+
+
+def generate_plots_for_simulations_with_coupling_parameters(
+    sims_params: list, output_dir: str
+) -> None:
+    figures_output_dir = output_dir + '\\figures\\simulations_plots'
+    df_avg = pd.DataFrame([sim.results_dic for sim in sims_params])
     dp = DistPlotAverage(df=df_avg, output_dir=figures_output_dir)
     dp.create_plot()
 
@@ -813,4 +825,7 @@ if __name__ == '__main__':
     raw_av = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", "phase_correction_sims_average.p")
     # Default location to save plots
     output = r"C:\Python Projects\jazz-jitter-analysis\reports"
-    generate_simulations_plots(raw, raw_av, output)
+    # Generate plots for our simulations from every performance
+    generate_plots_for_individual_performance_simulations(raw, output)
+    # Generate plots for our simulations using our coupling parameters
+    generate_plots_for_simulations_with_coupling_parameters(raw_av, output)

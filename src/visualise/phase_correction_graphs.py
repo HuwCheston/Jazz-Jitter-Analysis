@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 from statsmodels.nonparametric.smoothers_lowess import lowess as sm_lowess
-from statistics import mean
+from statsmodels.stats.multitest import multipletests
 from matplotlib import animation, pyplot as plt
 from matplotlib.patches import ConnectionPatch
 import seaborn as sns
@@ -10,11 +10,15 @@ import scipy.stats as stats
 import statsmodels.stats.multicomp as mc
 import warnings
 from itertools import combinations
-from statsmodels.stats.multitest import multipletests
 
 from src.analyse.phase_correction_models import PhaseCorrectionModel
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
+
+# Define the modules we can import from this file in others
+__all__ = [
+    'generate_phase_correction_plots'
+]
 
 
 class PairGrid(vutils.BasePlot):
@@ -239,7 +243,7 @@ class SingleConditionPlot:
         # Create the matplotlib objects - figure with grid spec, 5 subplots
         self.fig = plt.figure(figsize=(9.4, 15))
         self.ax = vutils.get_gridspec_array(fig=self.fig)
-        self.rsquared = mean([self.keys_md.rsquared, self.drms_md.rsquared])
+        self.rsquared = np.mean([self.keys_md.rsquared, self.drms_md.rsquared])
         # Create attributes for plots
         self.polar_num_bins = 15
         self.polar_xt = np.pi / 180 * np.linspace(-90, 90, 5, endpoint=True)
@@ -1421,11 +1425,11 @@ def generate_phase_correction_plots(
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\phase_correction_plots'
     # Create regression table
-    vutils.output_regression_table(
-        mds=autils.create_model_list(df=df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
-                                     avg_groupers=['latency', 'jitter', 'instrument']),
-        output_dir=figures_output_dir, verbose_footer=False
-    )
+    # vutils.output_regression_table(
+    #     mds=autils.create_model_list(df=df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
+    #                                  avg_groupers=['latency', 'jitter', 'instrument']),
+    #     output_dir=figures_output_dir, verbose_footer=False
+    # )
     # Create box plot
     bp = BoxPlot(df=df, output_dir=figures_output_dir, yvar='correction_partner', ylim=(-0.2, 1.5))
     bp.create_plot()

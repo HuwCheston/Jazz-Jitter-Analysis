@@ -7,6 +7,11 @@ import seaborn as sns
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
 
+# Define the objects we can import from this file into others
+__all__ = [
+    'generate_misc_plots'
+]
+
 
 class BarPlotInterpolatedIOIs(vutils.BasePlot):
     """
