@@ -8,6 +8,8 @@ import statsmodels.api as sm
 import src.visualise.visualise_utils as vutils
 import src.analyse.analysis_utils as autils
 
+from src.analyse.simulations import Simulation
+
 # Define the objects we can import from this file into others
 __all__ = [
     'generate_plots_for_simulations_with_coupling_parameters',
@@ -21,7 +23,7 @@ class LinePlotAllParameters(vutils.BasePlot):
     (anarchy, democracy etc.)
     """
     def __init__(
-            self, simulations: list, **kwargs
+            self, simulations: list[Simulation], **kwargs
     ):
         super().__init__(**kwargs)
         # Our list of Simulation classes: we need not have created the simulations yet when passing them in
@@ -168,7 +170,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         super().__init__(**kwargs)
         self.key: dict = {'Original': 0, 'Democracy': 1, 'Anarchy': 2, 'Leadership': 3}
         self.df = self._format_df(df=df)
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=3, sharex=True, figsize=(18.8, 5))
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=True, figsize=(18.8, 5))
 
     @staticmethod
     def _format_df(
@@ -178,9 +180,9 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         Wrangles dataframe into form required for plotting.
         """
         # Fill our 'None' leader values with empty strings
-        df['leader'] = df['leader'].fillna(value='').str.lower()
+        # df['leader'] = df['leader'].fillna(value='').str.lower()
         # Format our parameter column by combining with leader column, replacing values with title case
-        df['parameter'] = df[['parameter', 'leader', ]].astype(str).agg(''.join, axis=1)
+        # df['parameter'] = df[['parameter', 'leader', ]].astype(str).agg(''.join, axis=1)
         df['parameter'] = df['parameter'].replace({col: col.title() for col in df['parameter'].unique()})
         # Remove values from parameter column that we don't need
         df = df[(df['parameter'] != 'Leadershipkeys')]
@@ -209,10 +211,10 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         Creates the stripplot and barplot for both variables, then carries out t-test and adds in asterisks
         """
         # Iterate through both variables which we wish to plot
-        for num, var in enumerate(['tempo_slope_simulated', 'ioi_variability_simulated', 'asynchrony_simulated']):
+        for num, var in enumerate(['tempo_slope_simulated', 'asynchrony_simulated']):
             # Add the scatter plot, showing each individual performance
             sns.stripplot(
-                data=self.df, ax=self.ax[num], x='parameter', y=var, dodge=True, s=3, marker='.', jitter=0.1,
+                data=self.df, ax=self.ax[num], x='parameter', y=var, dodge=True, s=5, marker='.', jitter=0.1,
                 color=vutils.BLACK,
             )
             # Add the bar plot, showing the median values
@@ -228,16 +230,14 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         Formats axes objects, setting ticks, labels etc.
         """
         # Apply formatting to tempo slope ax
-        self.ax[0].set_ylabel('Tempo slope (BPM/s', fontsize=vutils.FONTSIZE + 3)
+        self.ax[0].set_ylabel('Tempo slope (BPM/s)', fontsize=vutils.FONTSIZE + 3)
         self.ax[0].set(xlabel='', ylim=(-0.75, 0.75))
         self.ax[0].axhline(y=0, linestyle='-', color=vutils.BLACK, linewidth=2)
-        self.ax[1].set_ylabel('IOI variability (SD, ms)', fontsize=vutils.FONTSIZE + 3)
-        self.ax[1].set(xlabel='')
         # Apply formatting to async ax
         t = [1, 10, 100, 1000, 10000]
-        self.ax[2].set_yscale('log')
-        self.ax[2].set(xlabel='', ylim=(1, 10000), yticks=t, yticklabels=t)
-        self.ax[2].set_ylabel('Asynchrony (RMS, ms)', fontsize=vutils.FONTSIZE + 3, labelpad=-2)
+        self.ax[1].set_yscale('log')
+        self.ax[1].set(xlabel='', ylim=(1, 10000), yticks=t, yticklabels=t)
+        self.ax[1].set_ylabel('Asynchrony (RMS, ms)', fontsize=vutils.FONTSIZE + 3, labelpad=-2)
         # Apply joint formatting to both axes
         for ax in self.ax:
             # Adjust width of each bar on the bar plot
@@ -258,7 +258,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         Formats figure object, setting legend and padding etc.
         """
         # Add a label to the x axis
-        self.fig.supxlabel('Simulated coupling parameter')
+        self.fig.supxlabel('Coupling paradigm')
         # Adjust subplots positioning a bit to fit in the legend we've just created
         self.fig.subplots_adjust(bottom=0.35, top=0.95, left=0.07, right=0.99, wspace=0.27)
 
@@ -795,7 +795,7 @@ class DistPlotAverage(vutils.BasePlot):
 
 
 def generate_plots_for_individual_performance_simulations(
-    sims: list, output_dir: str,
+    sims: list[Simulation], output_dir: str,
 ) -> None:
     figures_output_dir = output_dir + '\\figures\\simulations_plots'
     df = pd.DataFrame([sim.results_dic for sim in sims])
@@ -805,19 +805,66 @@ def generate_plots_for_individual_performance_simulations(
     rp.create_plot()
     rp = RegPlotSlopeComparisons(df, output_dir=figures_output_dir, original_noise=False)
     rp.create_plot()
-    bp = BarPlotSimulationParameters(df, output_dir=figures_output_dir)
-    bp.create_plot()
     ap = ArrowPlotParams(output_dir=figures_output_dir)
     ap.create_plot()
 
 
 def generate_plots_for_simulations_with_coupling_parameters(
-    sims_params: list, output_dir: str
+    sims_params: list[Simulation], output_dir: str
 ) -> None:
     figures_output_dir = output_dir + '\\figures\\simulations_plots'
     df_avg = pd.DataFrame([sim.results_dic for sim in sims_params])
     dp = DistPlotAverage(df=df_avg, output_dir=figures_output_dir)
     dp.create_plot()
+    bp = BarPlotSimulationParameters(df_avg, output_dir=figures_output_dir)
+    bp.create_plot()
+
+#
+# test = df.melt(
+#     id_vars=['trial', 'block', 'latency', 'jitter', 'instrument'],
+#     value_vars=['tempo_slope', 'ioi_std', 'pw_asym', 'success']
+# )
+# test = test[test['latency'] != 0]
+#
+# fig, ax = plt.subplots(
+#     nrows=4, ncols=3, sharex='col', sharey='row',
+#     figsize=(18.8, 18.8), gridspec_kw=dict(width_ratios=[4, 3, 2])
+# )
+# plt.rcParams.update({'font.size': vutils.FONTSIZE, 'legend.title_fontsize': vutils.FONTSIZE + 3})
+# for x, (i, grp), tit in zip(range(0, 4), test.groupby('variable', sort=False),
+#                        ['Tempo slope (BPM/s)', 'Timing irregularity (SD, ms)',
+#                         'Asynchrony (RMS, ms)', 'Success']):
+#     for y, var in zip(range(0, 3), ['latency', 'jitter', 'instrument']):
+#         if y == 2 and x == 0:
+#             ax[x, y].axline(
+#                 xy1=(0, 0), xy2=(1, 1), linewidth=3, transform=ax[x, y].transAxes,
+#                 color=vutils.BLACK
+#             )
+#         else:
+#             g = sns.barplot(
+#                 data=grp, x=var, y='value', hue='trial', ax=ax[x, y], errorbar=None,
+#                 estimator=np.mean, width=0.8, edgecolor=vutils.BLACK, lw=3,
+#                 palette=vutils.DUO_CMAP,
+#             )
+#             if i == 'tempo_slope':
+#                 ax[x, y].axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK, linewidth=3)
+#         ax[x, y].set(
+#             xlabel=var.capitalize() if x == 3 else '', title=var.capitalize() if x == 0 else '',
+#             ylabel=tit if y == 0 else '', ylim=[1, 9] if i == 'success' else ax[x, y].get_ylim(),
+#             yticks=np.linspace(1, 9, 5) if i == 'success' else ax[x, y].get_yticks()
+#         )
+# for a in ax.flatten():
+#     try:
+#         a.get_legend().remove()
+#     except AttributeError:
+#         pass
+#     plt.setp(a.spines.values(), linewidth=2)
+#     a.tick_params(axis='both', width=3)
+# g.legend()
+# sns.move_legend(g, loc='right', ncol=1, title='Duo', frameon=False, markerscale=2,
+#                 fontsize=vutils.FONTSIZE + 3, bbox_to_anchor=(1.5, 2.35))
+# fig.subplots_adjust(bottom=0.05, top=0.95, left=0.075, right=0.915)
+# plt.show()
 
 
 if __name__ == '__main__':
@@ -825,7 +872,7 @@ if __name__ == '__main__':
     raw_av = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", "phase_correction_sims_average.p")
     # Default location to save plots
     output = r"C:\Python Projects\jazz-jitter-analysis\reports"
-    # Generate plots for our simulations from every performance
-    generate_plots_for_individual_performance_simulations(raw, output)
     # Generate plots for our simulations using our coupling parameters
     generate_plots_for_simulations_with_coupling_parameters(raw_av, output)
+    # Generate plots for our simulations from every performance
+    # generate_plots_for_individual_performance_simulations(raw, output)

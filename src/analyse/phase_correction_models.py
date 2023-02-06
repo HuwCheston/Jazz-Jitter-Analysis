@@ -152,8 +152,9 @@ class PhaseCorrectionModel:
         # Create the regression model and extract the tempo slope coefficient
         return smf.ols('bpm~my_onset', data=conc.dropna()).fit()
 
+    @staticmethod
     def _extract_pairwise_asynchrony(
-            self, asynchrony_col: str = 'asynchrony'
+            nn, asynchrony_col: str = 'asynchrony'
     ):
         """
         Extract pairwise asynchrony as a float (in milliseconds, as is standard for this unit in the literature)
@@ -166,10 +167,8 @@ class PhaseCorrectionModel:
         -	Get the overall mean (here we collapse both arrays down to a single value);
         -	Take the square root of this mean.
         """
-        # Concatenate both arrays of asynchrony values together
-        con = np.concatenate((self.keys_nn[asynchrony_col].to_numpy(), self.drms_nn[asynchrony_col].to_numpy()))
         # Square all the asynchrony values, take the mean, then the square root, then convert to milliseconds
-        return np.sqrt(np.nanmean(np.square(con))) * 1000
+        return np.sqrt(np.nanmean(np.square(nn[asynchrony_col].to_numpy()))) * 1000
 
     def _extract_pairwise_asynchrony_with_standard_deviations(
             self, asynchrony_col: str = 'asynchrony'
@@ -559,7 +558,7 @@ class PhaseCorrectionModel:
             # Summary variables: tempo slope, ioi variability, asynchrony, self-reported success
             'tempo_slope': self._extract_tempo_slope().params.loc['my_onset'],
             'ioi_std': self._get_rolling_standard_deviation_values(nn_df=nn)['my_prev_ioi_std'].median(),
-            'pw_asym': self._extract_pairwise_asynchrony(),
+            'pw_asym': self._extract_pairwise_asynchrony(nn),
             'success': c['success'],
             # Tempo-slope related additional variables
             'tempo_intercept': self._extract_tempo_slope().params.loc['Intercept'],
@@ -572,7 +571,7 @@ class PhaseCorrectionModel:
             ),
             # Asynchrony related additional variables
             'asynchrony_mean': nn['asynchrony'].mean(),
-            'pw_asym_raw': self._extract_pairwise_asynchrony(asynchrony_col='asynchrony_raw'),
+            'pw_asym_raw': self._extract_pairwise_asynchrony(nn, asynchrony_col='asynchrony_raw'),
             'pw_asym_std': self._extract_pairwise_asynchrony_with_standard_deviations(),
             'pw_asym_raw_std': self._extract_pairwise_asynchrony_with_standard_deviations(
                 asynchrony_col='asynchrony_raw'

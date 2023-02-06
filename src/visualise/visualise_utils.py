@@ -10,7 +10,6 @@ import pandas as pd
 import functools
 
 
-
 # Define constants
 WIDTH = 6.2677165
 HEIGHT = 10.446194166666666666666666666667
@@ -209,3 +208,21 @@ def break_axis(
     # Plot diagonal lines to show axis break
     ax2.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)
     ax2.plot((-d, d), (1 - d, 1 + d), **kwargs)
+
+
+def bootstrap_mean_difference(
+    a1: pd.Series, a2: pd.Series, quantile: float = 0.025, n_boot: int = N_BOOT
+):
+    """
+    Helper function to bootstrap the mean difference between two arrays (a1, a2). Number of bootstraps is given by the
+    N_BOOT constant if not provided. Quantile is set to 2.5, for 95% confidence intervals.
+    """
+    # Get our bootstrapped means for both arrays
+    m1 = np.array([a1.sample(frac=1, replace=True, random_state=n).mean() for n in range(0, n_boot)])
+    m2 = np.array([a2.sample(frac=1, replace=True, random_state=n).mean() for n in range(0, n_boot)])
+    # Get the mean difference for each bootstrap iteration
+    diff = np.subtract(m2, m1)
+    # Get our upper and lower quantiles
+    low = np.quantile(diff, quantile)
+    high = np.quantile(diff, 1 - quantile)
+    return low, high

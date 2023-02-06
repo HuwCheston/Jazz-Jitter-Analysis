@@ -37,7 +37,7 @@ def main(
     # CREATE SIMULATIONS WITH COUPLING PARAMETERS - ANARCHY, DEMOCRACY ETC. #
     logger.info(f'Generating phase correction simulations with coupling parameters...')
     generate_phase_correction_simulations_for_coupling_parameters(
-        mds, output_dir=output_filepath, logger=logger, force_rebuild=False, num_simulations=autils.NUM_SIMULATIONS
+        mds, output_dir=output_filepath, logger=logger, force_rebuild=False, num_simulations=100
     )
     logger.info(f'... simulations with parameters generated!')
 

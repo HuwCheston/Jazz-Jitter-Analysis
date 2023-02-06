@@ -357,20 +357,23 @@ class Simulation:
             'keys_parameters': self.keys_params_raw,
             'drums_parameters': self.drms_params_raw,
             # Metrics from the actual original performance on which this simulation was based
-            'tempo_slope_original': self.keys_pcm['tempo_slope'].iloc[0],
-            'ioi_variability_original': np.mean([self.keys_pcm['ioi_std'].iloc[0], self.drms_pcm['ioi_std'].iloc[0]]),
-            'asynchrony_original': self.keys_pcm['pw_asym'].iloc[0],
+            'tempo_slope_original': np.mean(
+                [self.keys_pcm['tempo_slope'].iloc[0], self.drms_pcm['tempo_slope'].iloc[0]]
+            ),
+            'ioi_variability_original': np.mean(
+                [self.keys_pcm['ioi_std'].iloc[0], self.drms_pcm['ioi_std'].iloc[0]]
+            ),
+            'asynchrony_original': np.mean(
+                [self.keys_pcm['pw_asym'].iloc[0], self.drms_pcm['pw_asym'].iloc[0]]
+            ),
             # Summary metrics from all the simulated performances
-            'tempo_slope_simulated_raw': self.get_average_tempo_slope(func=lambda x: x),    # raw values
-            'tempo_slope_simulated': self.get_average_tempo_slope(),  # average
+            'tempo_slope_simulated': self.get_average_tempo_slope(func=np.nanmedian),  # average
             'tempo_slope_simulated_std': self.get_average_tempo_slope(func=np.nanstd),  # standard deviation
             'tempo_slope_simulated_ci': self.get_average_tempo_slope(func=np.nanpercentile, q=[2.5, 97.5]),     # 95% ci
-            'ioi_variability_simulated_raw': self.get_average_ioi_variability(func=lambda x: x),
-            'ioi_variability_simulated': self.get_average_ioi_variability(),
+            'ioi_variability_simulated': self.get_average_ioi_variability(func=np.nanmedian),
             'ioi_variability_simulated_std': self.get_average_ioi_variability(func=np.nanstd),
             'ioi_variability_simulated_ci': self.get_average_ioi_variability(func=np.nanpercentile, q=[2.5, 97.5]),
-            'asynchrony_simulated_raw': self.get_average_pairwise_asynchrony(func=lambda x: x),
-            'asynchrony_simulated': self.get_average_pairwise_asynchrony(),
+            'asynchrony_simulated': self.get_average_pairwise_asynchrony(func=np.nanmedian),
             'asynchrony_simulated_std': self.get_average_pairwise_asynchrony(func=np.nanstd),
             'asynchrony_simulated_ci': self.get_average_pairwise_asynchrony(func=np.nanpercentile, q=[2.5, 97.5]),
         }
@@ -446,49 +449,49 @@ def generate_phase_correction_simulations_for_coupling_parameters(
     ).reset_index(drop=True)
     # Create an empty list to hold our simulations
     all_sims = []
+    avg_noise = 0.005
     # Iterate through each condition
     for idx, grp in df.groupby(by=['latency', 'jitter']):
-        # Create the grouped phase correction model, across all trials
-        pcm_a = grouper(grp)
         # Iterate through each duo
         for i, g in grp.groupby('trial'):
             # Create the grouped model, averaging performance of each duo for one condition over both sessions
             pcm_o = grouper(g)
-            # Set our intercepts to 0
-            pcm_o['intercept'] = 0
-            # Set our noise to our constant
-            # Set our self-coupling to the average self-coupling over all duos
-            pcm_o['correction_self'] = pcm_a['correction_self']
             # Create the simulation object
             sim = Simulation(
-                pcm=pcm_o, num_simulations=num_simulations, parameter='original', leader=None, use_original_noise=False
+                pcm=pcm_o, num_simulations=num_simulations, parameter='original', leader=None, use_original_noise=False,
+                noise=avg_noise
             )
             # Log the current duo and condition in our GUI, if we've passed a logger
             _log_simulation(sim, logger)
             # Create all simulations and append the simulation object to our list
             sim.create_all_simulations()
             all_sims.append(sim)
+        # Create the grouped phase correction model, across all trials
+        pcm_a = grouper(grp)
         # Set our intercepts to 0 and our trial metadata to 0 (helpful when logging)
-        pcm_a['intercept'] = 0
         pcm_a['trial'] = 0
         # Create our anarchy model: both coupling coefficients set to 0
         anarchy_md = pcm_a.copy()
         anarchy_md['correction_partner'] = 0
+        anarchy_md['intercept'] = 0
         # Create our democracy model: both coupling coefficients set to their means
         democracy_md = pcm_a.copy()
         democracy_md['correction_partner'] = democracy_md['correction_partner'].mean()
+        democracy_md['intercept'] = 0
         # Create our leadership model: drums coupling set to 0, keys coupling set to mean
         leadership_md = pcm_a.copy()
         leadership_md['correction_partner'] = np.where(
             leadership_md['instrument'] == 'Drums', 0,
             leadership_md[leadership_md['instrument'] == 'Keys']['correction_partner']
         )
+        leadership_md['intercept'] = 0
         # Iterate over all of our paradigm models
         for md, param in zip([anarchy_md, democracy_md, leadership_md],
                              ['anarchy', 'democracy', 'leadership']):
             # Create our simulation
             sim = Simulation(
-                pcm=md, num_simulations=num_simulations, parameter=param, leader=None, use_original_noise=False
+                pcm=md, num_simulations=num_simulations, parameter=param, leader=None, use_original_noise=False,
+                noise=avg_noise
             )
             # Log the current simulation in our GUI
             _log_simulation(sim, logger)

@@ -214,7 +214,7 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         """
         return sns.lineplot(
             data=self.df, hue='jitter', x='lag', y='mean', errorbar=None, palette=vutils.JITTER_CMAP,
-            lw=3, ax=self.ax, style='jitter', markers=vutils.JITTER_MARKERS, markersize=10
+            lw=3, ax=self.ax, style='jitter', markers=vutils.JITTER_MARKERS, markersize=10,
         )
 
     def _format_ax(
@@ -257,6 +257,108 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         self.fig.subplots_adjust(left=0.15, right=0.8, bottom=0.15, top=0.9)
 
 
+class NumberLineIOIVariability(vutils.BasePlot):
+    """
+    Creates a numberline showing difference in pairwise asynchrony between duos this experiment during the control
+    condition and a corpus of pairwise asynchrony values from other studies and genres
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.df = self._format_df()
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 5))
+
+    @vutils.plot_decorator
+    def create_plot(self) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class to generate and save the image.
+        """
+        self.g = self._create_plot()
+        self._add_annotations()
+        self._format_plot()
+        fname = f'{self.output_dir}\\numberline_ioi_variability'
+        return self.g.figure, fname
+
+    def _format_df(self) -> pd.DataFrame:
+        """
+        Formats the dataframe by concatenating with data from the corpus
+        """
+        # Read in the data from the experimental dataframe
+        trial = self.df[self.df['latency'] == 0]
+        trial = (
+            trial.groupby(['trial', 'instrument'])
+                 .mean()
+                 .reset_index(drop=False)
+                 .rename(columns={'trial': 'style'})
+
+        )
+        trial = trial[['style', 'ioi_std', 'instrument']]
+        trial['source'] = ''
+        # Add a bit of noise to trial 3 and 4 so they don't overlap exactly on the graph
+        trial.loc[trial['instrument'] == 'Keys', 'instrument'] = 'Pianist'
+        trial.loc[trial['instrument'] == 'Drums', 'instrument'] = 'Drummer'
+        trial['style'] = trial['instrument'] + ', Duo ' + trial['style'].astype(str)
+        trial['placeholder'] = 0
+        # Concatenate trial and corpus data together
+        return trial
+
+    def _create_plot(self):
+        """
+        Creates the facetgrid object
+        """
+        return sns.stripplot(
+            data=self.df, x='ioi_std', y='placeholder', jitter=False, dodge=False, s=15,
+            ax=self.ax, orient='h', palette=vutils.INSTR_CMAP, hue='instrument', hue_order=['Pianist', 'Drummer'],
+            edgecolor=vutils.BLACK, linewidth=2
+        )
+
+    def _add_annotations(self):
+        """
+        Add the annotations onto the plot
+        """
+        for k, v in self.df.iterrows():
+            x = v['ioi_std']
+            if v['instrument'] == 'Pianist':
+                x -= 0.25
+                self.g.annotate(text=v['style'], xy=(v['ioi_std'], 0), xytext=(x, -1.4), rotation=315)
+            else:
+                x -= 0.1
+                self.g.annotate(text=v['style'] + '\n' + v['source'], xy=(v['ioi_std'], 0), xytext=(x, 0.05),
+                                rotation=45)
+
+    def _format_plot(self):
+        """
+        Formats the plot
+        """
+        # Set axis position
+        self.ax.spines['bottom'].set_position(('data', 0))
+        # Adjust tick parameters and width
+        self.ax.tick_params(axis="x", direction="out", pad=10, width=3, )
+        plt.setp(self.ax.spines.values(), linewidth=2)
+        # Set ticks and axis label
+        self.g.set(xlim=(0, 40), ylim=(-1, 1), xticks=np.linspace(0, 40, 5), xlabel='', ylabel='')
+        plt.yticks([], [])
+        self.g.figure.supxlabel('Timing irregularity (SD, ms)', y=0.01)
+        # Add arrows and labels showing the direction of the x variable
+        for text_x, arr_x, lab in zip([0.6, 0.36], [0.9, 0.1], ['Irregular', 'Regular']):
+            self.g.annotate(
+                f"${lab}$", (arr_x, 0.93), xytext=(text_x, 0.92), annotation_clip=False,
+                textcoords='figure fraction', xycoords='figure fraction', fontsize=vutils.FONTSIZE + 3,
+                arrowprops=dict(arrowstyle='->', color=vutils.BLACK, lw=4)
+            )
+        self.g.annotate(
+            f"Absolute isochrony", (0.035, 0.35), xytext=(0.03, 0.2), annotation_clip=False,
+            textcoords='figure fraction', xycoords='figure fraction', fontsize=vutils.FONTSIZE + 3,
+            arrowprops=dict(arrowstyle='->', color=vutils.BLACK, lw=4)
+        )
+        # Remove the left and bottom axis
+        sns.despine(left=True, bottom=False)
+        # Adjust plot position slightly
+        plt.subplots_adjust(top=0.63, bottom=0.2, left=0.03, right=0.97)
+        # Remove the legend
+        plt.legend([], [], frameon=False)
+
+
 def generate_tempo_stability_plots(
         mds: list, output_dir: str
 ):
@@ -270,6 +372,10 @@ def generate_tempo_stability_plots(
     lp.create_plot()
     lp = LinePlotLaggedLatency(df=df, output_dir=figures_output_dir, errorbar='ci')
     lp.create_plot()
+    nl = NumberLineIOIVariability(
+        df=df, output_dir=figures_output_dir
+    )
+    nl.create_plot()
 
 
 if __name__ == '__main__':

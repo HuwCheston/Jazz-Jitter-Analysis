@@ -21,7 +21,7 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.df = self._format_df(corpus_filepath=kwargs.get('corpus_filepath', None))
-        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 5))
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 5.5))
 
     @vutils.plot_decorator
     def create_plot(self) -> tuple[plt.Figure, str]:
@@ -68,11 +68,11 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
         """
         _ = sns.stripplot(
             data=self.df[self.df['this_study'] == True], x='pw_asym', y='placeholder', jitter=False, dodge=False, s=15,
-            ax=self.ax, orient='h', marker='o'
+            ax=self.ax, orient='h', marker='o', edgecolor=vutils.BLACK, linewidth=2
         )
         return sns.stripplot(
             data=self.df[self.df['this_study'] == False], x='pw_asym', y='placeholder', jitter=False, dodge=False, s=12,
-            ax=self.ax, orient='h', marker='s'
+            ax=self.ax, orient='h', marker='s', edgecolor=vutils.BLACK, linewidth=2
         )
 
     def _add_annotations(self):
@@ -93,15 +93,27 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
         """
         Formats the plot
         """
-        # Format the plot
+        # Set axis position
         self.ax.spines['bottom'].set_position(('data', 0))
+        # Adjust tick parameters and width
         self.ax.tick_params(axis="x", direction="in", pad=-25, width=3, )
         plt.setp(self.ax.spines.values(), linewidth=2)
+        # Set ticks and axis label
         self.g.set(xlim=(15, 45), ylim=(-1, 1), xticks=np.linspace(15, 45, 7), xlabel='', ylabel='')
-        self.g.figure.supxlabel('Asynchrony (RMS, ms)', y=0.01)
-        sns.despine(left=True, bottom=False)
-        plt.subplots_adjust(top=0.7, bottom=0.2, left=0.03, right=0.97)
         plt.yticks([], [])
+        self.g.figure.supxlabel('Asynchrony (RMS, ms)', y=0.01)
+        # Add arrows and labels showing the direction of the x variable
+        for text_x, arr_x, lab in zip([0.6, 0.4], [0.9, 0.1], ['Looser', 'Tighter']):
+            self.g.annotate(
+                f"${lab}$", (arr_x, 0.93), xytext=(text_x, 0.92), annotation_clip=False,
+                textcoords='figure fraction', xycoords='figure fraction', fontsize=vutils.FONTSIZE + 3,
+                arrowprops=dict(arrowstyle='->', color=vutils.BLACK, lw=4)
+            )
+        # Remove the left and bottom axis
+        sns.despine(left=True, bottom=False)
+        # Adjust plot position slightly
+        plt.subplots_adjust(top=0.63, bottom=0.18, left=0.03, right=0.97)
+        # Remove the legend
         plt.legend([], [], frameon=False)
 
 
@@ -118,7 +130,6 @@ def generate_asynchrony_plots(
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\asynchrony_plots'
 
-    # TODO: corpus should be saved in the root//references directory!
     corpus_dir = r"C:\Python Projects\jazz-jitter-analysis\references\corpus.xlsx"
     nl = NumberLinePairwiseAsynchrony(
         df=df, output_dir=figures_output_dir, corpus_filepath=corpus_dir

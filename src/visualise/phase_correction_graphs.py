@@ -514,10 +514,10 @@ class BarPlot(vutils.BasePlot):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.estimator: callable = kwargs.get('estimator', np.median)
+        self.estimator: callable = kwargs.get('estimator', np.mean)
         self.yvar: str = kwargs.get('yvar', 'correction_partner')
         self.ylim: tuple[float] = kwargs.get('ylim', (0., 1.5))
-        self.ylabel: str = kwargs.get('ylabel', 'Partner coupling')
+        self.ylabel: str = kwargs.get('ylabel', 'Coupling coefficient')
         self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
 
     @vutils.plot_decorator
@@ -537,11 +537,11 @@ class BarPlot(vutils.BasePlot):
         """
         ax = sns.stripplot(
             data=self.df, x='trial', y=self.yvar, hue='instrument', dodge=True,
-            palette='dark:' + vutils.BLACK, s=4, marker='.', jitter=0.1, ax=self.ax
+            palette='dark:' + vutils.BLACK, s=6, marker='.', jitter=0.1, ax=self.ax
         )
         ax = sns.barplot(
-            data=self.df, x='trial', y=self.yvar, hue='instrument', ax=ax, errorbar=('ci', 25),
-            palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'], errcolor='#3953a3', errwidth=10,
+            data=self.df, x='trial', y=self.yvar, hue='instrument', ax=ax, errorbar=None,
+            palette=vutils.INSTR_CMAP, hue_order=['Keys', 'Drums'],
             estimator=self.estimator, edgecolor=vutils.BLACK, lw=2
         )
         return ax
@@ -724,24 +724,27 @@ class RegPlotGrid(vutils.BasePlot):
         """
         Coerce the dataframe into the correct format for plotting
         """
+        def abs_correction(grp: pd.DataFrame.groupby, var: str = 'correction_partner'):
+            ke = grp[grp['instrument'] == 'Keys'][var].mean()
+            dr = grp[grp['instrument'] != 'Keys'][var].mean()
+            return abs(ke - dr)
+
         # Create lists of columns for grouping
         gps = ['trial', 'latency', 'jitter']
         cols = gps + ['coupling_balance', *self.xvars]
-        # Define functions to be applied to variables
-        abs_correction = lambda grp: abs(grp.iloc[1]['correction_partner'] - grp.iloc[0]['correction_partner'])
-        abs_success = lambda grp: abs(
-            grp.groupby('instrument').mean()['success'].iloc[0] - grp.groupby('instrument').mean()['success'].iloc[1]
-        )
         # If we want the difference between self-reported success values
         if success_diff:
             test = pd.DataFrame(
-                [[*i, abs_correction(g, ), *(g[v].mean() if v != 'tempo_slope' else abs_success(g) for v in self.xvars)]
-                 for i, g in self.df.groupby(gps)], columns=cols
+                [
+                    [*i, abs_correction(g), *(g[v].mean() if v != 'tempo_slope' else abs_correction(g, v)
+                                              for v in self.xvars)
+                     ] for i, g in self.df.groupby(gps)
+                ], columns=cols
             )
         # If we want the mean of self-reported success values
         else:
             test = pd.DataFrame(
-                [[*i, abs_correction(g, ), *(g[v].mean() for v in self.xvars)]
+                [[*i, abs_correction(g), *(g[v].mean() for v in self.xvars)]
                  for i, g in self.df.groupby(gps)], columns=cols
             )
         # Melt the dataframe according to the x variables and return
@@ -785,12 +788,11 @@ class RegPlotGrid(vutils.BasePlot):
             )
             # Set parameters of the kde plot now, as we have access to both it and the scatter plot
             kp.set(yticks=sp.get_yticks(), yticklabels=[], xticks=[], xlabel='', ylabel='', ylim=sp.get_ylim(), )
+            # Add a standard linear regression line
+            self._add_regression(ax=a, grp=grp)
             # Add a lowess curve to the tempo slope variable plot, with confidence intervals created with bootstrapping
             if idx == 'tempo_slope':
                 self._add_lowess(ax=a, grp=grp)
-            # Else, add a standard linear regression line
-            else:
-                self._add_regression(ax=a, grp=grp)
         # Create the first row of marginal plots, showing distribution of coupling balance
         for m in self.marginal_ax.flatten()[:2]:
             # We can just use the last group and scatter plot here as the data is the same
@@ -798,7 +800,7 @@ class RegPlotGrid(vutils.BasePlot):
                 data=grp, x='coupling_balance', hue='trial', ax=m, palette=vutils.DUO_CMAP, legend=False, lw=2,
                 multiple='stack', fill=True, common_grid=True,
             )
-            kp.set(xticks=sp.get_xticks(), xticklabels=[], xlim=sp.get_xlim(), yticks=[], xlabel='', ylabel='')
+            kp.set(xticks=sp.get_xticks(), xticklabels=[], yticks=[], xlim=[-0.03, 1.03], xlabel='', ylabel='')
 
     def _add_regression(
             self, ax: plt.Axes, grp: pd.DataFrame
@@ -869,7 +871,7 @@ class RegPlotGrid(vutils.BasePlot):
 
         # Add in actual lowess curve from raw data
         act_x, act_y = lowess(grp['value'], grp['coupling_balance'], self.ci_it, self.ci_frac)
-        ax.plot(act_x, act_y, color=vutils.BLACK, lw=self.lw)
+        ax.plot(act_x, act_y, color=vutils.RED, lw=self.lw)
         # Bootstrap confidence intervals
         res_x, res_y = [], []
         for n in range(0, self.n_boot):
@@ -905,7 +907,7 @@ class RegPlotGrid(vutils.BasePlot):
         # Apply some smoothing to the error bar
         conc.iloc[0:-5] = conc.iloc[0:-5].rolling(10, min_periods=1).mean()
         # Shade error bar in plot
-        ax.fill_between(conc['x'], conc['low'], conc['high'], color=vutils.BLACK, alpha=0.2)
+        ax.fill_between(conc['x'], conc['low'], conc['high'], color=vutils.RED, alpha=0.2)
         # Add horizontal line at y=0 if required
         if add_hline:
             ax.axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK, linewidth=self.lw)
@@ -926,7 +928,7 @@ class RegPlotGrid(vutils.BasePlot):
             ax.get_legend().remove()
             # Set parameters
             ax.set_ylabel(lab, fontsize=20)
-            ax.set(xlabel='', xticks=np.linspace(0, 1.2, 5))
+            ax.set(xlabel='', xticks=np.linspace(0, 1.2, 5), xlim=[-0.03, 1.03],)
             # For the top row of plots, we don't want tick labels, so remove them
             if num < 2:
                 ax.set_xticklabels([])
@@ -947,7 +949,7 @@ class RegPlotGrid(vutils.BasePlot):
             ax.spines['right'].set_visible(False)
             ax.tick_params(width=3, )
             plt.setp(ax.spines.values(), linewidth=2)
-            ax.set(yticklabels=[], xticklabels=[])
+            ax.set(yticklabels=[], xticklabels=[],)
             # Apply formatting only to top row of plots
             if i < 2:
                 box = ax.get_position()
@@ -1016,7 +1018,7 @@ class ArrowPlotPhaseCorrection(vutils.BasePlot):
             # Get means and standard errors for the duo and sort
             grp = duo.groupby('instrument')
             means = grp.mean()['correction_partner']
-            sems = grp.sem()['correction_partner']
+            sems = grp.std()['correction_partner']
             # Add in the title showing the duo number
             a.set_title(f'Duo {idx}', y=0.9)
             # Add text showing the absolute coupling balance
@@ -1191,7 +1193,7 @@ class ArrowPlotModelExplanation(vutils.BasePlot):
         self.fig.subplots_adjust(bottom=-0.15, top=0.95, right=0.99, left=0.15, wspace=0.4)
 
 
-class BarPlotCouplingStrengthAsymmetry(vutils.BasePlot):
+class BarPlotCouplingStrengthAsymmetryComparison(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.df = self._format_df()
@@ -1213,7 +1215,7 @@ class BarPlotCouplingStrengthAsymmetry(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_coupling_strength_asymmetry'
+        fname = f'{self.output_dir}\\barplot_coupling_strength_asymmetry_comparison'
         return self.fig, fname
 
     def _create_plot(self):
@@ -1306,14 +1308,7 @@ class PointPlotCouplingStrengthAsymmetry(vutils.BasePlot):
                 a2 = self.df[self.df['trial'] == g2][v]
                 # Get the actual mean difference
                 mea = a1.mean() - a2.mean()
-                # Bootstrap the means for each duo
-                m1 = np.array([a1.sample(frac=1, replace=True, random_state=n).mean() for n in range(0, vutils.N_BOOT)])
-                m2 = np.array([a2.sample(frac=1, replace=True, random_state=n).mean() for n in range(0, vutils.N_BOOT)])
-                # Get the mean difference for each bootstrap iteration
-                diff = np.subtract(m1, m2)
-                # Get our upper and lower quantiles
-                low = np.quantile(diff, 0.025)
-                high = np.quantile(diff, 0.975)
+                low, high = vutils.bootstrap_mean_difference(a1, a2)
                 # Compute our t-test and extract our p-value
                 _, p = stats.ttest_rel(a1, a2)
                 # Append the results to our list
@@ -1372,7 +1367,7 @@ class PointPlotCouplingStrengthAsymmetry(vutils.BasePlot):
             # Iterate through each row
             for idx, row in sub.iterrows():
                 # Add our t-test asterisks above the mean
-                ax.text(row['mean'], idx - 0.1, row['ast'], fontsize=vutils.FONTSIZE)
+                # ax.text(row['mean'], idx - 0.1, row['ast'], fontsize=vutils.FONTSIZE)
                 # Draw a horizontal line to act as a grid
                 ax.hlines(y=idx, xmin=-1, xmax=1, color=vutils.BLACK, alpha=0.2, lw=2, zorder=-1)
                 # Draw our 95% confidence intervals around our actual mean
@@ -1403,13 +1398,83 @@ class PointPlotCouplingStrengthAsymmetry(vutils.BasePlot):
         """
         Formats figure-level objects
         """
-        # Remove the top and bottom spines
-        sns.despine(left=False, bottom=False)
         # Add in the axis labels
         self.fig.supxlabel('Difference between means')
         self.fig.supylabel('Duos', x=0.01)
         # Adjust the subplot positioning slightly
         self.fig.subplots_adjust(left=0.07, right=0.95, bottom=0.15, top=0.9, wspace=0.1)
+
+
+class BarPlotCouplingStrengthAsymmetry(vutils.BasePlot):
+    """
+    Creates a plot showing the mean differences between coupling and strength
+    for each pair of duos, with confidence intervals obtained via bootstrapping
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=(18.8, 3.5))
+        self.df = self._format_df()
+
+    def _format_df(
+            self
+    ) -> pd.DataFrame:
+        """
+        Coerces dataframe into correct format for plotting
+        """
+        # Define grouper and column variables
+        gps = ['trial', 'latency', 'jitter']
+        cols = gps + ['coupling_asymmetry', 'coupling_strength']
+        # Define functions for extracting total and absolute correction difference
+        tot_correction = lambda grp: grp.iloc[1]['correction_partner'] + grp.iloc[0]['correction_partner']
+        abs_correction = lambda grp: abs(grp.iloc[1]['correction_partner'] - grp.iloc[0]['correction_partner'])
+        # Group to get the average correction per duo, instrument and condition
+        df_f = self.df.groupby(['trial', 'instrument', 'latency', 'jitter']).mean().reset_index()
+        # Return the absolute and total correction for each condition
+        return pd.DataFrame(
+            [[*i, abs_correction(g), tot_correction(g)] for i, g in df_f.groupby(gps)], columns=cols
+        )
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the plot to generate the figure, format, and save in decorator
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        # Save the plot
+        fname = f'{self.output_dir}\\barplot_coupling_asymmetry_strength'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Creates the scatter and line plots
+        """
+        for i, var in zip(range(0, 2), ['coupling_strength', 'coupling_asymmetry']):
+            g = sns.barplot(
+                data=self.df, x='trial', y=var, ax=self.ax[i], estimator=np.mean,
+                errorbar=('ci', 95), n_boot=vutils.N_BOOT, seed=1, capsize=0.1, width=0.4,
+                errcolor=vutils.BLACK, errwidth=2, edgecolor=vutils.BLACK, lw=2,
+                palette=vutils.DUO_CMAP,
+            )
+            g.set_title(var.split('_')[-1].capitalize(), y=1.025)
+
+    def _format_ax(self):
+        for ax in self.ax.flatten():
+            ax.set(xlabel='', ylabel='', ylim=(0, 1.25))
+            ax.tick_params(width=3, which='major')
+            ax.tick_params(width=0, which='minor')
+            plt.setp(ax.spines.values(), linewidth=2)
+
+    def _format_fig(self):
+        self.fig.supxlabel('Duo')
+        self.fig.supylabel('Coupling', x=0.01)
+        self.fig.subplots_adjust(top=0.85, bottom=0.2, right=0.975, left=0.075, wspace=0.05, hspace=0.15)
 
 
 def generate_phase_correction_plots(
@@ -1454,6 +1519,8 @@ def generate_phase_correction_plots(
     bar = BarPlot(df=df, output_dir=figures_output_dir, yvar='correction_self', ylabel='Self coupling', ylim=(-1, 1))
     bar.create_plot()
     bp = BarPlotCouplingStrengthAsymmetry(df=df, output_dir=figures_output_dir)
+    bp.create_plot()
+    bp = BarPlotCouplingStrengthAsymmetryComparison(df=df, output_dir=figures_output_dir)
     bp.create_plot()
     ap = ArrowPlotPhaseCorrection(df=df, output_dir=figures_output_dir)
     ap.create_plot()

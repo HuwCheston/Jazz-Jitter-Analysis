@@ -147,7 +147,7 @@ class NumberLineTempoSlope(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.df = self._format_df(corpus_filepath=kwargs.get('corpus_filepath', None))
-        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 5))
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 5.5))
 
     @vutils.plot_decorator
     def create_plot(self) -> tuple[plt.Figure, str]:
@@ -190,11 +190,11 @@ class NumberLineTempoSlope(vutils.BasePlot):
         """
         _ = sns.stripplot(
             data=self.df[self.df['this_study'] == True], x='tempo_slope', y='placeholder', jitter=False, dodge=False,
-            s=15, ax=self.ax, orient='h', marker='o'
+            s=15, ax=self.ax, orient='h', marker='o', edgecolor=vutils.BLACK, linewidth=2
         )
         return sns.stripplot(
             data=self.df[self.df['this_study'] == False], x='tempo_slope', y='placeholder', jitter=False, dodge=False,
-            s=12, ax=self.ax, orient='h', marker='s'
+            s=12, ax=self.ax, orient='h', marker='s', edgecolor=vutils.BLACK, linewidth=2
         )
 
     def _add_annotations(self):
@@ -217,10 +217,22 @@ class NumberLineTempoSlope(vutils.BasePlot):
         self.ax.spines['bottom'].set_position(('data', 0))
         self.ax.tick_params(axis="x", direction="in", pad=-25, width=3, )
         plt.setp(self.ax.spines.values(), linewidth=2)
-        self.g.set(xlim=(-0.05, 0.75), ylim=(-1, 1), xticks=np.linspace(0, 0.75, 4), xlabel='', ylabel='')
+        self.g.set(xlim=(-0.15, 0.15), ylim=(-1, 1), xticks=np.linspace(-0.15, 0.15, 3), xlabel='', ylabel='')
         self.g.figure.supxlabel('Tempo slope (BPM/s)', y=0.01)
+        for text_x, arr_x, lab in zip([0.55, 0.35], [0.9, 0.1], ['Accelerating', 'Decelerating']):
+            self.g.annotate(
+                f"${lab}$", (arr_x, 0.93), xytext=(text_x, 0.92), annotation_clip=False,
+                textcoords='figure fraction', xycoords='figure fraction', fontsize=vutils.FONTSIZE + 3,
+                arrowprops=dict(arrowstyle='->', color=vutils.BLACK, lw=4)
+            )
+        self.g.annotate(
+            f"Absolute stability\n(no tempo change)", (0.5, 0.5), xytext=(0.43, 0.7), annotation_clip=False,
+            textcoords='figure fraction', xycoords='figure fraction', fontsize=vutils.FONTSIZE + 3,
+            arrowprops=dict(arrowstyle='->', color=vutils.BLACK, lw=4)
+        )
         sns.despine(left=True, bottom=False)
-        plt.subplots_adjust(top=0.7, bottom=0.2, left=0.03, right=0.97)
+        # Adjust plot position slightly
+        plt.subplots_adjust(top=0.63, bottom=0.18, left=0.03, right=0.97)
         plt.yticks([], [])
         plt.legend([], [], frameon=False)
 

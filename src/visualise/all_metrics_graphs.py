@@ -4,6 +4,7 @@ import scipy.stats as stats
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import seaborn as sns
+import warnings
 from stargazer.stargazer import Stargazer
 import statsmodels.formula.api as smf
 
@@ -27,15 +28,15 @@ class PairPlotAllVariables(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.labels: list[str] = kwargs.get(
-            'labels', ['Tempo slope\n(BPM/s)', 'Timing\nirregularity\n(SD, ms)',
-                       'Asynchrony\n(RMS, ms)', 'Self-reported\nsuccess']
+            'labels', ['Tempo slope\n(BPM/s)', 'Asynchrony\n(RMS, ms)',
+                       'Timing\nirregularity\n(SD, ms)', 'Self-reported\nsuccess']
         )
         self._jitter_success: bool = kwargs.get('jitter_success', True)
         self._abs_slope: bool = kwargs.get('abs_slope', True)
         self.error_bar: str = kwargs.get('error_bar', 'sd')
         self.n_boot: int = kwargs.get('n_boot', vutils.N_BOOT)
         self.percentiles: tuple[float] = kwargs.get('percentiles', (2.5, 97.5))
-        self.vars: list[str] = kwargs.get('vars', ['tempo_slope', 'ioi_std', 'pw_asym', 'success'])
+        self.vars: list[str] = kwargs.get('vars', ['tempo_slope', 'pw_asym', 'ioi_std', 'success'])
         self.df: pd.DataFrame = self._format_df()
         self.counter: int = 0
 
@@ -85,7 +86,7 @@ class PairPlotAllVariables(vutils.BasePlot):
         # Get the required label from our list
         s = self.labels[self.counter]
         # Add the label to the upper centre of the diagonal plot
-        y = 0.85 if self.counter != 1 else 0.8
+        y = 0.85 if self.counter != 2 else 0.8
         ax.annotate(
             s, xy=(0.97, y), transform=ax.transAxes, xycoords='axes fraction', va='center', ha='right', fontsize=30
         )
@@ -219,7 +220,7 @@ class PairPlotAllVariables(vutils.BasePlot):
         # If we're using absolute slope, we need to define a different axis limit
         slope_lim = (0, 0.5) if self._abs_slope else (-0.5, 0.5)
         # Iterate through all rows and columns and set required axis limits and step values
-        for i, lim, step in zip(range(0, 4), [slope_lim, (0, 100), (0, 400), (1, 9)], [3, 5, 5, 3]):
+        for i, lim, step in zip(range(0, 4), [slope_lim, (0, 400), (0, 100), (1, 9)], [3, 5, 5, 3]):
             ticks = np.linspace(lim[0], lim[1], step)
             self.g.axes[i, i].set(ylim=lim, xlim=lim, yticks=ticks, xticks=ticks)
         # If using absolute tempo slope, adjust axis limit slightly so we don't cut off some markers
@@ -259,11 +260,14 @@ class RegressionTableAllMetrics:
     def _format_df(
             df: pd.DataFrame
     ) -> pd.DataFrame:
-        return (
-            df.groupby(['trial', 'latency', 'jitter', 'instrument'])
-              .mean(numeric_only=False)
-              .reset_index(drop=False)
-        )
+        # Need to catch FutureWarnings related to dropping invalid columns in a group by
+        with warnings.catch_warnings():
+            warnings.simplefilter(action='ignore', category=FutureWarning)
+            return (
+                df.groupby(['trial', 'latency', 'jitter', 'instrument'])
+                  .mean(numeric_only=False)
+                  .reset_index(drop=False)
+            )
 
     def _generate_models(
             self,
@@ -341,6 +345,123 @@ class RegressionTableAllMetrics:
         return out
 
 
+class PointPlotRepeatComparisons(vutils.BasePlot):
+    """
+
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.metrics = ['tempo_slope', 'ioi_std', 'pw_asym', 'success']
+        self.titles = [
+            'Tempo slope (BPM/s)',
+            'Timing irregularity (SD, ms)',
+            'Asynchrony (RMS, ms)',
+            'Self-reported success',
+        ]
+        self.xlims = [0.2, 9, 70, -2]
+        self.fig, self.ax = plt.subplots(
+            nrows=1, ncols=len(self.metrics), sharex=False, sharey=True, figsize=(18.8, 5.52)
+        )
+        self.boot_df = self._generate_bootstraps()
+
+    def _generate_bootstraps(
+            self
+    ) -> pd.DataFrame:
+        """
+        Generate our bootstrapped difference in means between sessions for each metric and duo combination
+        """
+        # Initialise empty list to hold results
+        res = []
+        # Iterate through each duo
+        for idx, grp in self.df.groupby('trial'):
+            # Iterate through each of the metrics we want to extract
+            for met in self.metrics:
+                # Extract both arrays
+                a1 = grp[grp['block'] == 1][met]
+                a2 = grp[grp['block'] == 2][met]
+                # Get the actual mean difference between arrays
+                mea = a2.mean() - a1.mean()
+                # Get the lower and upper bands of our confidence intervals and append everything
+                low, high = vutils.bootstrap_mean_difference(a1, a2)
+                # We append index as a string so that it is automatically treated as a category in seaborn
+                res.append((str(idx), met, low, high, mea,))
+        # Return everything as a dataframe
+        return pd.DataFrame(res, columns=['duo', 'metric', 'low', 'high', 'mean'])
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the plot to generate the figure, format, and save in decorator
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        # Save the plot
+        fname = f'{self.output_dir}\\pointplot_repeat_comparisons'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Creates the plots for each metric and duo
+        """
+        # Iterate over all of our metrics and axes at the same time
+        for (i, v), ax in zip(
+                self.boot_df.groupby('metric', sort=False), self.ax.flatten()
+        ):
+            # Create our scatter plots
+            sns.scatterplot(
+                data=v, y='duo', x='mean', ax=ax, s=125, zorder=100, edgecolor=vutils.BLACK, lw=2,
+                palette=vutils.DUO_CMAP, markers=vutils.DUO_MARKERS, hue='duo', legend=False, style='duo'
+            )
+            # Iterate through each row
+            for idx, row in v.groupby('duo'):
+                # Draw our horizontal lines to act as a grid
+                ax.hlines(y=idx, xmin=-100, xmax=100, color=vutils.BLACK, alpha=0.2, lw=2, zorder=-1)
+                # Draw our 95% confidence intervals around our actual mean
+                ax.hlines(y=idx, xmin=row['low'], xmax=row['high'], lw=3, color=vutils.BLACK, zorder=10)
+                # Add vertical brackets to our confidence intervals
+                for var in ['low', 'high']:
+                    ax.vlines(
+                        x=row[var], ymin=int(idx) - 1.1, lw=3, ymax=int(idx) - 0.9, color=vutils.BLACK, zorder=-1
+                    )
+
+    def _format_ax(
+            self
+    ) -> None:
+        """
+        Formats axis-level objects
+        """
+        # Iterate over each axis, x axis limit, and title
+        for ax, lim, tit in zip(
+                self.ax.flatten(), self.xlims, self.titles,
+        ):
+            # Set axis properties
+            ax.set(xlabel='', ylabel='', xlim=(-lim, lim))
+            ax.set_title(tit, y=1.01)
+            # Set tick and axis width slightly
+            plt.setp(ax.spines.values(), linewidth=2)
+            ax.tick_params(axis='both', width=3)
+            # Add in a vertical line at 0 (no significant difference between duos)
+            ax.axvline(x=0, color=vutils.BLACK, ls='--', lw=2, alpha=0.8)
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Formats figure-level objects
+        """
+        # Add in the axis labels
+        self.fig.supxlabel('Difference in mean across both sessions')
+        self.fig.supylabel('Duos', x=0.01)
+        # Adjust the subplot positioning slightly
+        self.fig.subplots_adjust(left=0.05, right=0.95, bottom=0.15, top=0.9, wspace=0.1)
+
+
 def generate_all_metrics_plots(
     mds: list[PhaseCorrectionModel], output_dir: str,
 ) -> None:
@@ -358,6 +479,8 @@ def generate_all_metrics_plots(
     pp.create_plot()
     rt = RegressionTableAllMetrics(df, output_dir=figures_output_dir)
     rt.create_tables()
+    pp_ = PointPlotRepeatComparisons(df=df, output_dir=figures_output_dir)
+    pp_.create_plot()
 
 
 if __name__ == '__main__':

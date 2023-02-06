@@ -12,7 +12,7 @@ import collections
 import warnings
 
 WINDOW_SIZE = 6
-NUM_SIMULATIONS = 500
+NUM_SIMULATIONS = 100
 CONSTANT_RESID_NOISE = 0.005
 
 
