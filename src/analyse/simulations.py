@@ -146,7 +146,10 @@ class Simulation:
             value_type=nb.types.float64[:],
         )
         # Fill the dictionary with arrays (pre-allocated in order to make running the simulation easier)
-        for s in ['my_onset', 'asynchrony', 'my_next_ioi', 'my_prev_ioi', 'my_next_ioi_diff', 'my_prev_ioi_diff']:
+        for s in [
+            'my_onset', 'asynchrony', 'asynchrony_third_person',
+            'my_next_ioi', 'my_prev_ioi', 'my_next_ioi_diff', 'my_prev_ioi_diff'
+        ]:
             nb_dict[s] = np.zeros(shape=self.total_beats)
         # Fill the dictionary arrays with our starting values
         # My onset
@@ -290,7 +293,7 @@ class Simulation:
         ], **kwargs)
 
     def get_average_pairwise_asynchrony(
-            self, func=np.nanmean, **kwargs
+            self, func=np.nanmean, async_col: str = 'asynchrony', **kwargs
     ) -> float | None:
         """
         Gets the average pairwise asynchrony (in milliseconds!) across all simulated performances
@@ -300,7 +303,7 @@ class Simulation:
             Function used to calculate the pairwise asynchrony for a single simulation, in milliseconds
             """
             # Concatenate the two asynchrony columns together
-            conc = np.concatenate((keys['asynchrony'].to_numpy(), drms['asynchrony'].to_numpy()))
+            conc = np.concatenate((keys[async_col].to_numpy(), drms[async_col].to_numpy()))
             # Square the values, take the mean, then the square root, then convert to miliseconds and return
             return np.sqrt(np.nanmean(np.square(conc))) * 1000
 
@@ -373,7 +376,9 @@ class Simulation:
             'ioi_variability_simulated': self.get_average_ioi_variability(func=np.nanmedian),
             'ioi_variability_simulated_std': self.get_average_ioi_variability(func=np.nanstd),
             'ioi_variability_simulated_ci': self.get_average_ioi_variability(func=np.nanpercentile, q=[2.5, 97.5]),
-            'asynchrony_simulated': self.get_average_pairwise_asynchrony(func=np.nanmedian),
+            'asynchrony_simulated': self.get_average_pairwise_asynchrony(func=np.nanmedian,
+                                                                         async_col='asynchrony_third_person'),
+            'asynchrony_simulated_indiv': self.get_average_pairwise_asynchrony(func=np.nanmedian),
             'asynchrony_simulated_std': self.get_average_pairwise_asynchrony(func=np.nanstd),
             'asynchrony_simulated_ci': self.get_average_pairwise_asynchrony(func=np.nanpercentile, q=[2.5, 97.5]),
         }

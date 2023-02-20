@@ -12,7 +12,7 @@ import collections
 import warnings
 
 WINDOW_SIZE = 6
-NUM_SIMULATIONS = 100
+NUM_SIMULATIONS = 500
 CONSTANT_RESID_NOISE = 0.005
 
 
@@ -322,7 +322,12 @@ def resample(
     offset = timedelta(seconds=8 - perf.iloc[0][col])
     # Set the index, resample to every second, and take the mean
     if interpolate:
-        return perf.set_index(idx).resample(resample_window, offset=offset).apply(func).interpolate(limit_direction='backward')
+        return (
+            perf.set_index(idx)
+                .resample(resample_window, offset=offset)
+                .apply(func)
+                .interpolate(limit_direction='backward')
+        )
     else:
         return perf.set_index(idx).resample(resample_window, offset=offset).apply(func)
 
@@ -377,6 +382,14 @@ def create_one_simulation(
         """
         return (their_onset + get_latency_at_onset(my_onset)) - my_onset
 
+    def calculate_third_person_async(
+            my_onset: float, their_onset: float
+    ) -> float:
+        """
+        Calculates the asynchrony experienced by an imagined third-person at our onset -- i.e. both delayed!
+        """
+        return (their_onset + get_latency_at_onset(my_onset)) - (my_onset + get_latency_at_onset(my_onset))
+
     def predict_next_ioi_diff(
             prev_diff: float, asynchrony: float, params: nb.typed.Dict, noise: np.ndarray
     ) -> float:
@@ -409,6 +422,12 @@ def create_one_simulation(
         try:
             keys_data['asynchrony'][i] = calculate_async(keys_data['my_onset'][i], drms_data['my_onset'][i])
             drms_data['asynchrony'][i] = calculate_async(drms_data['my_onset'][i], keys_data['my_onset'][i])
+            keys_data['asynchrony_third_person'][i] = calculate_third_person_async(
+                keys_data['my_onset'][i], drms_data['my_onset'][i]
+            )
+            drms_data['asynchrony_third_person'][i] = calculate_third_person_async(
+                drms_data['my_onset'][i], keys_data['my_onset'][i]
+            )
         # If there's an issue here, break out of the simulation
         except:
             break

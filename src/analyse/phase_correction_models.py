@@ -171,7 +171,7 @@ class PhaseCorrectionModel:
         return np.sqrt(np.nanmean(np.square(nn[asynchrony_col].to_numpy()))) * 1000
 
     def _extract_pairwise_asynchrony_with_standard_deviations(
-            self, asynchrony_col: str = 'asynchrony'
+            self, async_col: str = 'asynchrony'
     ):
         """
         Extract pairwise asynchrony using the standard deviation of the asynchrony
@@ -195,10 +195,19 @@ class PhaseCorrectionModel:
             con = le.rename(columns={'my_onset': 'o'}).merge(r.rename(columns={'their_onset': 'o'}), how='left', on='o')
             # Append the pairwise asynchrony value
             means.append(
-                np.sqrt(np.nanmean(np.square(con[[f'{asynchrony_col}_x', f'{asynchrony_col}_y']].std(axis=1)))) * 1000
+                np.sqrt(np.nanmean(np.square(con[[f'{async_col}_x', f'{async_col}_y']].std(axis=1)))) * 1000
             )
         # Calculate the mean of both values
         return np.mean(means)
+
+    def _extract_asynchrony_third_person(
+            self, async_col: str = 'asynchrony_third_person'
+    ) -> float:
+        """
+        Extracts asynchrony experienced by an imagined third person joined to the Zoom call
+        """
+        conc = np.concatenate([self.keys_nn[async_col].to_numpy(), self.drms_nn[async_col].to_numpy()])
+        return np.sqrt(np.nanmean(np.square(conc))) * 1000
 
     def _match_onsets(
             self, live_arr: np.ndarray, delayed_arr: np.ndarray, zoom_arr: np.ndarray
@@ -225,9 +234,14 @@ class PhaseCorrectionModel:
         nn_df = self._append_zoom_array(nn_df, zoom_arr=zoom_arr)
         # Add the correct amount of latency onto our partner's onset time
         nn_df['their_onset_delayed'] = nn_df['their_onset'] + nn_df['latency']
+        # Add the correct amount of latency onto our onset time (for asynchrony calculation)
+        nn_df['my_onset_delayed'] = nn_df['my_onset'] + nn_df['latency']
         # Recalculate our asynchrony column with the now delayed partner onsets
         nn_df['asynchrony'] = nn_df['their_onset_delayed'] - nn_df['my_onset']
+        # Raw asynchrony - without latency added to either performer
         nn_df['asynchrony_raw'] = nn_df['their_onset'] - nn_df['my_onset']
+        # Third person asynchrony - with latency added to both performers
+        nn_df['asynchrony_third_person'] = nn_df['their_onset_delayed'] - nn_df['my_onset_delayed']
         # Format the now matched dataframe and return
         return self._format_df_for_model(nn_df)
 
@@ -558,7 +572,7 @@ class PhaseCorrectionModel:
             # Summary variables: tempo slope, ioi variability, asynchrony, self-reported success
             'tempo_slope': self._extract_tempo_slope().params.loc['my_onset'],
             'ioi_std': self._get_rolling_standard_deviation_values(nn_df=nn)['my_prev_ioi_std'].median(),
-            'pw_asym': self._extract_pairwise_asynchrony(nn),
+            'pw_asym': self._extract_asynchrony_third_person(),    # both performers delayed - imagined third person
             'success': c['success'],
             # Tempo-slope related additional variables
             'tempo_intercept': self._extract_tempo_slope().params.loc['Intercept'],
@@ -571,11 +585,10 @@ class PhaseCorrectionModel:
             ),
             # Asynchrony related additional variables
             'asynchrony_mean': nn['asynchrony'].mean(),
-            'pw_asym_raw': self._extract_pairwise_asynchrony(nn, asynchrony_col='asynchrony_raw'),
+            'pw_asym_indiv': self._extract_pairwise_asynchrony(nn),    # Me live, them delayed
+            'pw_asym_raw': self._extract_pairwise_asynchrony(nn, asynchrony_col='asynchrony_raw'),  # Both live
             'pw_asym_std': self._extract_pairwise_asynchrony_with_standard_deviations(),
-            'pw_asym_raw_std': self._extract_pairwise_asynchrony_with_standard_deviations(
-                asynchrony_col='asynchrony_raw'
-            ),
+            'pw_asym_raw_std': self._extract_pairwise_asynchrony_with_standard_deviations(async_col='asynchrony_raw'),
             # Success related additional variables
             'interaction': c['interaction'],
             'coordination': c['coordination'],

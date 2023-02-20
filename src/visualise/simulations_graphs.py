@@ -703,15 +703,17 @@ class DistPlotAverage(vutils.BasePlot):
                     s=150, color=vutils.BLACK, label=None, zorder=10
                 )
                 if lat != 0:
+                    x_pad = 0
                     if i == 'democracy':
-                        y_pad = -30
+                        x_pad = 0.2
+                        y_pad = 10
                     elif i == 'anarchy':
                         y_pad = 100
                     else:
                         y_pad = 10
                     self.ax[x, y].annotate(
                         i.title(), xy=(g['tempo_slope_simulated'], g['asynchrony_simulated']),
-                        xytext=(g['tempo_slope_simulated'], g['asynchrony_simulated'] + y_pad),
+                        xytext=(g['tempo_slope_simulated'] + x_pad, g['asynchrony_simulated'] + y_pad),
                         arrowprops=dict(arrowstyle="-", color='black', lw=2, alpha=vutils.ALPHA), ha='left', va='bottom'
                     )
                 else:
@@ -756,18 +758,11 @@ class DistPlotAverage(vutils.BasePlot):
             tit = f'Latency: {lat}ms\nJitter: {jit}x' if y == 0 else f'{lat}ms\n{jit}x'
             # Set parameters for both rows of plots
             self.ax[0, y].set(
-                xlim=(-1, 1), xticks=[], yticks=[2600], title=tit, ylim=(2250, 3000)
+                xlim=(-1, 1), xticks=[], yticks=[1750, 2500, 3250], title=tit, ylim=(1500, 3500)
             )
             self.ax[1, y].set(
-                ylim=(0, 175), xlim=(-0.7, 0.7), xticks=np.linspace(-0.5, 0.5, 3), yticks=np.linspace(0, 150, 4)
+                ylim=(0, 200), xlim=(-0.7, 0.7), xticks=np.linspace(-0.5, 0.5, 3), yticks=np.linspace(0, 150, 4)
             )
-            # Set parameters for any plots where latency was applied
-            if lat != 0:
-                # Add in a shaded area showing the 'impossible' asynchrony values (below the minimum latency)
-                self.ax[1, y].axhspan(
-                    ymin=0, ymax=lat, alpha=0.1, hatch='/', fc=vutils.BLACK, ec=vutils.BLACK, lw=3, ls='--'
-                )
-                self.ax[1, y].annotate(f'Baseline', (0.45, lat + 7), ha='center', va='center', alpha=vutils.ALPHA)
             # Apply the same formatting to all plots
             for x in range(0, 2):
                 # Remove y tick labels on all but the first column of plots
@@ -818,53 +813,6 @@ def generate_plots_for_simulations_with_coupling_parameters(
     dp.create_plot()
     bp = BarPlotSimulationParameters(df_avg, output_dir=figures_output_dir)
     bp.create_plot()
-
-#
-# test = df.melt(
-#     id_vars=['trial', 'block', 'latency', 'jitter', 'instrument'],
-#     value_vars=['tempo_slope', 'ioi_std', 'pw_asym', 'success']
-# )
-# test = test[test['latency'] != 0]
-#
-# fig, ax = plt.subplots(
-#     nrows=4, ncols=3, sharex='col', sharey='row',
-#     figsize=(18.8, 18.8), gridspec_kw=dict(width_ratios=[4, 3, 2])
-# )
-# plt.rcParams.update({'font.size': vutils.FONTSIZE, 'legend.title_fontsize': vutils.FONTSIZE + 3})
-# for x, (i, grp), tit in zip(range(0, 4), test.groupby('variable', sort=False),
-#                        ['Tempo slope (BPM/s)', 'Timing irregularity (SD, ms)',
-#                         'Asynchrony (RMS, ms)', 'Success']):
-#     for y, var in zip(range(0, 3), ['latency', 'jitter', 'instrument']):
-#         if y == 2 and x == 0:
-#             ax[x, y].axline(
-#                 xy1=(0, 0), xy2=(1, 1), linewidth=3, transform=ax[x, y].transAxes,
-#                 color=vutils.BLACK
-#             )
-#         else:
-#             g = sns.barplot(
-#                 data=grp, x=var, y='value', hue='trial', ax=ax[x, y], errorbar=None,
-#                 estimator=np.mean, width=0.8, edgecolor=vutils.BLACK, lw=3,
-#                 palette=vutils.DUO_CMAP,
-#             )
-#             if i == 'tempo_slope':
-#                 ax[x, y].axhline(y=0, linestyle='-', alpha=1, color=vutils.BLACK, linewidth=3)
-#         ax[x, y].set(
-#             xlabel=var.capitalize() if x == 3 else '', title=var.capitalize() if x == 0 else '',
-#             ylabel=tit if y == 0 else '', ylim=[1, 9] if i == 'success' else ax[x, y].get_ylim(),
-#             yticks=np.linspace(1, 9, 5) if i == 'success' else ax[x, y].get_yticks()
-#         )
-# for a in ax.flatten():
-#     try:
-#         a.get_legend().remove()
-#     except AttributeError:
-#         pass
-#     plt.setp(a.spines.values(), linewidth=2)
-#     a.tick_params(axis='both', width=3)
-# g.legend()
-# sns.move_legend(g, loc='right', ncol=1, title='Duo', frameon=False, markerscale=2,
-#                 fontsize=vutils.FONTSIZE + 3, bbox_to_anchor=(1.5, 2.35))
-# fig.subplots_adjust(bottom=0.05, top=0.95, left=0.075, right=0.915)
-# plt.show()
 
 
 if __name__ == '__main__':

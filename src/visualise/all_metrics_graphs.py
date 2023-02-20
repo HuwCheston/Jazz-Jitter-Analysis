@@ -347,7 +347,7 @@ class RegressionTableAllMetrics:
 
 class PointPlotRepeatComparisons(vutils.BasePlot):
     """
-
+    Creates a pointplot showing bootstrapped mean differences in variables across each experimental session.
     """
 
     def __init__(self, **kwargs):
@@ -462,6 +462,449 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
         self.fig.subplots_adjust(left=0.05, right=0.95, bottom=0.15, top=0.9, wspace=0.1)
 
 
+class BarPlotRegressionCoefficients(vutils.BasePlot):
+    """
+    Creates a barplot showing regression coefficients and confidence intervals for numerous multiple regression models
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Get parameters for table from kwargs
+        self.categories: list[str] = kwargs.get('categories', ['tempo_slope', 'pw_asym', 'ioi_std', 'success'])
+        self.labels: list[str] = kwargs.get('labels', [
+            'Tempo slope (BPM/s)', 'Asynchrony (RMS, ms)', 'Timing irregularity (SD, ms)', 'Self-reported success'
+        ])
+        self.averaged_vars: list[str] = kwargs.get('averaged_vars', ['tempo_slope', 'pw_asym'])
+        self.predictor_ticks: list[str] = kwargs.get('predictor_ticks', [
+            'Reference\n(0ms, 0.0x, Drums)', 'Latency (ms)', 'Jitter', 'Instrument'
+        ])
+        self.levels: list[str] = kwargs.get('levels', ['Intercept', '23', '45', '90', '180', '0.5', '1.0', 'Keys'])
+        self.alpha: float = kwargs.get('alpha', 0.05)
+        # Format dataframe to get regression results
+        self.df = self._format_df()
+        # Get plotting parameters from kwargs
+        self.x_fontsize: int = kwargs.get('x_fontsize', 60)
+        self.errorbar_margin: float = kwargs.get('errorbar_margin', 0.03)
+        self.vlines_margin: float = kwargs.get('vlines_margin', 0.25)
+        self.add_pvals: bool = kwargs.get('add_pvals', False)
+        # Create plotting objects in matplotlib
+        self.fig, self.ax = plt.subplots(nrows=4, ncols=1, sharex=True, sharey=False, figsize=(18.8, 18.8))
+        self.legend_handles_labels = None   # Used to hold our legend object for later
+
+    def _extract_regression_parameters(
+            self, reg
+    ) -> pd.DataFrame:
+        """
+        Extracts regression parameter from statsmodels ols fit and coerces into a dataframe
+        """
+        # Extract confidence intervals
+        ci = reg.conf_int(alpha=self.alpha).rename(columns={0: 'low', 1: 'high'})
+        # Extract beta coefficients
+        beta = reg.params.rename('beta')
+        # Concatenate confidence intervals and coefficients
+        full = pd.concat([beta, ci], axis=1)
+        # Add in our p-values, now converted into asterisks
+        full['pval'] = [vutils.get_significance_asterisks(p) for p in reg.pvalues.to_list()]
+        return full
+
+    def _format_df(
+            self
+    ) -> pd.DataFrame:
+        """
+        Coerces dataframe into correct format for plotting by extracting regression results
+        """
+        # Melt the dataframe to convert our response variables from rows to columns
+        test = self.df.melt(
+            id_vars=['trial', 'block', 'latency', 'jitter', 'instrument'], value_vars=self.categories
+        )
+        res = []
+        # Iterate through each trial
+        for idx, grp in test.groupby('trial'):
+            # Iterate through each response variable
+            for i, g in grp.groupby('variable'):
+                # Define our initial model formula and rename our value column
+                md = f'{i}~C(latency)+C(jitter)'
+                g = g.rename(columns={'value': i})
+                # Variables which are averaged across the duo, i.e. tempo slope, asynchrony
+                if i in self.averaged_vars:
+                    avg = g.groupby(['trial', 'latency', 'jitter']).mean().reset_index(drop=False)
+                # Variables which are unique for each performer, i.e. timing irregularity and self-reported success
+                else:
+                    avg = g.groupby(['trial', 'latency', 'jitter', 'instrument']).mean().reset_index(drop=False)
+                    # For these variables, add in instrument as a predictor
+                    md += '+C(instrument)'
+                # Create and fit our regression model
+                reg = smf.ols(data=avg, formula=md).fit()
+                # Extract the parameters we want from our dataframe
+                full = self._extract_regression_parameters(reg)
+                # Iterate through each row
+                for pred, row in full.iterrows():
+                    # Append the required results
+                    res.append({
+                        'trial': idx,
+                        'var': i,
+                        'predictor': str(pred).split(')[T.')[-1].split(']')[0],   # We modify the string slightly here
+                        'beta': row['beta'],
+                        'pval': row['pval'],
+                        'low_ci': row['low'],
+                        'high_ci': row['high']
+                    })
+        # Create the dataframe and set the correct column types
+        df = pd.DataFrame(res)
+        df['var'] = pd.Categorical(df['var'], self.categories)
+        df['predictor'] = pd.Categorical(df['predictor'], self.levels)
+        return df.sort_values(by=['trial', 'predictor']).reset_index(drop=True)
+
+    def _add_dummy_instrument_var(
+            self, df: pd.DataFrame, var_name: str = 'tempo_slope'
+    ) -> pd.DataFrame:
+        """
+        Add in dummy instrument variable for metrics which don't use this as a predictor, to enable us to keep the x
+        axis consistent for all subplots
+        """
+        # Iterate through each trial number
+        for i in range(self.df['trial'].nunique()):
+            with warnings.catch_warnings():
+                warnings.simplefilter(action='ignore', category=FutureWarning)
+                # Append a new row to our dataframe with the dummy variable in
+                df = df.append(
+                    {'trial': i + 1, 'var': var_name, 'predictor': 'Keys', 'beta': 0, 'low_ci': 0, 'high_ci': 0},
+                    ignore_index=True)
+        return df
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the plot to generate the figure, format, and save in decorator
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        # Save the plot
+        fname = f'{self.output_dir}\\barplot_regression_coefs'
+        return self.fig, fname
+
+    def _add_errorbars(
+            self, grp: pd.DataFrame, ax: plt.Axes
+    ) -> None:
+        """
+        Adds errorbars into a grouped barplot. This is difficult to do in standard matplotlib, so we add errorbars
+        manually using the ax.hlines method, providing our upper and lower confidence intervals into this
+        """
+        # Zip and iterate through each row in the dataframe and patch (bar) in the graph
+        for (i, r), p in zip(grp.iterrows(), ax.patches):
+            # Get the centre of our x position
+            pos = p.get_x() + p.get_width() / 2
+            # Add in the centre line of our error bar
+            ax.vlines(pos, r['low_ci'], r['high_ci'], color=vutils.BLACK, lw=2)
+            # Add in brackets/braces to our error bar, at the top and bottom
+            for v in ['low_ci', 'high_ci']:
+                ax.hlines(
+                    r[v], pos - self.errorbar_margin, pos + self.errorbar_margin, color=vutils.BLACK, lw=2
+                )
+            # Add in our significance asterisks, if required (off by default)
+            if self.add_pvals:
+                ypos = r['low_ci'] if abs(r['low_ci']) > abs(r['high_ci']) else r['high_ci']
+                ax.text(pos, ypos + self.errorbar_margin, r['pval'])
+
+    def _add_x_to_averaged_vars(
+            self, ax: plt.Axes
+    ) -> None:
+        """
+        Adds in an X to an axes to show that certain variables were not included as predictors
+        """
+        # Get all of our X positions, sort the, and extract the final 5 (equivalent to our keys variable, all duos)
+        xs = sorted([p.get_x() for p in ax.patches])[-5:]
+        # Add in the text
+        ax.text((xs[2] + xs[3]) / 2, y=0, s='X', fontsize=self.x_fontsize, ha='center', va='center_baseline')
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Creates bar chart + error bars for each subplot, corresponding to one variable
+        """
+        # Iterate through our subplots and each variable
+        for ax, (idx, grp) in zip(self.ax.flatten(), self.df.groupby('var')):
+            # Add in our dummy instrument variable rows to the groups that need it
+            if idx in self.averaged_vars:
+                grp = self._add_dummy_instrument_var(grp, var_name=idx)
+            # Sort our table here so that our error bars match our bar heights
+            grp['predictor'] = pd.Categorical(grp['predictor'], self.levels)
+            grp = grp.sort_values(by=['trial', 'predictor']).reset_index(drop=True)
+            # Create the bar plot
+            sns.barplot(
+                data=grp, x='predictor', y='beta', hue='trial', ax=ax, errorbar=None, edgecolor=vutils.BLACK,
+                lw=2, palette=vutils.DUO_CMAP, saturation=0.8, alpha=0.8
+            )
+            # Add in our error bars to the plot
+            self._add_errorbars(grp, ax)
+            # Add in Xs if required to axis
+            if idx in self.averaged_vars:
+                self._add_x_to_averaged_vars(ax)
+
+    def _add_predictor_ticks(
+            self, ax: plt.Axes, ticks: list[str] = None
+    ) -> None:
+        """
+        Adds a secondary x axis showing the names of each of our predictor variables
+        """
+        ax2 = ax.secondary_xaxis('top')
+        ax2.set_xticks([0, 2.5, 5.5, 7], self.predictor_ticks if ticks is None else ticks)
+        ax2.tick_params(width=3, which='major')
+        plt.setp(ax2.spines.values(), linewidth=2)
+
+    def _add_seperating_vlines(
+            self, ax: plt.Axes
+    ) -> None:
+        """
+        Adds in vertical lines seperating levels for each predictor on the x axis, e.g. latency, jitter...
+        """
+        # Get the ticks corresponding to each predictor
+        xs = np.array(sorted([p.get_x() for p in ax.patches]))
+        idxs = np.argwhere(np.diff(xs) > self.vlines_margin)
+        vals = xs[idxs][[0, 4, 6]]
+        # Get our axis y limit
+        ymi, yma = ax.get_ylim()
+        # Iterate through each of the required lines and add it in
+        for v in vals:
+            ax.vlines(v + self.vlines_margin, ymin=ymi, ymax=yma, color=vutils.BLACK, lw=2, alpha=vutils.ALPHA, ls='--')
+
+    def _format_ax(
+            self
+    ) -> None:
+        """
+        Applies required axis formatting
+        """
+        # Iterate through each axis and label, with a counter
+        for count, ax, lab in zip(range(self.df['var'].nunique()), self.ax.flatten(), self.labels):
+            # Add in a horizontal line at y = 0
+            ax.axhline(y=0, color=vutils.BLACK, lw=2)
+            # Set our axis labels
+            ax.set(xlabel='', ylabel=lab, xticklabels=['Intercept', '23', '45', '90', '180', '0.5x', '1.0x', 'Keys'])
+            # Add in our predictor ticks to the top of the first subplot
+            ticks = self.predictor_ticks if count == 0 else ['' for _ in range(len(self.predictor_ticks))]
+            self._add_predictor_ticks(ax=ax, ticks=ticks)
+            # Add vertical lines separating each predictor variable
+            self._add_seperating_vlines(ax=ax)
+            # Adjust tick formatting
+            ax.tick_params(width=3, which='major')
+            plt.setp(ax.spines.values(), linewidth=2)
+            # Save our legend handles and labels, then remove the legend -- we'll add this back in later
+            self.legend_handles_labels = ax.get_legend_handles_labels()
+            ax.legend_.remove()
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Applies figure-level formatting, including legend, axis labels etc.
+        """
+        # Add our legend back in
+        hand, lab = self.legend_handles_labels
+        self.fig.legend(
+            hand, lab, loc='right', ncol=1, title='Duo', frameon=False,
+            markerscale=2, fontsize=vutils.FONTSIZE + 3, bbox_to_anchor=(1.0, 0.5),
+        )
+        # Add our axis text and labels in
+        self.fig.suptitle('Model predictor variables')
+        self.fig.supylabel(r'Coefficient (B)')
+        self.fig.supxlabel('Categorical levels')
+        # Adjust the subplot positioning slightly
+        self.fig.subplots_adjust(top=0.92, bottom=0.05, left=0.1, right=0.9)
+
+
+class BarPlotModelComparison(vutils.BasePlot):
+    """
+    Creates a barplot comparing criteria across models with a different number of predictors
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Dataframe formatting attributes
+        self.categories: list[str] = kwargs.get('categories', ['tempo_slope', 'ioi_std', 'pw_asym', 'success'])
+        self.labels: list[str] = kwargs.get('labels', [
+            'Tempo slope (BPM/s)', 'Timing irregularity (SD, ms)', 'Asynchrony (RMS, ms)', 'Self-reported success'
+        ])
+        self.averaged_vars: list[str] = kwargs.get('averaged_vars', ['tempo_slope', 'pw_asym'])
+        self.full_mds = [
+            'C(latency)+C(jitter)+C(instrument)',
+            'C(latency)+C(jitter)',
+            'C(instrument)',
+            'C(latency)+C(instrument)',
+            'C(jitter)+C(instrument)',
+            'C(latency)',
+            'C(jitter)',
+        ]
+        self.partial_mds = [
+            'C(latency)+C(jitter)',
+            'C(latency)',
+            'C(jitter)',
+        ]
+        # Format the dataframe
+        self.df = self._format_df()
+        # Create subplots
+        self.fig, self.ax = plt.subplots(
+            nrows=2, ncols=2, sharex='col', sharey='all', figsize=(18.8, 9.4),
+            gridspec_kw=dict(width_ratios=[3, 7])
+        )
+        # Visualisation attributes
+        self.ci: str = kwargs.get('ci', 'se')  # Type of error bar to plot
+
+    def _format_df(
+            self
+    ) -> pd.DataFrame:
+        """
+        Creates models for each performance success metric and extracts required critiera (e.g. R2, AIC)
+        """
+        # Melt the dataframe to convert our response variables from rows to columns
+        test = self.df.melt(
+            id_vars=['trial', 'block', 'latency', 'jitter', 'instrument'],
+            value_vars=self.categories
+        )
+        res = []
+        # Iterate through each trial
+        for idx, grp in test.groupby('trial'):
+            # Iterate through each response variable
+            for i, g in grp.groupby('variable'):
+                g = g.rename(columns={'value': i})
+                # Variables which are averaged across the duo, i.e. tempo slope, asynchrony
+                if i in self.averaged_vars:
+                    avg = g.groupby(['trial', 'latency', 'jitter']).mean().reset_index(drop=False)
+                    mds = self.partial_mds
+                # Variables which are unique for each performer, i.e. timing irregularity and self-reported success
+                else:
+                    avg = g.groupby(['trial', 'latency', 'jitter', 'instrument']).mean().reset_index(drop=False)
+                    # For these variables, add in instrument as a predictor
+                    mds = self.full_mds
+                # Iterate through all the required models
+                for md in mds:
+                    # Create and fit our regression model
+                    reg = smf.ols(data=avg, formula=f'{i}~{md}').fit()
+                    # Extract the comparison criteria and append to our list
+                    res.append({
+                        'trial': idx,
+                        'var': i,
+                        'md': md,
+                        'r2_adj': reg.rsquared_adj * 100,
+                        'aic': abs(reg.aic),
+                        'bic': abs(reg.bic)
+                    })
+        # Create the dataframe and set the variable column as categorical -- needed for correct ordering!
+        res = pd.DataFrame(res)
+        res['var'] = pd.Categorical(res['var'], self.categories)
+        return res
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class, creates the plot and saves in plot decorator
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        # Save the plot
+        fname = f'{self.output_dir}\\barplot_model_comparison'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Creates the barplots for each performance success metric
+        """
+        # Iterate through each axis and performance success variable
+        for ax, (idx, grp) in zip(self.ax.flatten(), self.df.groupby('var')):
+            # Melt dataframe into correct format for plotting
+            grp = grp.melt(id_vars=['trial', 'md'], value_vars=['r2_adj', ])
+            # Create the barplot
+            g = sns.barplot(
+                data=grp, x='md', y='value', ax=ax, estimator=np.mean,
+                errorbar=self.ci, edgecolor=vutils.BLACK, lw=2, saturation=0.8, alpha=0.8,
+                palette='husl', errwidth=2, capsize=0.05, width=0.8, errcolor=vutils.BLACK
+            )
+            if grp['md'].str.contains('instrument').sum() > 0:
+                self._add_bar_labels(grp, g, 'C(latency)+C(jitter)+C(instrument)', self.full_mds)
+            else:
+                self._add_bar_labels(grp, g, 'C(latency)+C(jitter)', self.partial_mds, y_mod=20)
+
+    @staticmethod
+    def _add_bar_labels(grp: pd.DataFrame, g: plt.Axes, ref: str, md_list: list, y_mod: int = 10):
+        ref_mean = grp[grp['md'] == ref]['value'].mean()
+        grp['md_'] = pd.Categorical(grp['md'], md_list)
+        for artist, (i_, lab) in zip(g.containers[0], grp.groupby('md_')):
+            txt = round(lab["value"].mean() - ref_mean, 2)
+            if txt != 0:
+                y_pos = artist.get_y() + artist.get_height() + (lab['value'].sem() * 1.6)
+                if y_pos < 10:
+                    y_pos = artist.get_y() + artist.get_height() + y_mod
+                g.text(
+                    artist.get_x() + 0.05, y_pos, f'$\Delta{txt}$',
+                    ha='left', va='baseline', fontsize=vutils.FONTSIZE - 1
+                )
+
+    def _format_ax(
+            self
+    ) -> None:
+        """
+        Formats axis-level attributes
+        """
+        # Iterate through each axis and label together
+        for ax, lab in zip(self.ax.flatten(), self.labels):
+            # Set title and axis labels
+            ax.set(title=lab, ylabel='', xlabel='', ylim=[-20, 115], )
+            # Set x axis ticks and tick parameters
+            self._set_axis_ticks(ax)
+            ax.tick_params(width=3, which='major')
+            plt.setp(ax.spines.values(), linewidth=2)
+            # Add horizontal line at y = 0
+            ax.axhline(y=0, color=vutils.BLACK, lw=2)
+
+    @staticmethod
+    def _set_axis_ticks(
+            ax
+    ) -> None:
+        """
+        Sets ticks for x axis
+        """
+        # Get our ticks
+        ticks = [t.get_text() for t in ax.get_xticklabels()]
+        if 'C(instrument)' in ticks:
+            new_ticks = [
+                'Full model\n(~$L$ + $J$ + $I$)',
+                'Testbed only\n(~$L$ + $J$)',
+                'Instrument only\n(~$I$)',
+                'Latency + instrument\n(~$L$ + $I$)',
+                'Jitter + instrument\n(~$J$ + $I$)',
+                'Latency only\n(~$L$)',
+                'Jitter only\n(~$J$)',
+            ]
+        elif 'C(latency)' in ticks:
+            new_ticks = [
+                'Full model\n(~$L$ + $J$)',
+                'Latency only\n(~$L$)',
+                'Jitter only\n(~$J$)',
+            ]
+        else:
+            new_ticks = ticks
+        ax.set_xticks(ax.get_xticks(), labels=new_ticks, rotation=45, ha='right', rotation_mode='anchor')
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Formats figure-level attributes
+        """
+        # Add in x and y axis labels
+        self.fig.supxlabel('Model predictor variables')
+        self.fig.supylabel(r'Coefficient of determination ($R^{2}_{adj}$, %)')
+        # Adjust plot positioning slightly
+        self.fig.subplots_adjust(bottom=0.3, top=0.95, left=0.08, right=0.95, hspace=0.2, wspace=0.1)
+
+
 def generate_all_metrics_plots(
     mds: list[PhaseCorrectionModel], output_dir: str,
 ) -> None:
@@ -475,12 +918,16 @@ def generate_all_metrics_plots(
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\all_metrics_plots'
 
+    bp = BarPlotModelComparison(df=df, output_dir=figures_output_dir)
+    bp.create_plot()
     pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir, error_bar='ci')
     pp.create_plot()
     rt = RegressionTableAllMetrics(df, output_dir=figures_output_dir)
     rt.create_tables()
     pp_ = PointPlotRepeatComparisons(df=df, output_dir=figures_output_dir)
     pp_.create_plot()
+    bp = BarPlotRegressionCoefficients(df=df, output_dir=figures_output_dir)
+    bp.create_plot()
 
 
 if __name__ == '__main__':

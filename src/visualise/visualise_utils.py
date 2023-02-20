@@ -53,15 +53,20 @@ def plot_decorator(plotter: callable):
         if output is None:
             output = args[0].output_dir     # Will be None anyway if no output_dir ever passed to class
         # Create the plot and return the figure
-        fig, fname = plotter(*args, **kwargs)
-        # If we've provided an output directory, create a folder and save the plot within it
-        if output is not None:
-            create_output_folder(output)
-            # Iterate through all filetypes and save the plot as each type
-            for filetype in filetypes:
-                fig.savefig(f'{fname}.{filetype}', format=filetype, facecolor=WHITE)
-        # Close the plot to prevent it from remaining in memory
-        plt.close(fig)
+        try:
+            fig, fname = plotter(*args, **kwargs)
+            # If we've provided an output directory, create a folder and save the plot within it
+            if output is not None:
+                create_output_folder(output)
+                # Iterate through all filetypes and save the plot as each type
+                for filetype in filetypes:
+                    fig.savefig(f'{fname}.{filetype}', format=filetype, facecolor=WHITE)
+        # We've forgotten to return anything from our plotter
+        except TypeError:
+            pass
+        else:
+            # Close the plot to prevent it from remaining in memory
+            plt.close(fig)
     return wrapper
 
 
