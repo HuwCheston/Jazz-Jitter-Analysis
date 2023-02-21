@@ -66,10 +66,12 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
         """
         Creates the facetgrid object
         """
-        _ = sns.stripplot(
+        # Create the strip plot data for results coming from this study
+        sns.stripplot(
             data=self.df[self.df['this_study'] == True], x='pw_asym', y='placeholder', jitter=False, dodge=False, s=15,
             ax=self.ax, orient='h', marker='o', edgecolor=vutils.BLACK, linewidth=2
         )
+        # Create the strip plot data for results not coming from this study
         return sns.stripplot(
             data=self.df[self.df['this_study'] == False], x='pw_asym', y='placeholder', jitter=False, dodge=False, s=12,
             ax=self.ax, orient='h', marker='s', edgecolor=vutils.BLACK, linewidth=2

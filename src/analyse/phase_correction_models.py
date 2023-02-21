@@ -37,6 +37,7 @@ class PhaseCorrectionModel:
         self._rolling_window_size: str = kwargs.get('rolling_window_size', '2s')   # 2 seconds = 2 beats at 120BPM
         self._rolling_min_periods: int = kwargs.get('rolling_min_periods', 2)
         self._maximum_lag: int = kwargs.get('maximum_lag', 8)   # 8 seconds = 2 bars at 120BPM
+        self._higher_level_order: int = kwargs.get('higher_level_order', 4)
         # The cleaned data, before dataframe conversion
         self.keys_raw: dict = c1_keys
         self.drms_raw: dict = c2_drms
@@ -62,9 +63,16 @@ class PhaseCorrectionModel:
         # The phase correction models
         self.keys_md = self._create_phase_correction_model(self.keys_nn)
         self.drms_md = self._create_phase_correction_model(self.drms_nn)
+        # Higher-order phase correction models, incorporating a greater number of lags
+        self.keys_md_higher = self._create_higher_order_phase_correction_models(self.keys_nn)
+        self.drms_md_higher = self._create_higher_order_phase_correction_models(self.drms_nn)
         # The summary dictionaries, which can be appended to a dataframe of all performances
-        self.keys_dic = self._create_summary_dictionary(c1_keys, self.keys_md, self.keys_nn, self.keys_filtered_onsets)
-        self.drms_dic = self._create_summary_dictionary(c2_drms, self.drms_md, self.drms_nn, self.drms_filtered_onsets)
+        self.keys_dic = self._create_summary_dictionary(
+            c1_keys, self.keys_md, self.keys_nn, self.keys_filtered_onsets, self.keys_md_higher
+        )
+        self.drms_dic = self._create_summary_dictionary(
+            c2_drms, self.drms_md, self.drms_nn, self.drms_filtered_onsets, self.drms_md_higher
+        )
 
     def _get_contamination_value_from_json(
             self, default: float = None
@@ -541,15 +549,41 @@ class PhaseCorrectionModel:
         return res.params.filter(like=ind_var, axis=0).to_list()
 
     def _create_phase_correction_model(
-            self, df: pd.DataFrame
+            self, df: pd.DataFrame, md: str = None
     ):
         """
         Create the linear phase correction model
         """
-        return smf.ols(self._model, data=df.dropna(), missing='drop').fit()
+        if md is None:
+            md = self._model
+        return smf.ols(md, data=df.dropna(), missing='drop').fit()
+
+    def _create_higher_order_phase_correction_models(
+            self, df: pd.DataFrame, endog: str = 'my_next_ioi_diff',
+            exog_vars: tuple[str] = ('my_prev_ioi_diff', 'asynchrony')
+    ) -> list:
+        """
+        Creates a list of higher order phase correction models, including a greater number of lags of the asynchrony
+        and previous IOI terms
+        """
+        # Convert our exog to a list so we can append variables to it
+        exog = list(exog_vars)
+        # Create a list to hold our models
+        higher_order_mds = []
+        # Iterate through all the model orders we want
+        for i in range(1, self._higher_level_order + 1):
+            # Iterate through all the variables we want to use as predictors
+            for var in exog_vars:
+                # Shift our columns by the required amount and append to the list
+                df[f'{var}_l{i}'] = df[var].shift(i)
+                exog.append(f'{var}_l{i}')
+            # Create the model using our current exog variables and append to our list
+            higher_order_mds.append(self._create_phase_correction_model(df, md=f'{endog}~{"+".join(exog)}'))
+        # Return the list of models
+        return higher_order_mds
 
     def _create_summary_dictionary(
-            self, c, md, nn, rn,
+            self, c: dict, md, nn: pd.DataFrame, rn: int, higher_order_md: list
     ):
         """
         Creates a dictionary of summary statistics, used when analysing all models.
@@ -601,10 +635,16 @@ class PhaseCorrectionModel:
             'resid_std': np.std(md.resid),
             'resid_len': len(md.resid),
             'rsquared': md.rsquared,
+            'rsquared_adj': md.rsquared_adj,
             'aic': md.aic,
             'bic': md.bic,
             'log-likelihood': md.llf,
-            # Model comparison variables
+            # Higher order model comparison variables
+            'higher_order_rsquared': [md_.rsquared for md_ in higher_order_md],
+            'higher_order_rsquared_adj': [md_.rsquared_adj for md_ in higher_order_md],
+            'higher_order_aic': [md_.aic for md_ in higher_order_md],
+            'higher_order_bic': [md_.bic for md_ in higher_order_md],
+            'higher_order_log-likelihood': [md_.llf for md_ in higher_order_md]
         }
 
 

@@ -788,8 +788,6 @@ class BarPlotModelComparison(vutils.BasePlot):
                         'var': i,
                         'md': md,
                         'r2_adj': reg.rsquared_adj * 100,
-                        'aic': abs(reg.aic),
-                        'bic': abs(reg.bic)
                     })
         # Create the dataframe and set the variable column as categorical -- needed for correct ordering!
         res = pd.DataFrame(res)
