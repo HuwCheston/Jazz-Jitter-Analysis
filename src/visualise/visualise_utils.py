@@ -35,7 +35,8 @@ LINE_CMAP = ['#1f77b4', '#ff7f0e']     # Original matplotlib colour palette used
 DUO_CMAP = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']      # Colour palette used for duos
 DUO_MARKERS = ['o', 'X', 's', 'P', 'D']     # Marker cycle used for duos
 JITTER_CMAP = ['#FF0000', '#00FF00', '#0000FF']     # Colour palette used for different jitter levels
-JITTER_MARKERS = ['o', 's', '^']    # Marker cycle used for jitter levels
+JITTER_MARK = ['o', 's', '^']    # Marker cycle used for jitter levels
+JITTER_LS = ['-', '--', 'dotted']
 
 
 def plot_decorator(plotter: callable):

@@ -94,7 +94,7 @@ class LinePlotTempoSlopes(vutils.BasePlot):
             for i, g in grp.groupby('block'):
                 # Plot the individual condition
                 pdf = g['tempo_slope'].values[0]
-                self.ax[y, x].plot(pdf.index.seconds, pdf, color=vutils.LINE_CMAP[i - 1], lw=2, label=f'Repeat {i}')
+                self.ax[y, x].plot(pdf.index.seconds - 8, pdf, color=vutils.LINE_CMAP[i - 1], lw=2, label=f'Session {i}')
             # Set axes titles, labels now as we have access to our index variables already
             if y == 0:
                 if x == 0:
@@ -117,11 +117,11 @@ class LinePlotTempoSlopes(vutils.BasePlot):
         # Iterate through all axes
         for ax in self.ax.flatten():
             # Set x and y ticks, axes limits
-            ax.set(xlim=(0, 101), ylim=(30, 160), xticks=[0, 50], xticklabels=[0, 50], )
+            ax.set(xlim=(0, 90), ylim=(30, 160), xticks=[0, 45], xticklabels=[0, 45], )
             ax.tick_params(axis='both', which='both', bottom=False, left=False, )
             plt.setp(ax.spines.values(), linewidth=2)
             # Add horizontal line at metronome tempo
-            ax.axhline(y=120, color=vutils.BLACK, linestyle='--', alpha=vutils.ALPHA, label='Metronome tempo', lw=2)
+            ax.axhline(y=120, color=vutils.BLACK, linestyle='--', alpha=vutils.ALPHA, label='Reference tempo', lw=2)
 
     def _format_fig(
             self

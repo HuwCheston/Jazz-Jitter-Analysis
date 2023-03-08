@@ -596,7 +596,8 @@ class PhaseCorrectionModel:
             'jitter': c['jitter'],
             'instrument': c['instrument'],
             # Raw data, including latency and MIDI arrays, used for creating tempo slope graphs
-            'raw_beats': [c['midi_bpm']],
+            'raw_beats': [c['midi_bpm']],   # Just the crotchet beats
+            'all_beats': [c['midi_raw']],   # ALL the onsets in a performance
             'zoom_arr': c['zoom_array'],
             # Cleaning metadata
             'total_beats': autils.extract_interpolated_beats(c)[0],     # Raw number of beats from the performance
@@ -644,7 +645,10 @@ class PhaseCorrectionModel:
             'higher_order_rsquared_adj': [md_.rsquared_adj for md_ in higher_order_md],
             'higher_order_aic': [md_.aic for md_ in higher_order_md],
             'higher_order_bic': [md_.bic for md_ in higher_order_md],
-            'higher_order_log-likelihood': [md_.llf for md_ in higher_order_md]
+            'higher_order_log-likelihood': [md_.llf for md_ in higher_order_md],
+            # Coupling comparison between first and second half of performance
+            'coupling_1st': self._create_phase_correction_model(nn[nn['my_onset'] <= 53]).params.loc['asynchrony'],
+            'coupling_2nd': self._create_phase_correction_model(nn[nn['my_onset'] >= 53]).params.loc['asynchrony'],
         }
 
 

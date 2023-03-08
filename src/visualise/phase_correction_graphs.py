@@ -1339,7 +1339,7 @@ class PointPlotCouplingStrengthAsymmetry(vutils.BasePlot):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=(18.8, 5.52))
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True, figsize=(18.8, 4))
         self.df = self._format_df()
         self.boot_df = self._generate_bootstraps()
 
@@ -1470,10 +1470,10 @@ class PointPlotCouplingStrengthAsymmetry(vutils.BasePlot):
         Formats figure-level objects
         """
         # Add in the axis labels
-        self.fig.supxlabel('Difference between means')
+        self.fig.supxlabel('Difference in means')
         self.fig.supylabel('Duos', x=0.01)
         # Adjust the subplot positioning slightly
-        self.fig.subplots_adjust(left=0.07, right=0.95, bottom=0.15, top=0.9, wspace=0.1)
+        self.fig.subplots_adjust(left=0.07, right=0.95, bottom=0.175, top=0.9, wspace=0.1)
 
 
 class BarPlotCouplingStrengthAsymmetry(vutils.BasePlot):
@@ -1550,8 +1550,7 @@ class BarPlotCouplingStrengthAsymmetry(vutils.BasePlot):
 
 class BarPlotPhaseCorrectionModelComparison(vutils.BasePlot):
     """
-    Creates barplots showing the difference in R2 between models explaining
-
+    Creates barplots showing the difference in R2 between models
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1564,10 +1563,9 @@ class BarPlotPhaseCorrectionModelComparison(vutils.BasePlot):
             '~coupling_strength+coupling_balance',
             '~C(latency)+C(jitter)+coupling_balance',
             '~C(latency)+C(jitter)+coupling_strength',
-
         ])
         self.ref_md: str = 'latency+jitter+coupling_strength+coupling_balance'
-        self.vars: str = ['tempo_slope', 'ioi_std', 'pw_asym', 'success']
+        self.vars: list[str] = ['tempo_slope', 'ioi_std', 'pw_asym', 'success']
         self.md_names: list[str] = kwargs.get('md_names', [
             'Full model\n(~$L$ + $J$ + $C_a$ + $C_s$)',
             'Testbed only\n(~$L$ + $J$)',
@@ -1606,18 +1604,38 @@ class BarPlotPhaseCorrectionModelComparison(vutils.BasePlot):
         res['tempo_slope'] = res['tempo_slope'].abs()
         return res
 
-    def _bootstrap_r2(self, md_: str, n: int):
-        boot = self.df.sample(frac=1, replace=True, random_state=n)
-        m = smf.ols(md_, data=boot).fit()
-        return m.rsquared_adj * 100
+    @staticmethod
+    def _get_conditional_r2(md):
+        # Variance explained by the fixed effects: we need to use md.predict() with the underlying data to get this
+        var_fixed = md.predict().var()
+        # Variance explained by the random effects
+        var_random = float(md.cov_re.iloc[0])
+        # Variance of the residuals
+        var_resid = md.scale
+        # Total variance of the model
+        total_var = var_fixed + var_random + var_resid
+        return (var_fixed + var_random) / total_var
+
+    def _create_mixed_md(self, form: str, df: pd.DataFrame):
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            try:
+                md = smf.mixedlm(form, data=df, groups=df['trial']).fit(reml=False)
+                return self._get_conditional_r2(md)
+            except:
+                return None
 
     def _generate_mds(self):
         md_res = []
         for var in self.vars:
             for md in self.mds:
-                m = smf.ols(var + md, data=self.df).fit()
-                act_r2 = m.rsquared_adj * 100
-                boot_r2 = [self._bootstrap_r2(var + md, n) for n in range(1000)]
+                act_r2 = self._create_mixed_md(var + md, self.df)
+                boot_r2 = []
+                for n in range(self.n_boot):
+                    boot_df = self.df.sample(frac=1, replace=True, random_state=n)
+                    r2 = self._create_mixed_md(var + md, boot_df)
+                    if r2 is not None:
+                        boot_r2.append(r2)
                 md_res.append({
                     'var': var,
                     'md': md.replace('~', '').replace('C(', '').replace(')', ''),
@@ -1642,10 +1660,12 @@ class BarPlotPhaseCorrectionModelComparison(vutils.BasePlot):
         return self.fig, fname
 
     def _create_plot(self):
-        for ax, (i, var) in zip(self.ax.flatten(), self.mds.groupby('var')):
+        palette = sns.color_palette('Set2', n_colors=4)
+        palette[1], palette[2] = palette[2], palette[1]
+        for ax, (i, var), col in zip(self.ax.flatten(), self.mds.groupby('var'), palette):
             g = sns.barplot(
                 data=var, x='md', y='mean', ax=ax, edgecolor=vutils.BLACK,
-                lw=2, saturation=0.8, alpha=0.8, palette='husl', width=0.8,
+                lw=2, saturation=0.8, alpha=0.8, color=col, width=0.8,
             )
             g.errorbar(
                 x=var['md'], y=var['mean'], yerr=(var['low'], var['high']),
@@ -1655,12 +1675,12 @@ class BarPlotPhaseCorrectionModelComparison(vutils.BasePlot):
             self._add_bar_labels(var, g)
 
     def _add_bar_labels(self, var: pd.DataFrame, g: plt.Axes):
-        var['label'] = round(var['mean'] - var[var['md'] == self.ref_md].iloc[0]['mean'], 2)
+        var['label'] = var['mean'] - var[var['md'] == self.ref_md].iloc[0]['mean']
         for artist, (i_, lab) in zip(g.containers[0], var.iterrows()):
             if lab['label'] != 0:
-                y_pos = artist.get_y() + artist.get_height() + (lab['low'] + lab['high']) + 1
+                y_pos = artist.get_y() + artist.get_height() + (lab['low'] + lab['high']) + 0.01
                 g.text(
-                    artist.get_x() + 0.1, y_pos, f'$\Delta{lab["label"]}$',
+                    artist.get_x() + 0.1, y_pos, f'$\Delta{round(lab["label"], 2)}$',
                     ha='left', va='baseline', fontsize=vutils.FONTSIZE - 1
                 )
 
@@ -1668,7 +1688,7 @@ class BarPlotPhaseCorrectionModelComparison(vutils.BasePlot):
         for ax, tit in zip(self.ax.flatten(), self.titles):
             ax.set(
                 xticklabels=self.md_names, title=tit, ylabel='', xlabel='',
-                ylim=[-10, 115], yticks=np.linspace(0, 100, 5)
+                ylim=[-0.2, 1.15], yticks=np.linspace(0, 1, 3)
             )
             plt.setp(ax.spines.values(), linewidth=2)
             ax.set_xticklabels(self.md_names, rotation=45, ha='right', rotation_mode='anchor')
@@ -1677,8 +1697,323 @@ class BarPlotPhaseCorrectionModelComparison(vutils.BasePlot):
 
     def _format_fig(self):
         self.fig.supxlabel('Model predictor variables')
-        self.fig.supylabel(r'Coefficient of determination ($R^{2}_{adj}$, %)')
+        self.fig.supylabel(r'Conditional $R^{2}$', y=0.6)
         self.fig.subplots_adjust(bottom=0.3, top=0.95, left=0.08, right=0.95, hspace=0.2, wspace=0.1)
+
+
+class BarPlotMixedEffectsRegressionCoefficients(vutils.BasePlot):
+    """
+    Creates a barplot showing regression coefficients and confidence intervals for mixed effects models
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Get parameters for table from kwargs
+        self.group_vars: list[str] = ['trial', 'block', 'latency', 'jitter']
+        self.categories: list[str] = kwargs.get('categories', ['tempo_slope', 'pw_asym', 'ioi_std', 'success', ])
+        self.labels: list[str] = kwargs.get('labels', [
+            'Tempo slope (BPM/s)', 'Asynchrony (RMS, ms)', 'Timing irregularity (SD, ms)', 'Self-reported success'
+        ])
+        self.averaged_vars: list[str] = kwargs.get('averaged_vars', ['tempo_slope', 'pw_asym'])
+        self.predictor_ticks: list[str] = kwargs.get('predictor_ticks', [
+            'Reference\n(0ms, 0.0x)', 'Latency (ms)', 'Jitter', 'Coupling'
+        ])
+        self.levels: list[str] = kwargs.get('levels', ['Intercept', '23', '45', '90', '180', '0.5', '1.0', 'Strength',
+                                                       'Asymmetry'])
+        self.alpha: float = kwargs.get('alpha', 0.05)
+        # Format dataframe to get regression results
+        self.df = self._format_df()
+        self.mds = self._create_mixed_models()
+        self.md_dfs = self._extract_betas_ci()
+        # Get plotting parameters from kwargs
+        self.palette: str = kwargs.get('palette', 'Set2')
+        self.errorbar_margin: float = kwargs.get('errorbar_margin', 0.03)
+        self.vlines_margin: float = kwargs.get('vlines_margin', 0.9)
+        self.add_pvals: bool = kwargs.get('add_pvals', False)
+        # Create plotting objects in matplotlib
+        self.fig, self.ax = plt.subplots(nrows=4, ncols=1, sharex=True, sharey=False, figsize=(18.8, 18.8))
+        self.legend_handles_labels = None  # Used to hold our legend object for later
+
+    def _format_df(
+            self
+    ) -> pd.DataFrame:
+        """
+        Coerces dataframe into correct format for plotting by extracting regression results
+        """
+        res = []
+        for idx, grp in self.df.groupby(self.group_vars):
+            dr = grp[grp['instrument'] != 'Keys']['correction_partner'].iloc[0]
+            ke = grp[grp['instrument'] == 'Keys']['correction_partner'].iloc[0]
+            di = {'coupling_strength': dr + ke, 'coupling_asymmetry': abs(dr - ke)}
+            di.update({k: v for k, v in zip(self.group_vars, idx)})
+            di.update({var_: grp[var_].mean() for var_ in self.categories})
+            res.append(di)
+        return (
+            pd.DataFrame(res)
+              .groupby(['trial', 'latency', 'jitter'])
+              .mean()
+              .reset_index(drop=False)
+        )
+
+    def extract_re_stds(self):
+        """
+        Extracts standard deviation of random effects specified in mixed model
+        """
+        return [np.sqrt(float(md.summary().tables[1]['Coef.'].iloc[-1])) for md in self.mds]
+
+    def extract_marginal_conditional_r2(self) -> pd.DataFrame:
+        """
+        Extracts marginal and conditional r2 from linear mixed models according to procedure outlined
+        by Nakagawa and Schielzeth (2013)
+        """
+        r2 = []
+        for var, md in zip(self.categories, self.mds):
+            # Variance explained by the fixed effects: we need to use md.predict() with the underlying data to get this
+            var_fixed = md.predict().var()
+            # Variance explained by the random effects
+            var_random = float(md.cov_re.iloc[0])
+            # Variance of the residuals
+            var_resid = md.scale
+            # Total variance of the model
+            total_var = var_fixed + var_random + var_resid
+            # Calculate the r2 values and append to the model
+            r2.append({
+                'var': var,
+                'conditional_r2': (var_fixed + var_random) / total_var,
+                'marginal_r2': var_fixed / total_var
+            })
+        return pd.DataFrame(r2)
+
+    def _extract_betas_ci(self):
+        """
+        Extracts beta coefficients and confidence intervals from mixed models
+        """
+        def formatter(md):
+            betas = md.params.rename('beta')
+            cis = md.conf_int().rename(columns={0: 'low', 1: 'high'})
+            conc = (
+                pd.concat([betas, cis], axis=1)
+                  .reset_index(drop=False)
+                  .rename(columns={'index': 'variable'})
+                  .iloc[:-1]
+            )
+            for s in ['C(latency)[T.', 'C(jitter)[T.', 'coupling_', ']']:
+                conc['variable'] = conc['variable'].str.replace(s, '', regex=False)
+            conc['variable'] = conc['variable'].str.title()
+            return conc
+
+        return [formatter(md) for md in self.mds]
+
+    def _create_mixed_models(self):
+        mds = []
+        for var in self.categories:
+            formula = var + '~' + 'C(latency)+C(jitter)+coupling_strength+coupling_asymmetry'
+            md = smf.mixedlm(formula, data=self.df, groups=self.df['trial']).fit(reml=False)
+            mds.append(md)
+        return mds
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the plot to generate the figure, format, and save in decorator
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        # Save the plot
+        fname = f'{self.output_dir}\\barplot_mixed_effects_regression_coefs'
+        return self.fig, fname
+
+    def _add_errorbars(
+            self, grp: pd.DataFrame, ax: plt.Axes
+    ) -> None:
+        """
+        Adds errorbars into a grouped barplot. This is difficult to do in standard matplotlib, so we add errorbars
+        manually using the ax.hlines method, providing our upper and lower confidence intervals into this
+        """
+        # Zip and iterate through each row in the dataframe and patch (bar) in the graph
+        for (i, r), p in zip(grp.iterrows(), ax.patches):
+            # Get the centre of our x position
+            pos = p.get_x() + p.get_width() / 2
+            # Add in the centre line of our error bar
+            ax.vlines(pos, r['low'], r['high'], color=vutils.BLACK, lw=2)
+            # Add in brackets/braces to our error bar, at the top and bottom
+            for v in ['low', 'high']:
+                ax.hlines(
+                    r[v], pos - self.errorbar_margin, pos + self.errorbar_margin, color=vutils.BLACK, lw=2
+                )
+            # Add in our significance asterisks, if required (off by default)
+            if self.add_pvals:
+                ypos = r['low_ci'] if abs(r['low_ci']) > abs(r['high_ci']) else r['high_ci']
+                ax.text(pos, ypos + self.errorbar_margin, r['pval'])
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Creates bar chart + error bars for each subplot, corresponding to one variable
+        """
+        palette = sns.color_palette(self.palette, n_colors=len(self.md_dfs))
+        for ax, md, col in zip(self.ax.flatten(), self.md_dfs, palette):
+            md['variable'] = pd.Categorical(md['variable'], self.levels)
+            sns.barplot(
+                data=md, x='variable', y='beta', ax=ax, errorbar=None, edgecolor=vutils.BLACK,
+                lw=2, saturation=0.8, alpha=0.8, color=col
+            )
+            self._add_errorbars(md, ax)
+
+    def _add_predictor_ticks(
+            self, ax: plt.Axes, ticks: list[str] = None
+    ) -> None:
+        """
+        Adds a secondary x axis showing the names of each of our predictor variables
+        """
+        ax2 = ax.secondary_xaxis('top')
+        ax2.set_xticks([0, 2.5, 5.5, 7.5], self.predictor_ticks if ticks is None else ticks)
+        ax2.tick_params(width=3, which='major')
+        plt.setp(ax2.spines.values(), linewidth=2)
+
+    def _add_seperating_vlines(
+            self, ax: plt.Axes
+    ) -> None:
+        """
+        Adds in vertical lines seperating levels for each predictor on the x axis, e.g. latency, jitter...
+        """
+        # Get the ticks corresponding to each predictor
+        xs = np.array(sorted([p.get_x() for p in ax.patches]))
+        idxs = np.argwhere(np.diff(xs) > self.vlines_margin)
+        vals = xs[idxs][[0, 4, 6]]
+        # Get our axis y limit
+        ymi, yma = ax.get_ylim()
+        # Iterate through each of the required lines and add it in
+        for v in vals:
+            ax.vlines(v + self.vlines_margin, ymin=ymi, ymax=yma, color=vutils.BLACK, lw=2, alpha=vutils.ALPHA, ls='--')
+
+    def _format_ax(
+            self
+    ) -> None:
+        """
+        Applies required axis formatting
+        """
+        # Iterate through each axis and label, with a counter
+        for count, ax, lab in zip(range(len(self.md_dfs)), self.ax.flatten(), self.labels):
+            # Add in a horizontal line at y = 0
+            ax.axhline(y=0, color=vutils.BLACK, lw=2)
+            # Set our axis labels
+            ax.set(xlabel='', ylabel=lab,
+                   xticklabels=['Intercept', '23', '45', '90', '180', '0.5x', '1.0x', 'Strength', 'Asymmetry'])
+            # Add in our predictor ticks to the top of the first subplot
+            ticks = self.predictor_ticks if count == 0 else ['' for _ in range(len(self.predictor_ticks))]
+            self._add_predictor_ticks(ax=ax, ticks=ticks)
+            # Add vertical lines separating each predictor variable
+            self._add_seperating_vlines(ax=ax)
+            # Adjust tick formatting
+            ax.tick_params(width=3, which='major')
+            plt.setp(ax.spines.values(), linewidth=2)
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Applies figure-level formatting, including legend, axis labels etc.
+        """
+        # Add our axis text and labels in
+        self.fig.suptitle('Model predictor variables')
+        self.fig.supylabel(r'Coefficient (B)')
+        self.fig.supxlabel('Categorical levels')
+        # Adjust the subplot positioning slightly
+        self.fig.subplots_adjust(top=0.92, bottom=0.05, left=0.1, right=0.95)
+
+
+class PointPlotSelfPartnerCouplingByInstrument(vutils.BasePlot):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.n_boot = kwargs.get('n_boot', vutils.N_BOOT)
+        self.fig, self.ax = plt.subplots(
+            nrows=1, ncols=2, sharex=False, sharey=True, figsize=(18.8, 4)
+        )
+        self.titles = [r'Self coupling ($\alpha_{i, i}$)', r'Partner coupling ($\alpha_{i, j}$)']
+        self.lims = [0.25, 0.9]
+        self.handles, self.labels = None, None
+        self.df = self._format_df()
+
+    def _format_df(self):
+        res = []
+        df_ = self.df.groupby(['trial', 'latency', 'jitter', 'instrument']).mean().reset_index(drop=False)
+        for v in ['correction_self', 'correction_partner']:
+            for idx, grp in df_.groupby(['trial']):
+                a1 = grp[grp['instrument'] == 'Keys'][v]
+                a2 = grp[grp['instrument'] != 'Keys'][v]
+                # Get the actual mean difference
+                mea = a2.mean() - a1.mean()
+                low, high = vutils.bootstrap_mean_difference(a1, a2, n_boot=self.n_boot)
+                # Append the results to our list
+                res.append((idx, v, low, high, mea,))
+        res = pd.DataFrame(res, columns=['duo', 'variable', 'low', 'high', 'mean'])
+        res['duo'] = pd.Categorical(res['duo'], [1, 2, 3, 4, 5])
+        res['variable'] = pd.Categorical(res['variable'], ['correction_self', 'correction_partner'])
+        return res
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the plot to generate the figure, format, and save in decorator
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        # Save the plot
+        fname = f'{self.output_dir}\\pointplot_coupling_by_instrument'
+        return self.fig, fname
+
+    def _create_plot(self):
+        for (idx, grp), ax_ in zip(self.df.groupby('variable'), self.ax.flatten()):
+            sns.scatterplot(
+                data=grp, y='duo', x='mean', ax=ax_, s=200, zorder=100,
+                edgecolor=vutils.BLACK, lw=2, marker='o', hue='duo', style='duo',
+                palette=vutils.DUO_CMAP, markers=vutils.DUO_MARKERS
+            )
+            # Iterate through each row
+            for idx_, row in grp.groupby('duo'):
+                # Draw a horizontal line to act as a grid
+                ax_.hlines(y=idx_, xmin=-1, xmax=1, color=vutils.BLACK, alpha=0.2, lw=2, zorder=-1)
+                # Draw our 95% confidence intervals around our actual mean
+                ax_.hlines(y=idx_, xmin=row['low'], xmax=row['high'], lw=3, color=vutils.BLACK, zorder=10)
+                # Add vertical brackets to our confidence intervals
+                for var in ['low', 'high']:
+                    ax_.vlines(x=row[var], ymin=idx_ - 0.1, lw=3, ymax=idx_ + 0.1, color=vutils.BLACK, zorder=-1)
+
+    def _format_ax(self):
+        # Iterate through both axis
+        for ax_, tit, lim in zip(self.ax.flatten(), self.titles, self.lims):
+            # Remove labels and set axis limits
+            ax_.set(xlabel='', ylabel='', xlim=(-lim, lim), title=tit)
+            # Set tick and axis width slightly
+            plt.setp(ax_.spines.values(), linewidth=2)
+            ax_.tick_params(axis='both', width=3)
+            # Add in a vertical line at 0 (no significant difference between duos)
+            ax_.axvline(x=0, color=vutils.BLACK, ls='--', lw=2, alpha=0.8)
+            self.handles, self.labels = ax_.get_legend_handles_labels()
+            ax_.get_legend().remove()
+
+    def _format_fig(self):
+        leg = self.fig.legend(
+            self.handles, self.labels, ncol=1, title='Duo', frameon=False, bbox_to_anchor=(1, 0.75),
+            markerscale=1.6, fontsize=vutils.FONTSIZE
+        )
+        for handle in leg.legendHandles:
+            handle.set_edgecolor(vutils.BLACK)
+            handle.set_sizes([200])
+        plt.setp(leg.get_title(), fontsize=20)
+        # Add in the axis labels
+        self.fig.supxlabel('Difference in means')
+        self.fig.supylabel('Duos', x=0.01)
+        # Adjust the subplot positioning slightly
+        self.fig.subplots_adjust(left=0.05, right=0.93, bottom=0.175, top=0.9, wspace=0.1)
 
 
 def generate_phase_correction_plots(
@@ -1699,12 +2034,17 @@ def generate_phase_correction_plots(
     #                                  avg_groupers=['latency', 'jitter', 'instrument']),
     #     output_dir=figures_output_dir, verbose_footer=False
     # )
-    ap = ArrowPlotPhaseCorrection(df=df, output_dir=figures_output_dir)
-    ap.create_plot()
     pp = PointPlotCouplingStrengthAsymmetry(df=df, output_dir=figures_output_dir)
     pp.create_plot()
-    bp = BarPlotPhaseCorrectionModelComparison(df=df, output_dir=figures_output_dir)
+    pp = PointPlotSelfPartnerCouplingByInstrument(df=df, output_dir=figures_output_dir)
+    pp.create_plot()
+    bp = BarPlotPhaseCorrectionModelComparison(df=df, output_dir=figures_output_dir, n_boot=500)
     bp.create_plot()
+    bp = BarPlotMixedEffectsRegressionCoefficients(df=df, output_dir=figures_output_dir)
+    bp.create_plot()
+    ap = ArrowPlotPhaseCorrection(df=df, output_dir=figures_output_dir)
+    ap.create_plot()
+
     # Create box plot
     bp = BoxPlot(df=df, output_dir=figures_output_dir, yvar='correction_partner', ylim=(-0.2, 1.5))
     bp.create_plot()

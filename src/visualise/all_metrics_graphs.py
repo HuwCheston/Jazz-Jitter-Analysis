@@ -359,7 +359,7 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
             'Asynchrony (RMS, ms)',
             'Self-reported success',
         ]
-        self.xlims = [0.2, 9, 70, -2]
+        self.xlims = [0.2, 9, 70, 2]
         self.fig, self.ax = plt.subplots(
             nrows=1, ncols=len(self.metrics), sharex=False, sharey=True, figsize=(18.8, 5.52)
         )
@@ -787,7 +787,7 @@ class BarPlotModelComparison(vutils.BasePlot):
                         'trial': idx,
                         'var': i,
                         'md': md,
-                        'r2_adj': reg.rsquared_adj * 100,
+                        'r2_adj': reg.rsquared_adj,
                     })
         # Create the dataframe and set the variable column as categorical -- needed for correct ordering!
         res = pd.DataFrame(res)
@@ -814,33 +814,35 @@ class BarPlotModelComparison(vutils.BasePlot):
         """
         Creates the barplots for each performance success metric
         """
+        palette = sns.color_palette('Set2', n_colors=4)
+        palette[1], palette[2] = palette[2], palette[1]
         # Iterate through each axis and performance success variable
-        for ax, (idx, grp) in zip(self.ax.flatten(), self.df.groupby('var')):
+        for ax, (idx, grp), col in zip(self.ax.flatten(), self.df.groupby('var'), palette):
             # Melt dataframe into correct format for plotting
             grp = grp.melt(id_vars=['trial', 'md'], value_vars=['r2_adj', ])
             # Create the barplot
             g = sns.barplot(
                 data=grp, x='md', y='value', ax=ax, estimator=np.mean,
                 errorbar=self.ci, edgecolor=vutils.BLACK, lw=2, saturation=0.8, alpha=0.8,
-                palette='husl', errwidth=2, capsize=0.05, width=0.8, errcolor=vutils.BLACK
+                color=col, errwidth=2, capsize=0.05, width=0.8, errcolor=vutils.BLACK
             )
             if grp['md'].str.contains('instrument').sum() > 0:
                 self._add_bar_labels(grp, g, 'C(latency)+C(jitter)+C(instrument)', self.full_mds)
             else:
-                self._add_bar_labels(grp, g, 'C(latency)+C(jitter)', self.partial_mds, y_mod=20)
+                self._add_bar_labels(grp, g, 'C(latency)+C(jitter)', self.partial_mds)
 
     @staticmethod
-    def _add_bar_labels(grp: pd.DataFrame, g: plt.Axes, ref: str, md_list: list, y_mod: int = 10):
+    def _add_bar_labels(grp: pd.DataFrame, g: plt.Axes, ref: str, md_list: list,):
         ref_mean = grp[grp['md'] == ref]['value'].mean()
         grp['md_'] = pd.Categorical(grp['md'], md_list)
         for artist, (i_, lab) in zip(g.containers[0], grp.groupby('md_')):
-            txt = round(lab["value"].mean() - ref_mean, 2)
+            txt = lab["value"].mean() - ref_mean
             if txt != 0:
                 y_pos = artist.get_y() + artist.get_height() + (lab['value'].sem() * 1.6)
-                if y_pos < 10:
-                    y_pos = artist.get_y() + artist.get_height() + y_mod
+                if y_pos < 0.1:
+                    y_pos = 0.15
                 g.text(
-                    artist.get_x() + 0.05, y_pos, f'$\Delta{txt}$',
+                    artist.get_x() + 0.05, y_pos, f'$\Delta{round(txt, 2)}$',
                     ha='left', va='baseline', fontsize=vutils.FONTSIZE - 1
                 )
 
@@ -853,7 +855,7 @@ class BarPlotModelComparison(vutils.BasePlot):
         # Iterate through each axis and label together
         for ax, lab in zip(self.ax.flatten(), self.labels):
             # Set title and axis labels
-            ax.set(title=lab, ylabel='', xlabel='', ylim=[-20, 115], )
+            ax.set(title=lab, ylabel='', xlabel='', ylim=[-0.2, 1.15], )
             # Set x axis ticks and tick parameters
             self._set_axis_ticks(ax)
             ax.tick_params(width=3, which='major')
@@ -898,7 +900,7 @@ class BarPlotModelComparison(vutils.BasePlot):
         """
         # Add in x and y axis labels
         self.fig.supxlabel('Model predictor variables')
-        self.fig.supylabel(r'Coefficient of determination ($R^{2}_{adj}$, %)')
+        self.fig.supylabel(r'Adjusted $R^{2}$', y=0.6)
         # Adjust plot positioning slightly
         self.fig.subplots_adjust(bottom=0.3, top=0.95, left=0.08, right=0.95, hspace=0.2, wspace=0.1)
 

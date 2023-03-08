@@ -131,7 +131,7 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         self.n_boot: int = kwargs.get('n_boot', vutils.N_BOOT)
         self.df = self._format_df()
         self.df = self._bootstrap_df()
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=1, figsize=(9.4, 5))
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=3, figsize=(18.8, 5), sharey=True)
 
     @vutils.plot_decorator
     def create_plot(
@@ -140,7 +140,7 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         """
         Called from outside of the class to generate the figure and save
         """
-        self.g = self._create_plot()
+        self._create_plot()
         self._format_ax()
         self._format_fig()
         # Create filename and return to save
@@ -208,14 +208,19 @@ class LinePlotLaggedLatency(vutils.BasePlot):
 
     def _create_plot(
             self
-    ) -> plt.Axes:
+    ):
         """
-        Create the basic line plot in seaborn and return
+        Create the basic line plot in seaborn
         """
-        return sns.lineplot(
-            data=self.df, hue='jitter', x='lag', y='mean', errorbar=None, palette=vutils.JITTER_CMAP,
-            lw=3, ax=self.ax, style='jitter', markers=vutils.JITTER_MARKERS, markersize=10,
-        )
+        # Define the zip object
+        z = zip(self.ax.flatten(), self.df.groupby('jitter'), vutils.JITTER_CMAP, vutils.JITTER_MARK, vutils.JITTER_LS)
+        # Iterate over all the required objects and create separate plots
+        for ax, (_, df), col, mark, ls in z:
+            g = sns.lineplot(
+                data=df, x='lag', y='mean', errorbar=None, lw=4, ax=ax, marker=mark, color=col, markersize=12, ls=ls
+            )
+            # Fill between the confidence intervals
+            g.fill_between(df['lag'], df['low'], df['high'], alpha=vutils.ALPHA, color=col)
 
     def _format_ax(
             self
@@ -223,22 +228,21 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         """
         Adjust axes-level parameters
         """
-        # Fill between the confidence intervals
-        for num, (_, jit) in enumerate(self.df.groupby('jitter')):
-            self.ax.fill_between(jit['lag'], jit['low'], jit['high'], alpha=vutils.ALPHA, color=vutils.JITTER_CMAP[num])
-        # Set axes parameters - labels, axes limits etc
-        ticks = [n for n in range(0, 9)]
-        self.g.set(
-            ylim=(-0.1, 0.3), xlabel=None, ylabel=None, xticks=ticks, xticklabels=ticks
-        )
-        # Adjust axes parameters
-        self.ax.tick_params(width=3, )
-        plt.setp(self.ax.spines.values(), linewidth=2)
-        # Set bottom spine to y=0
-        self.ax.spines['bottom'].set_position(('data', 0))
-        # Hide right and top spines that Seaborn adds by default
-        for spine in ['right', 'top']:
-            self.ax.spines[spine].set_visible(False)
+        for ax, jit in zip(self.ax.flatten(), ['0.0x', '0.5x', '1.0x']):
+            # Set axes parameters - labels, axes limits etc
+            ticks = [n for n in range(0, 9)]
+            ax.set(
+                ylim=(-0.05, 0.3), xlabel=None, ylabel=None, xticks=ticks, xticklabels=ticks,
+                yticks=np.linspace(0, 0.3, 4), title=f'Jitter: {jit}'
+            )
+            # Adjust axes parameters
+            ax.tick_params(width=3, )
+            plt.setp(ax.spines.values(), linewidth=2)
+            # Set bottom spine to y=0
+            ax.spines['bottom'].set_position(('data', 0))
+            # Hide right and top spines that Seaborn adds by default
+            for spine in ['right', 'top']:
+                ax.spines[spine].set_visible(False)
 
     def _format_fig(
             self
@@ -248,13 +252,9 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         """
         # Add axes labels
         self.fig.supxlabel('Lag (s)')
-        self.fig.supylabel('Correlation ($r$)')
-        # Move legend
-        sns.move_legend(
-            self.g, 'center right', ncol=1, title='Jitter', frameon=False, bbox_to_anchor=(1.3, 0.5)
-        )
+        self.fig.supylabel('Partial correlation ($r$)')
         # Adjust padding around plot edges
-        self.fig.subplots_adjust(left=0.15, right=0.8, bottom=0.15, top=0.9)
+        self.fig.subplots_adjust(left=0.075, right=0.95, bottom=0.125, top=0.875, wspace=0.1)
 
 
 class NumberLineIOIVariability(vutils.BasePlot):

@@ -789,6 +789,182 @@ class DistPlotAverage(vutils.BasePlot):
         self.fig.subplots_adjust(bottom=0.15, top=0.85, left=0.075, right=0.935, wspace=0.1, hspace=0.2)
 
 
+class RegPlotSlopeAsynchrony(vutils.BasePlot):
+    """
+    Creates a regression jointplot, designed to show similarity in tempo slope and asynchrony
+    between simulated and original performances.
+    """
+
+    def __init__(
+            self, df: pd.DataFrame, **kwargs
+    ):
+        super().__init__(**kwargs)
+        # Define variables
+        self.var = kwargs.get('var', 'tempo_slope')
+        self.n_boot: int = kwargs.get('n_boot', vutils.N_BOOT)
+        self.error_bar: str = kwargs.get('error_bar', 'sd')
+        self.percentiles: tuple[float] = kwargs.get('percentile', (2.5, 97.5))
+        self.original_noise = kwargs.get('original_noise', False)
+        self.orig_var, self.sim_var = self.var + '_original', self.var + '_simulated'
+        self.df = self._format_df(df)
+        self.fig = plt.figure(figsize=(18.8, 8))
+        self.main_ax, self.marginal_ax = self._init_gridspec_subplots()
+        self.handles, self.labels = None, None
+
+    def _init_gridspec_subplots(
+            self, widths: tuple[int] = (5, 1, 0.3, 5, 1), heights: tuple[int] = (1, 5)
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Initialise grid of subplots. Returns two numpy arrays corresponding to main and marginal axes respectively.
+        """
+        # Initialise subplot grid with desired width and height ratios
+        grid = self.fig.add_gridspec(nrows=2, ncols=5, width_ratios=widths, height_ratios=heights, wspace=0.1,
+                                     hspace=0.1)
+        # Create a list of index values for each subplot type
+        margins = [0, 3, 6, 9, ]
+        mains = [5, 8, ]
+        # Create empty lists to hold subplots
+        marginal_ax = []
+        main_ax = []
+        # Iterate through all the subplots we want to create
+        for i in range(len(heights) * len(widths)):
+            # Create the subplot object
+            ax = self.fig.add_subplot(grid[i // len(widths), i % len(widths)])
+            # Append the subplot to the desired list
+            if i in margins:
+                marginal_ax.append(ax)
+            elif i in mains:
+                main_ax.append(ax)
+            # If we don't want to keep the axis, turn it off so it is hidden from the plot
+            else:
+                ax.axis('off')
+        # Return the figure, main subplots (as numpy array), and marginal subplots (as numpy array)
+        return np.array(main_ax), np.array(marginal_ax)
+
+    def _format_df(
+            self, df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Extracts results data from each Simulation class instance and subsets to get original coupling simulations only.
+        Results data is initialised when simulations are created, which makes this really fast.
+        """
+        return df[(df['parameter'] == 'original') & (df['original_noise'] == self.original_noise) & (
+                    df['tempo_slope_simulated'] <= 4)]
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class; creates plot and returns to vutils.plot_decorator for saving.
+        """
+        self._create_plot()
+        self._format_main_ax()
+        self._format_marginal_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\regplot_simulation_slope_comparison_original_noise_{self.original_noise}'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> sns.JointGrid:
+        """
+        Creates scatter plots for both simulated and actual tempo slope values
+        """
+        # Create the grid, but don't map any plots onto it just yet
+        for main_ax, top_margin, right_margin, var in zip(
+                self.main_ax.flatten(), self.marginal_ax.flatten()[:2], self.marginal_ax.flatten()[2:],
+                ['tempo_slope', 'asynchrony']
+        ):
+            sns.scatterplot(
+                data=self.df, x=var + '_simulated', y=var + '_original', hue='trial', palette=vutils.DUO_CMAP,
+                style='trial', markers=vutils.DUO_MARKERS, s=100, edgecolor=vutils.BLACK, ax=main_ax
+            )
+            sns.regplot(
+                data=self.df, x=var + '_simulated', y=var + '_original', ax=main_ax, scatter=False,
+                n_boot=vutils.N_BOOT, line_kws=dict(color=vutils.BLACK, alpha=vutils.ALPHA, lw=3)
+            )
+            self._add_correlation_results(ax=main_ax, var=var)
+            for margin, kwargs, in zip([top_margin, right_margin],
+                                       [dict(x=var + '_simulated'), dict(y=var + '_original')]):
+                sns.kdeplot(
+                    data=self.df, hue='trial', palette=vutils.DUO_CMAP, legend=False, lw=2,
+                    multiple='stack', fill=True, common_grid=True, cut=0, ax=margin, **kwargs
+                )
+
+    def _add_correlation_results(
+            self, ax, var
+    ) -> None:
+        """
+        Adds the results of a linear correlation onto the plot
+        """
+        # Calculate the correlation, get r and p values
+        r, p = stats.pearsonr(self.df[var + '_simulated'], self.df[var + '_original'])
+        # Format correlation results into a string
+        s = f'$r$ = {round(r, 2)}{vutils.get_significance_asterisks(p)}'
+        # Add the annotation onto the plot
+        ax.annotate(
+            s, (0.8, 0.1), xycoords='axes fraction', fontsize=vutils.FONTSIZE + 3,
+            bbox=dict(facecolor='none', edgecolor=vutils.BLACK, pad=10.0), ha='center', va='center'
+        )
+
+    def _format_main_ax(self):
+        for ax, lim in zip(self.main_ax.flatten(), [(-0.75, 0.75), (0, 250)]):
+            # Get the axes limit from minimum and maximum values across both simulated and original data
+            ax.set(xlim=lim, ylim=lim, xlabel='Simulated', ylabel='Observed')
+            # Set the top and right spines of the joint plot to visible
+            ax.spines['top'].set_visible(True)
+            ax.spines['right'].set_visible(True)
+            # Add the diagonal line to the joint ax
+            ax.axline(
+                xy1=(0, 0), xy2=(1, 1), linewidth=3, transform=ax.transAxes,
+                color=vutils.BLACK, alpha=vutils.ALPHA, ls='--'
+            )
+            ax.tick_params(width=3, which='major')
+            plt.setp(ax.spines.values(), linewidth=2)
+            # Store our handles and labels
+            self.handles, self.labels = ax.get_legend_handles_labels()
+            # Remove the legend
+            ax.get_legend().remove()
+
+    def _format_marginal_ax(self):
+        for top_margin, right_margin, lim, tit in zip(
+                self.marginal_ax.flatten()[:2], self.marginal_ax.flatten()[2:], [(-0.6, 0.6), (0, 275)],
+                ['Tempo slope (BPM/s)', 'Asynchrony (RMS, ms)']
+        ):
+            top_margin.set(xlim=lim, ylabel='', xlabel='', xticklabels=[], yticks=[])
+            top_margin.set_title(tit, fontsize=vutils.FONTSIZE + 5, y=1.1)
+            top_margin.spines['left'].set_visible(False)
+            right_margin.set(ylim=lim, xlabel='', ylabel='', yticklabels=[], xticks=[])
+            right_margin.spines['bottom'].set_visible(False)
+            for ax in [top_margin, right_margin]:
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.tick_params(width=3, which='major')
+                plt.setp(ax.spines.values(), linewidth=2)
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Formats figure object, setting legend and padding etc.
+        """
+        # Add the legend back in
+        self.labels = [int(float(lab)) for lab in self.labels]
+        lgnd = plt.legend(
+            self.handles, self.labels, title='Duo', frameon=False, ncol=1, loc='right', markerscale=1.5,
+            fontsize=vutils.FONTSIZE + 3, edgecolor=vutils.BLACK, bbox_to_anchor=(2.25, 0.65),
+        )
+        # Set the legend font size
+        plt.setp(lgnd.get_title(), fontsize=vutils.FONTSIZE + 3)
+        # Set the legend marker size and edge color
+        for handle in lgnd.legendHandles:
+            handle.set_edgecolor(vutils.BLACK)
+            handle.set_sizes([100])
+        # Adjust subplots positioning a bit to fit in the legend we've just created
+        self.fig.subplots_adjust(bottom=0.1, top=0.91, left=0.075, right=0.92, )
+
+
 def generate_plots_for_individual_performance_simulations(
     sims: list[Simulation], output_dir: str,
 ) -> None:
@@ -809,6 +985,8 @@ def generate_plots_for_simulations_with_coupling_parameters(
 ) -> None:
     figures_output_dir = output_dir + '\\figures\\simulations_plots'
     df_avg = pd.DataFrame([sim.results_dic for sim in sims_params])
+    rp = RegPlotSlopeAsynchrony(df=df_avg, output_dir=figures_output_dir)
+    rp.create_plot()
     dp = DistPlotAverage(df=df_avg, output_dir=figures_output_dir)
     dp.create_plot()
     bp = BarPlotSimulationParameters(df_avg, output_dir=figures_output_dir)
