@@ -6,16 +6,27 @@ import logging
 
 class AVMuxer:
     """
-    This class is used to mux audio and video footage from each performance together
+    This class is used to mux audio and video footage from each performance together.
+    Make sure that FFMPEG is installed and accessible via PATH
     """
-    def __init__(self, input_dir, output_dir, ext: str = 'Delay', **kwargs):
-        # TODO: implement this more!
+    def __init__(
+            self, input_dir, output_dir, keys_ext: str = 'Delay', drms_ext: str = 'Delay', **kwargs
+    ):
         # The extension we should use to identify our performances (live or delayed)
-        self.ext = ext
+        self.keys_ext = keys_ext
+        self.drms_ext = drms_ext
+        self.ext = {
+            'keys_audio': self.keys_ext,
+            'drums_audio': self.drms_ext,
+            'keys_video': 'View' if self.keys_ext == 'Delay' else 'Rec',
+            'drums_video': 'View' if self.drms_ext == 'Delay' else 'Rec',
+        }
+
         # Input directory where our performance audio + video is found
         self.input_dir = input_dir
         # Output directory where we'll store our combined footage
         self.output_dir = output_dir
+        self.output_dir = self._create_output_folder()
         # Whether or not to show logging messages from FFMPEG
         self.report_ffmpeg: bool = kwargs.get('report_ffmpeg', False)
         self.subprocess_kwargs = self._get_ffmpeg_kwargs()
@@ -26,9 +37,10 @@ class AVMuxer:
         self.audio_filter: str = kwargs.get('audio_filter', 'amix=inputs=2:duration=longest')
         self.audio_output_ftype: str = kwargs.get('audio_output_ftype', 'aac')
         # Video attributes
-        self.video_filter: str = kwargs.get('video_filter', 'hstack,format=yuv420p')
+        self.video_filter: str = kwargs.get('video_filter', '[0:v]scale=w=1920:h=1080[scaledOne];'
+                                                            '[1:v]scale=w=1920:h=1080[scaledTwo];'
+                                                            '[scaledOne][scaledTwo]hstack=inputs=2,format=yuv420p')
         self.video_ftype: tuple[str] = kwargs.get('video_ftype', ('.mkv', '.avi'))
-        self.video_name: str = kwargs.get('video_name', 'View')
         self.video_output_ftype: str = kwargs.get('video_output_ftype', 'avi')
         self.video_codec: str = kwargs.get('video_codec', 'libx264')
         self.video_crf: str = kwargs.get('video_crf', '18')
@@ -66,12 +78,19 @@ class AVMuxer:
                 key = self._get_dict_key(dirpath)
                 if key not in dic:
                     dic[key] = {}
-                # If this is a video file, add it as such
-                if filename.endswith(self.video_ftype) and self.video_name in filename:
-                    dic[key][self._get_video_fpath(filename, key)] = join
-                # Else if this is an audio file, add it as such
-                elif filename.endswith(self.audio_ftype):
+                if filename.endswith(self.audio_ftype):
+                    ins = 'keys' if 'keys' in filename.lower() else 'drums'
+                    if self.ext[f'{ins}_audio'] not in filename:
+                        continue
                     dic[key][self._get_audio_fpath(filename)] = join
+                elif filename.endswith(self.video_ftype):
+                    if key[1] == '1':
+                        ins = 'drums' if 'cam1' in filename else 'keys'
+                    else:
+                        ins = 'keys' if 'cam1' in filename else 'drums'
+                    if self.ext[f'{ins}_video'] not in filename:
+                        continue
+                    dic[key][self._get_video_fpath(filename, key)] = join
         # Return our filepath dictionary
         return dic
 
@@ -83,7 +102,6 @@ class AVMuxer:
         Returns the type of video that is described by this filename
         """
         # cam1 = Drums, cam2 = Keys for duo 1 only
-        # TODO: I should probably change this at some point
         if key[1] == '1':
             if 'cam1' in filename:
                 return 'drms_vid'
@@ -138,7 +156,7 @@ class AVMuxer:
             # Get all of our filenames
             audio_fname = fr'{self.output_dir}\{k}_audio.{self.audio_output_ftype}'
             video_fname = fr'{self.output_dir}\{k}_video.{self.video_output_ftype}'
-            all_fname = fr'{self.output_dir}\{k}_all.avi'
+            all_fname = fr'{self.output_dir}\{k}_k{self.keys_ext.lower()}_d{self.drms_ext.lower()}.avi'
             # Mux the audio and video separately
             self._mux_audio(v, audio_fname)
             self._mux_video(v, video_fname)
@@ -148,6 +166,19 @@ class AVMuxer:
             self._cleanup_interim_files([audio_fname, video_fname])
         if self.logger is not None:
             self.logger.info(f'Muxing finished!')
+
+    def _create_output_folder(
+            self
+    ) -> str:
+        """
+        Creates an output folder according to the given parameters
+        """
+        # Gets the string of our new directory
+        new_dir = os.sep.join([self.output_dir, f'k{self.keys_ext.lower()}_d{self.drms_ext.lower()}'])
+        # Create the directory if it doesn't exist and return our directory filepath
+        if not os.path.exists(new_dir):
+            os.makedirs(new_dir)
+        return new_dir
 
     def _mux_audio(
             self, v: dict, fname: str,
@@ -215,16 +246,24 @@ class AVMuxer:
                 pass
 
 
-def generate_muxed_performances(input_dir: str, output_dir: str, logger_=None):
-    mux = AVMuxer(input_dir, output_dir, logger=logger_)
+def generate_muxed_performances(
+        input_dir: str, output_dir: str, logger=None, **kwargs
+) -> None:
+    """
+    Generates all muxed performances from an input and output directory
+    """
+    mux = AVMuxer(input_dir, output_dir, logger=logger, **kwargs)
     mux.mux_all_performances()
 
 
 if __name__ == '__main__':
+    # Initialise the logger
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
-    logger = logging.getLogger(__name__)
-
+    logger_ = logging.getLogger(__name__)
+    # Initialise default input and output paths and mux performances
     input_d = r"C:\Python Projects\jazz-jitter-analysis\data\raw\avmanip_output"
     output_d = r"C:\Python Projects\jazz-jitter-analysis\data\raw\muxed_performances"
-    generate_muxed_performances(input_d, output_d, logger)
+    generate_muxed_performances(
+        input_d, output_d, logger_, report_ffmpeg=False, keys_ext='Live', drms_ext='Live'
+    )
