@@ -647,10 +647,12 @@ class HeatmapNoteChoice(vutils.BasePlot):
             ('Rack Tom 1 Rimclick', plt.Circle, dict(xy=(0.125, 0.54), radius=0.08)),
             ('Floor Tom 1 Center', plt.Circle, dict(xy=(0.4, 0.36), radius=0.11)),
             ('Rack Tom 2 Rimclick', plt.Circle, dict(xy=(0.4, 0.36), radius=0.1)),
+            ('Crash Right', plt.Circle, dict(xy=(0.59, 0.4), radius=0.11)),
+            ('Crash Right', plt.Circle, dict(xy=(0.59, 0.4), radius=0.01)),
             ('Ride Bow Tip|Ride Edge', plt.Circle, dict(xy=(0.45, 0.58), radius=0.14)),
             ('Ride Bell', plt.Circle, dict(xy=(0.45, 0.58), radius=0.05)),
-            ('Crash', plt.Circle, dict(xy=(-0.05, 0.55), radius=0.12)),
-            ('Crash', plt.Circle, dict(xy=(-0.05, 0.55), radius=0.01)),
+            ('Crash Left', plt.Circle, dict(xy=(-0.05, 0.58), radius=0.12)),
+            ('Crash Left', plt.Circle, dict(xy=(-0.05, 0.58), radius=0.01)),
         ]
 
         self.drms_df = self._init_drms_df()
@@ -735,12 +737,17 @@ class HeatmapNoteChoice(vutils.BasePlot):
                 func_(**kwargs_, clip_on=False, linewidth=3,
                       edgecolor=vutils.BLACK, facecolor=self.cmap(freq))
             )
-            txt = ins_.split(' ')[0]
+            if 'Crash' in ins_:
+                txt = ins_[:7]
+            else:
+                txt = ins_.split(' ')[0]
             if txt not in seen:
                 seen.add(txt)
                 xy = kwargs_['xy']
-                if txt in ['Crash', 'Ride']:
+                if 'Ride' in txt:
                     xy = xy[0], xy[1] + 0.07
+                if 'Crash' in txt:
+                    xy = xy[0], xy[1] + 0.04 if txt == 'Crash L' else xy[1] - 0.04
                 if func_ == plt.Rectangle:
                     xy = xy[0] + (kwargs_['width']) / 2, abs(xy[1]) + (kwargs_['height'] / 2)
                 if txt == 'Hi-Hat':
@@ -804,7 +811,7 @@ class HeatmapNoteChoice(vutils.BasePlot):
         for ax, tit, xpos in zip(self.ax.flatten(), ['Drums', 'Piano'], [0.2, 0.4]):
             ax.axis('off')
             ax.set_title(tit, fontsize=vutils.FONTSIZE + 5, x=xpos)
-        self.fig.subplots_adjust(left=0.125, right=0.85, wspace=-0.125, hspace=0)
+        self.fig.subplots_adjust(left=0.125, right=0.85, wspace=-0.05, hspace=0)
 
     def _add_cbar(self):
         sm = plt.cm.ScalarMappable(cmap=self.cmap_obj, norm=plt.Normalize(vmin=0, vmax=1))

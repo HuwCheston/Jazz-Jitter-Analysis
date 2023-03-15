@@ -2,6 +2,9 @@ import subprocess
 import os
 import re
 import logging
+import datetime
+import time
+import math
 
 
 class AVMuxer:
@@ -27,24 +30,40 @@ class AVMuxer:
         # Output directory where we'll store our combined footage
         self.output_dir = output_dir
         self.output_dir = self._create_output_folder()
-        # Whether or not to show logging messages from FFMPEG
-        self.report_ffmpeg: bool = kwargs.get('report_ffmpeg', False)
-        self.subprocess_kwargs = self._get_ffmpeg_kwargs()
         # A logger we can use to provide our own messages
         self.logger = kwargs.get('logger', None)
+        self.log_individual_progress = kwargs.get('log_individual_progress', False)
         # Audio attributes
-        self.audio_ftype: tuple[str] = kwargs.get('audio_ftype', '.wav')
-        self.audio_filter: str = kwargs.get('audio_filter', 'amix=inputs=2:duration=longest')
-        self.audio_output_ftype: str = kwargs.get('audio_output_ftype', 'aac')
+        self.audio_in_ftype: tuple[str] = kwargs.get('audio_in_ftype', '.wav')
+        self.audio_codec: str = kwargs.get('audio_codec', 'aac')
         # Video attributes
-        self.video_filter: str = kwargs.get('video_filter', '[0:v]scale=w=1920:h=1080[scaledOne];'
-                                                            '[1:v]scale=w=1920:h=1080[scaledTwo];'
-                                                            '[scaledOne][scaledTwo]hstack=inputs=2,format=yuv420p')
-        self.video_ftype: tuple[str] = kwargs.get('video_ftype', ('.mkv', '.avi'))
-        self.video_output_ftype: str = kwargs.get('video_output_ftype', 'avi')
+        self.video_in_ftype: tuple[str] = kwargs.get('video_in_ftype', ('.mkv', '.avi'))
+        self.video_out_ftype: str = kwargs.get('video_out_ftype', 'mp4')
         self.video_codec: str = kwargs.get('video_codec', 'libx264')
-        self.video_crf: str = kwargs.get('video_crf', '18')
-        self.video_preset: str = kwargs.get('video_preset', 'ultrafast')
+        self.video_bitrate: str = kwargs.get('video_bitrate', '1500k')
+        self.video_px_fmt: str = kwargs.get('video_px_fmt', 'yuv420p')
+        self.video_resolution: str = kwargs.get('video_resolution', '1280:720')
+        self.video_crf: str = str(kwargs.get('video_crf', 28))
+        self.video_fps: str = str(kwargs.get('video_fps', 30))
+        self.duo_1_crf_mod: int = kwargs.get('duo_1_crf_mod', 4)
+        self.video_crop: str = str(kwargs.get('video_crop', 13))
+        self.duo_1_video_crop: str = str(kwargs.get('duo_1_video_crop', 31))
+        self.video_border_width: int = str(kwargs.get('video_border_width', 5))
+        # FFmpeg attributes
+        self.ffmpeg_filter = kwargs.get(
+            'ffmpeg_filter',
+            f"[0]crop=iw-{self.video_crop}:ih-{self.video_crop}:0:0,"
+            f"scale={self.video_resolution},pad=iw+{self.video_border_width}:color=black[vidL];"
+            f"[1]crop=iw-{self.video_crop}:ih-{self.video_crop}:0:0,"
+            f"scale={self.video_resolution},pad=iw+{self.video_border_width}:color=black[vidR];"
+            f"[vidL][vidR]hstack=inputs=2,format={self.video_px_fmt}[vid];"
+            "[2]dynaudnorm=f=100:maxgain=5:gausssize=31[audL];"
+            "[3]dynaudnorm=f=100:maxgain=5:gausssize=21[audR];"
+            "[audL][audR]amix=inputs=2:duration=longest[aud]",
+        )
+        self.ffmpeg_preset: str = kwargs.get('ffmpeg_preset', 'ultrafast')
+        self.input_ts: int = kwargs.get('input_ts', '00:00:06')
+        self.output_ts: float = kwargs.get('output_ts', '00:01:38')
         # The dictionary containing all of our matched filenames that will be used to create combined videos
         self.fname_dic: dict = self._get_matched_fnames()
 
@@ -78,12 +97,12 @@ class AVMuxer:
                 key = self._get_dict_key(dirpath)
                 if key not in dic:
                     dic[key] = {}
-                if filename.endswith(self.audio_ftype):
+                if filename.endswith(self.audio_in_ftype):
                     ins = 'keys' if 'keys' in filename.lower() else 'drums'
                     if self.ext[f'{ins}_audio'] not in filename:
                         continue
                     dic[key][self._get_audio_fpath(filename)] = join
-                elif filename.endswith(self.video_ftype):
+                elif filename.endswith(self.video_in_ftype):
                     if key[1] == '1':
                         ins = 'drums' if 'cam1' in filename else 'keys'
                     else:
@@ -126,44 +145,22 @@ class AVMuxer:
         elif 'Drums' in filename:
             return 'drms_wav'
 
-    def _get_ffmpeg_kwargs(
-            self
-    ) -> dict:
-        """
-        Returns a dictionary of keyword arguments for use in subprocess.command processes piped to FFMPEG
-        """
-        # These arguments tell Python not to log from FFMPEG
-        if not self.report_ffmpeg:
-            return dict(stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-        else:
-            return dict()
-
     def mux_all_performances(
-            self, duos: tuple = (1, 2, 3, 4, 5)
+            self, duos: tuple = (1, 2, 3, 4, 5),
     ) -> None:
         """
-        Muxes all performances together
+        Muxes all performances together. Duos should be an iterable containing the duo numbers we want to mux.
         """
         if self.logger is not None:
-            self.logger.info(f'Muxing all performances!')
-        # Iterate through all of our performances
-        for k, v in self.fname_dic.items():
-            # If we're skipping over this duo, continue on
-            if int(k[1]) not in duos:
-                continue
-            if self.logger is not None:
-                self.logger.info(f'Muxing: {k}')
-            # Get all of our filenames
-            audio_fname = fr'{self.output_dir}\{k}_audio.{self.audio_output_ftype}'
-            video_fname = fr'{self.output_dir}\{k}_video.{self.video_output_ftype}'
-            all_fname = fr'{self.output_dir}\{k}_k{self.keys_ext.lower()}_d{self.drms_ext.lower()}.avi'
-            # Mux the audio and video separately
-            self._mux_audio(v, audio_fname)
-            self._mux_video(v, video_fname)
-            # Mux the audio and video together
-            self._mux_audio_video(all_fname, video_fname, audio_fname)
-            # Cleanup the interim files
-            self._cleanup_interim_files([audio_fname, video_fname])
+            self.logger.info(f'Muxing performances by duos {duos}!')
+        # Get the performances we want to mux
+        performances_to_mux = {k: v for k, v in self.fname_dic.items() if int(k[1]) in duos}
+        for num, (k, v) in enumerate(performances_to_mux.items()):
+            self._log_progress_bar(current=num, end=len(performances_to_mux), perf=f'Muxing ({k})')
+            # Get the filename
+            fname = fr'{self.output_dir}\{k}_k{self.keys_ext.lower()}_d{self.drms_ext.lower()}.{self.video_out_ftype}'
+            # Mux the individual audio and video files together
+            self._mux_performance(k, v, fname, )
         if self.logger is not None:
             self.logger.info(f'Muxing finished!')
 
@@ -180,70 +177,114 @@ class AVMuxer:
             os.makedirs(new_dir)
         return new_dir
 
-    def _mux_audio(
-            self, v: dict, fname: str,
+    def _log_progress_bar(
+            self, current: float, end: float, perf: str
     ) -> None:
         """
-        Combines both audio files together
+        Logs current progress of the ffmpeg conversion, including current time, overall duration, and a progress bar
         """
-        command = [
-            'ffmpeg',  # Opens FFMPEG
-            '-i', v["keys_wav"],  # Keys wav as input
-            '-i', v["drms_wav"],  # Drums wav as input
-            '-filter_complex', self.audio_filter,  # Output as mix
-            fname, '-y'  # Output directory, overwrite if needed
-        ]
-        subprocess.call(command, **self.subprocess_kwargs)
+        def bar() -> str:
+            # Get our current progress percentage
+            perc = (current / end) * 100
+            # Get the nearest ten of our current progress, for conversion to progress bar
+            nearest_ten = int(10 * math.ceil(float(perc) / 10))
+            # Return our progress bar
+            return f'[{("=" * int(nearest_ten / 10)) + (" " * (10 - int(nearest_ten / 10)))} {round(perc, 2)}%]'
 
-    def _mux_video(
-            self, v: dict, fname: str,
+        if self.logger is not None:
+            self.logger.info(f'{perf}: {bar()} (completed: {current}, total: {end})')
+
+    @staticmethod
+    def _read_timedelta(
+            line: str
+    ) -> float:
+        """
+        Converts the reported time in ffmpeg to a Python timedelta object and gets number of seconds
+        """
+        reg = re.search('\d\d:\d\d:\d\d', line)
+        try:
+            x = time.strptime(reg.group(0), '%H:%M:%S')
+            return datetime.timedelta(hours=x.tm_hour, minutes=x.tm_min, seconds=x.tm_sec).total_seconds()
+        except AttributeError:
+            return None
+
+    def _read_ffmpeg_output(
+            self, process: subprocess.Popen, k: str, timeout_mins: int = 3
+    ):
+        """
+        Reads the output from ffmpeg, line by line, and logs a progress bar
+        """
+        duration = []
+        start = time.time() + (timeout_mins * 60)
+        while True:
+            if time.time() > start:
+                self.logger.warning(f'{k}: encoding timed out!')
+                break
+            # Read a line from the subprocess
+            line = process.stdout.readline()
+            # Break out of the loop once we no longer receive lines from ffmpeg
+            if not line:
+                break
+            # Try and convert the line into a timedelta object
+            td = self._read_timedelta(line)
+            # The first few lines of the ffmpeg output, i.e. the duration of each input object
+            # The current process of ffmpeg
+            if 'Duration' in line:
+                duration.append(td)
+            if 'time' in line and self.log_individual_progress and td is not None:
+                self._log_progress_bar(current=td, end=max(duration), perf=k)
+
+    def _get_video_crop_params(
+            self, perf: str,
+    ) -> tuple:
+        """
+
+        """
+        if int(perf[1]) == 1:
+            return self.ffmpeg_filter.replace(f":ih-{self.video_crop}", f":ih-{self.duo_1_video_crop}")
+        else:
+            return self.ffmpeg_filter
+
+    def _mux_performance(
+            self, k: str, v: dict, fname: str,
     ) -> None:
         """
         Combine both video files together
         """
+        filt = self._get_video_crop_params(perf=k)
+        # Initialise our ffmpeg command
         command = [
             'ffmpeg',   # Opens FFMPEG
             '-i', v["keys_vid"],    # Keys video filepath
             '-i', v["drms_vid"],    # Drums video filepath
-            '-filter_complex', self.video_filter,   # Output both videos side-by-side
-            '-c:v', self.video_codec,   # Select video codec, default lib x 264
-            '-crf', self.video_crf,     # Select video crf, default 18
-            '-preset', self.video_preset,   # Select video output preset, default ultrafast
-            fname, '-y'     # Output directory, overwrite if needed
+            '-i', v['keys_wav'],    # Keys audio filepath
+            '-i', v['drms_wav'],    # Drums audio filepath
+            '-filter_complex', filt,    # Ffmpeg filter
+            '-map', '[vid]',    # Maps video files
+            '-map', '[aud]',    # Maps audio files
+            '-b:v', self.video_bitrate,     # Sets video bitrate, default 1200kbps
+            '-c:a', self.audio_codec,   # Select audio codec, default aac
+            '-c:v', self.video_codec,   # Select video codec, default libx264
+            '-crf', self.video_crf if int(k[1]) != 1 else str(int(self.video_crf) + self.duo_1_crf_mod),
+            '-preset', self.ffmpeg_preset,   # Select video output preset, default ultrafast
+            '-r', self.video_fps,
+            fname, '-y'
         ]
-        subprocess.call(command, **self.subprocess_kwargs)
+        # Run the process, with the required kwargs for realtime logging
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+        # Start to read our ffmpeg output and log in the console
+        self._read_ffmpeg_output(process, k)
+        self._check_filesize(fname, k)
 
-    def _mux_audio_video(
-            self, fname: str, video_fname: str, audio_fname: str,
-    ) -> None:
+    def _check_filesize(
+            self, fname: str, performance: str, max_fsize: int = 75
+    ):
         """
-        Muxes together the muxed video and audio files
+        Checks size of a muxed video and raises a warning if it's suspicously large (encoding issue)
         """
-        # Combine video and audio
-        command = [
-            'ffmpeg',   # Opens FFMPEG
-            '-i', video_fname,    # Video filepath
-            '-i', audio_fname,    # Audio file[ath
-            '-c:v', 'copy',     # Copies the video output filetype
-            '-c:a', self.audio_output_ftype,    # Sets audio output filetype
-            fname, '-y'     # Output directory, overwrite if needed
-        ]
-        subprocess.call(command, **self.subprocess_kwargs)
-
-    @staticmethod
-    def _cleanup_interim_files(
-            files: list
-    ) -> None:
-        """
-        Removes interim audio and video files
-        """
-        # Iterate through files passed in as a list and try to remove them
-        for file in files:
-            try:
-                os.remove(file)
-            # We use the try-except block in case the interim file is missing, for whatever reason
-            except OSError:
-                pass
+        fsize = os.path.getsize(fname) >> 20
+        if fsize > max_fsize and self.logger is not None:
+            self.logger.warning(f'{performance}: size is suspicously large ({fsize} MB), check output!')
 
 
 def generate_muxed_performances(
@@ -265,5 +306,6 @@ if __name__ == '__main__':
     input_d = r"C:\Python Projects\jazz-jitter-analysis\data\raw\avmanip_output"
     output_d = r"C:\Python Projects\jazz-jitter-analysis\data\raw\muxed_performances"
     generate_muxed_performances(
-        input_d, output_d, logger_, report_ffmpeg=False, keys_ext='Live', drms_ext='Live'
+        input_d, output_d, logger_, keys_ext='Delay', drms_ext='Delay', video_crf=28, video_codec='libx264',
+        video_out_ftype='mp4', ffmpeg_preset='ultrafast', log_individual_progress=False, audio_codec='aac'
     )
