@@ -162,7 +162,7 @@ class LinePlotJitterMeasurement(vutils.BasePlot):
             ax.set_aspect('equal', adjustable='box')
             ax.set_xticks(np.linspace(0, 90, 4))
             ax.set_title(tit, x=0., y=1.15, fontsize=vutils.FONTSIZE + 5, fontweight='bold')
-        self.main_ax[0].set_xlabel('Time (s)', fontsize=vutils.FONTSIZE + 3)
+        self.main_ax[0].set_xlabel('Call duration (s)', fontsize=vutils.FONTSIZE + 3)
 
     def _format_ax(
             self
