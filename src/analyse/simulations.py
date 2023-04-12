@@ -429,7 +429,7 @@ def generate_phase_correction_simulations_for_individual_conditions(
 def generate_phase_correction_simulations_for_coupling_parameters(
         mds: list[PhaseCorrectionModel], output_dir: str, logger=None, force_rebuild: bool = False,
         num_simulations: int = autils.NUM_SIMULATIONS
-) -> list[Simulation]:
+) -> tuple[list[Simulation], str]:
     """
     Create simulated performances across a range of artificial coupling parameters for every phase correction model
     """
@@ -446,8 +446,9 @@ def generate_phase_correction_simulations_for_coupling_parameters(
     if not force_rebuild:
         all_sims = autils.load_from_disc(output_dir, filename='phase_correction_sims_average.p')
         # If we've successfully loaded models, return these straight away
-        if all_sims is not None:
-            return all_sims
+        if all_sims is not None and isinstance(all_sims, list):
+            if len(all_sims) != 0:
+                return all_sims, '...skipping generation, simulations loaded from disc!'
     # Create the dataframe
     df = pd.concat(
         [pd.concat([pd.DataFrame([pcm.keys_dic]), pd.DataFrame([pcm.drms_dic])]) for pcm in mds]
@@ -473,7 +474,7 @@ def generate_phase_correction_simulations_for_coupling_parameters(
             all_sims.append(sim)
         # Create the grouped phase correction model, across all trials
         pcm_a = grouper(grp)
-        # Set our intercepts to 0 and our trial metadata to 0 (helpful when logging)
+        # Set our trial metadata to 0 (helpful when logging)
         pcm_a['trial'] = 0
         # Create our anarchy model: both coupling coefficients set to 0
         anarchy_md = pcm_a.copy()
@@ -504,8 +505,8 @@ def generate_phase_correction_simulations_for_coupling_parameters(
             sim.create_all_simulations()
             all_sims.append(sim)
     # Pickle the result -- this can be quite large, if we're creating lots of simulations!
-    pickle.dump(all_sims, open(f"{output_dir}\\phase_correction_sims_average.p", "wb"))
-    return all_sims
+    pickle.dump(all_sims, open(f"{output_dir}\\phase_correction_sims.p", "wb"))
+    return all_sims, f'...simulations generated and saved as {output_dir}\\phase_correction_sims.p'
 
 
 if __name__ == '__main__':

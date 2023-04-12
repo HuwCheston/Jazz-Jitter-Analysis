@@ -654,16 +654,17 @@ class PhaseCorrectionModel:
 
 def generate_phase_correction_models(
         raw_data: list, output_dir: str, logger=None, force_rebuild: bool = False
-) -> list[PhaseCorrectionModel]:
+) -> tuple[list[PhaseCorrectionModel], str]:
     """
-    Generates all phase correction models
+    Generates all phase correction models. Returns the models and a string for logging
     """
     # Try and load the models from the disk to save time, unless we're forcing them to rebuild anyway
     if not force_rebuild:
         mds = autils.load_from_disc(output_dir, filename='phase_correction_mds.p')
         # If we've successfully loaded models, return these straight away
-        if mds is not None:
-            return mds
+        if mds is not None and isinstance(mds, list):
+            if len(mds) != 0:
+                return mds, '...skipping generation, models loaded from disc!'
     # Create an empty list to store our models
     res = []
     # Iterate through each conditions
@@ -680,7 +681,7 @@ def generate_phase_correction_models(
             res.append(pcm)
     # Pickle the results so we don't need to create them again
     pickle.dump(res, open(f"{output_dir}\\phase_correction_mds.p", "wb"))
-    return res
+    return res, f'...models generated and saved as {output_dir}\\phase_correction_mds.p'
 
 
 if __name__ == '__main__':

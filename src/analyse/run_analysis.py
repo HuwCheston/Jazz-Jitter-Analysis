@@ -31,22 +31,15 @@ def main(
 
     # CREATE MODELS #
     logger.info(f'Generating phase correction models...')
-    mds = generate_phase_correction_models(data, logger=logger, output_dir=output_filepath, force_rebuild=False)
-    logger.info(f'... models generated!')
+    mds, md_inf = generate_phase_correction_models(data, logger=logger, output_dir=output_filepath, force_rebuild=False)
+    logger.info(md_inf)
 
     # CREATE SIMULATIONS WITH COUPLING PARAMETERS - ANARCHY, DEMOCRACY ETC. #
-    logger.info(f'Generating phase correction simulations with coupling parameters...')
-    generate_phase_correction_simulations_for_coupling_parameters(
-        mds, output_dir=output_filepath, logger=logger, force_rebuild=False, num_simulations=100
-    )
-    logger.info(f'... simulations with parameters generated!')
-
-    # CREATE SIMULATIONS USING ORIGINAL COUPLING FROM EACH PERFORMANCE #
-    logger.info(f'Generating original phase correction simulations...')
-    generate_phase_correction_simulations_for_individual_conditions(
+    logger.info(f'Generating {autils.NUM_SIMULATIONS} simulations for each coupling parameter and condition...')
+    sims, sim_info = generate_phase_correction_simulations_for_coupling_parameters(
         mds, output_dir=output_filepath, logger=logger, force_rebuild=False, num_simulations=autils.NUM_SIMULATIONS
     )
-    logger.info(f'... original simulations generated!')
+    logger.info(sim_info)
 
 
 if __name__ == '__main__':
