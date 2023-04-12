@@ -21,7 +21,7 @@ from src.visualise.simulations_graphs import *
 
 @click.command()
 @click.option('-i', 'input_filepath', type=click.Path(exists=True), default='models')
-@click.option('-o', 'output_filepath', type=click.Path(exists=True), default=r'figures\reports')
+@click.option('-o', 'output_filepath', type=click.Path(exists=True), default=r'reports\figures')
 def main(input_filepath, output_filepath):
     """
     Runs data processing scripts to turn raw data from (../raw) into

@@ -6,8 +6,8 @@ import pickle
 from datetime import timedelta
 import statsmodels.formula.api as smf
 
-import analysis_utils as autils
-from phase_correction_models import PhaseCorrectionModel
+import src.analyse.analysis_utils as autils
+from src.analyse.phase_correction_models import PhaseCorrectionModel
 
 # Define the objects we can import from this file into others
 __all__ = [
