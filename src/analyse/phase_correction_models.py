@@ -679,7 +679,7 @@ def generate_phase_correction_models(
             res.append(pcm)
     # Pickle the results so we don't need to create them again
     pickle.dump(res, open(f"{output_dir}\\phase_correction_mds.p", "wb"))
-    return res, f'...models generated and saved in {output_dir}\\phase_correction_mds.p'
+    return res, f'...models saved in {output_dir}\\phase_correction_mds.p'
 
 
 if __name__ == '__main__':

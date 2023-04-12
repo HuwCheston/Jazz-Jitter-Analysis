@@ -20,8 +20,8 @@ from src.visualise.simulations_graphs import *
 
 
 @click.command()
-@click.argument('input_filepath', type=click.Path(exists=True))
-@click.argument('output_filepath', type=click.Path(exists=True))
+@click.option('-i', 'input_filepath', type=click.Path(exists=True), default='models')
+@click.option('-o', 'output_filepath', type=click.Path(exists=True), default=r'figures\reports')
 def main(input_filepath, output_filepath):
     """
     Runs data processing scripts to turn raw data from (../raw) into
@@ -32,36 +32,45 @@ def main(input_filepath, output_filepath):
 
     # LOAD DATA AND PREPARE #
     # Load the data in as list of lists of dictionaries (one list per trial, one dictionary per condition)
-    logger.info(f'loading models and simulations...')
+    logger.info(f'loading models...')
     mds = autils.load_from_disc(input_filepath, filename='phase_correction_mds.p')
-    sims_indiv = autils.load_from_disc(input_filepath, filename='phase_correction_sims.p')
-    sims_params = autils.load_from_disc(input_filepath, filename='phase_correction_sims_average.p')
+    logger.info(f'... loaded {len(mds)} models!')
+    logger.info(f'loading simulations...')
+    sims_params = autils.load_from_disc(input_filepath, filename='phase_correction_sims.p')
+    logger.info(f'... loaded {len(sims_params)} simulations!')
 
     # GENERATE PERFORMANCE SUCCESS PLOTS #
     # ALL METRICS TOGETHER #
     logger.info(f'generating plots for all metrics...')
     generate_all_metrics_plots(mds, output_filepath)
+    logger.info(f'... done!')
     # TEMPO SLOPE #
     logger.info(f'generating plots for tempo slope metric...')
     generate_tempo_slope_plots(mds, output_filepath)
+    logger.info(f'... done!')
     # TIMING IRREGULARITY #
     logger.info(f'generating plots for timing irregularity metric...')
     generate_tempo_stability_plots(mds, output_filepath)
+    logger.info(f'... done!')
     # ASYNCHRONY #
     logger.info(f'generating plots for asynchrony metric...')
     generate_asynchrony_plots(mds, output_filepath)
+    logger.info(f'... done!')
     # SUCCESS #
     logger.info(f'generating plots for self-reported success metric...')
     generate_questionnaire_plots(mds, output_filepath)
+    logger.info(f'... done!')
 
     # GENERATE PHASE CORRECTION PLOTS #
     logger.info(f'generating plots for phase correction models...')
     generate_phase_correction_plots(mds, output_filepath)
+    logger.info(f'... done!')
 
     # GENERATE SIMULATION PLOTS #
     logger.info(f'generating plots for simulations...')
-    generate_plots_for_individual_performance_simulations(sims_indiv, output_filepath)
+    # generate_plots_for_individual_performance_simulations(sims_indiv, output_filepath)
     generate_plots_for_simulations_with_coupling_parameters(sims_params, output_filepath)
+    logger.info(f'... done!')
 
 
 if __name__ == '__main__':
