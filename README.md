@@ -1,6 +1,6 @@
 # Code from: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances
 
-This repository is associated with the paper “Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances”, published in JOURNAL, and includes scripts for reproducing the analysis, computer simulations, and graphs contained in this paper. The corresponding dataset, comprising audio and video recordings of 130 individual performances, biometric data, and subjective evaluations and comments from both the musicians and listeners recruited in a separate perceptual study, is hosted on Zenodo at [10.5281/zenodo.7773824](https://doi.org/10.5281/zenodo.7773824)
+This repository is associated with the paper “Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances”, published in JOURNAL, and includes scripts for reproducing the analysis, computer simulations, audio-video stimuli, and graphs contained in this paper. The corresponding dataset, comprising audio and video recordings of 130 individual performances, biometric data, and subjective evaluations and comments from both the musicians and listeners recruited in a separate perceptual study, is hosted on Zenodo at [10.5281/zenodo.7773824](https://doi.org/10.5281/zenodo.7773824)
 
 ## Requirements
 - Windows (other operating systems may work but are not tested)
@@ -14,9 +14,9 @@ This repository is associated with the paper “Leader-Follower Relationships Op
 git clone https://github.com/HuwCheston/Jazz-Jitter-Analysis
 ```
 
-2. Download the dataset from [Zenodo](https://doi.org/10.5281/zenodo.7773824). This is the **data.zip** file and the 6 corresponding volumes, **data.z01 – data.z06**
+2. Download our data from [Zenodo](https://doi.org/10.5281/zenodo.7773824). You'll need the **data.zip** file and the 6 corresponding volumes, **data.z01 – data.z06**
     
-    *You do not need to download the file perceptual_study_videos.rar unless you wish to replicate the perceptual component of the paper, the code for which is hosted in a separate repository acccessible [via this link](https://github.com/HuwCheston/2023-duo-success-analysis).* The instructions in the section 
+    *You do not need to download the file perceptual_study_videos.rar unless you wish to replicate the perceptual component of the paper, the code for which is hosted in a separate repository acccessible [via this link](https://github.com/HuwCheston/2023-duo-success-analysis).* The instructions in the section **Reproduce audio-visual stimuli from perceptual component** show how to recreate the stimuli contained in this file from the raw data.
     
 3. Open the data.zip file (you may need to install a tool for opening multi-part zip files, such as [WinRAR](https://www.win-rar.com/)) and extract the contents into \data\raw. This folder should then look like:
     ```
@@ -64,11 +64,30 @@ git clone https://github.com/HuwCheston/Jazz-Jitter-Analysis
     run.cmd
     ```
 
-    This script will create a new virtual environment, install the required packages into it, create the final dataset from the raw data dump, create the models and simulations from the dataset, and finally create the graphs used in the original paper. Once the command has finished, you can access the final dataset in \data\processed, the models and simulations in \models, and the graphs in \figures\reports. The dataset, models, and simulations are saved as [Python pickle files](https://docs.python.org/3/library/pickle.html) and can be unserialized using any appropriate module e.g. [Dill](https://dill.readthedocs.io/en/latest/). The graphs are saved as .png and .svg files which can be opened in many applications. 
+    This script will first create a new virtual environment in the repository root folder and install the required dependencies into it. It will then create the final dataset from the raw data dump downloaded above, create the models and simulations from the dataset, and finally create the figures used in the original paper and supplementary material. Generating the models is fairly quick and optimised (on a system with a 2.6GHz CPU and 16GB of RAM, it takes about three minutes), but generating the simulations will typically take a lot longer; probably at least twenty minutes. 
+    
+5. Once the command has finished, you can access the final dataset in \data\processed, the models and simulations in \models, and the figures in \figures\reports. The dataset, models, and simulations are saved as [Python pickle files](https://docs.python.org/3/library/pickle.html) and can be unserialized using any appropriate module e.g. [Dill](https://dill.readthedocs.io/en/latest/). For instance, to read in the simulations and print summary results:
 
-    Generating the models is fairly quick (takes approximately 3 minutes with 2.6GHz CPU, 16GB RAM), however generating the simulations will typically take a lot longer (20 minutes+). To speed things up, the script will not attempt to rebuild the processed dataset, models, or simulations if it detects these have already been created. This can help e.g. if you wish to adjust simulation parameters without rebuilding the entire set of models. To force a rebuild you'll need to delete the processed files in the above folders.
+    ```
+    # These lines are necessary when unpickling custom classes
+    import sys
+    import os
+    sys.path.append(os.path.join(os.getcwd(), 'src\\analyse'))
+    
+    # Load in the simulations
+    import pickle
+    sims = pickle.load(open("\models\phase_correction_sims.p", "rb"))
+    
+    # Get all the results dictionaries and convert to a dataframe
+    import pandas as pd
+    df_avg = pd.DataFrame([sim.results_dic for sim in sims])
+    ```
 
-### Reproduce audio-visual stimuli from perceptual component
+    The figures are saved as .png and .svg files which can be opened in many different applications. 
+
+6. The script will not attempt to rebuild the processed dataset, models, or simulations if it detects that these have already been created. This can help e.g. if you wish to adjust simulation parameters without rebuilding the entire set of models. To force a rebuild you'll need to delete the processed files in the above folders.
+
+### Reproduce audio-visual stimuli from perceptual component of paper
 The raw dataset contains separate audio and video files (both with and without latency/jitter) for each performer inside the \data\raw\avmanip_output folder. These can be combined to create muxed audio-video recordings, i.e. a single video file containing both audio and video tracks, sync'ed together, with any combination of live or delayed audio/video. The perceptual component of this study used the delayed audio and video from both the pianist and drummer.
 
 1. Follow steps 1–3 in the section **Reproduce models, simulations, and figures from original paper**. You don't need to build the models or simulations, just get the data into the correct place within the overall filestructure.
