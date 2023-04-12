@@ -76,11 +76,10 @@ target/
 .ipynb_checkpoints/
 
 # exclude data from source control by default
-# /data/*
-# however, include the cleaned midi bpm files for now
-# !/data/raw/
-# /data/raw/*
-# !/data/raw/midi_bpm_cleaning/
+/data
+
+# exclude deprecated analysis files
+/src/_deprecated
 
 # Mac OS-specific storage files
 .DS_Store
@@ -101,3 +100,14 @@ target/
 *.png
 *.jpg
 *.csv
+*.rpp
+*.rpp-bak
+*.p
+*.iom
+*.html
+*.svg
+*.cff
+*.rar
+*.pdf
+*.sib
+*.mp3

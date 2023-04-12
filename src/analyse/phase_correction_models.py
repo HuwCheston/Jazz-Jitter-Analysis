@@ -10,7 +10,7 @@ from sklearn.covariance import EllipticEnvelope
 from pingouin import partial_corr
 from datetime import timedelta
 
-import src.analyse.analysis_utils as autils
+import analysis_utils as autils
 
 # Define the objects we can import from this file into others
 __all__ = [

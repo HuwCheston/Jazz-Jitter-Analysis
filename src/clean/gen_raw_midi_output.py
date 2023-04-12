@@ -1,6 +1,6 @@
 import os
 
-from src.clean.gen_pm_output import return_formatted_dic_from_filename, return_list_of_trials, \
+from gen_pm_output import return_formatted_dic_from_filename, return_list_of_trials, \
     return_pm_output, clean_pm_output
 
 

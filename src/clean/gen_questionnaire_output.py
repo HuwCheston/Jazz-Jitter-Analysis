@@ -49,7 +49,7 @@ def gen_questionnaire_output(input_dir) -> list:
     """Clean questionnaire output: return as list of dataframes, one dataframe per trial (both participants)"""
     # Read the excel spreadsheet created by Qualtrics
     df = pd.read_excel(
-        f'{input_dir}/questionnaire/questionnaire_raw.xlsx',
+        f'{input_dir}/questionnaire_anonymised.xlsx',
         engine="openpyxl",
         skiprows=1,
         index_col=22

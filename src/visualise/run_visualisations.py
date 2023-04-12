@@ -28,31 +28,38 @@ def main(input_filepath, output_filepath):
     cleaned data ready to be analyzed (saved in ../processed).
     """
     logger = logging.getLogger(__name__)
-    logger.info(f'running analysis scripts on processed data in {input_filepath}')
+    logger.info(f'generating graphs from models in {input_filepath}')
 
     # LOAD DATA AND PREPARE #
     # Load the data in as list of lists of dictionaries (one list per trial, one dictionary per condition)
-    logger.info(f'loading data...')
+    logger.info(f'loading models and simulations...')
     mds = autils.load_from_disc(input_filepath, filename='phase_correction_mds.p')
     sims_indiv = autils.load_from_disc(input_filepath, filename='phase_correction_sims.p')
     sims_params = autils.load_from_disc(input_filepath, filename='phase_correction_sims_average.p')
 
     # GENERATE PERFORMANCE SUCCESS PLOTS #
     # ALL METRICS TOGETHER #
+    logger.info(f'generating plots for all metrics...')
     generate_all_metrics_plots(mds, output_filepath)
     # TEMPO SLOPE #
+    logger.info(f'generating plots for tempo slope metric...')
     generate_tempo_slope_plots(mds, output_filepath)
     # TIMING IRREGULARITY #
+    logger.info(f'generating plots for timing irregularity metric...')
     generate_tempo_stability_plots(mds, output_filepath)
     # ASYNCHRONY #
+    logger.info(f'generating plots for asynchrony metric...')
     generate_asynchrony_plots(mds, output_filepath)
     # SUCCESS #
+    logger.info(f'generating plots for self-reported success metric...')
     generate_questionnaire_plots(mds, output_filepath)
 
     # GENERATE PHASE CORRECTION PLOTS #
+    logger.info(f'generating plots for phase correction models...')
     generate_phase_correction_plots(mds, output_filepath)
 
     # GENERATE SIMULATION PLOTS #
+    logger.info(f'generating plots for simulations...')
     generate_plots_for_individual_performance_simulations(sims_indiv, output_filepath)
     generate_plots_for_simulations_with_coupling_parameters(sims_params, output_filepath)
 

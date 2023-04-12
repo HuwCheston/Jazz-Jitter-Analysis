@@ -4,10 +4,10 @@ import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
-from src.clean.gen_pm_output import gen_pm_output
-from src.clean.gen_raw_midi_output import gen_raw_midi_output
-from src.clean.gen_questionnaire_output import gen_questionnaire_output
-from src.clean.combine_output import combine_output
+from gen_pm_output import gen_pm_output
+from gen_raw_midi_output import gen_raw_midi_output
+from gen_questionnaire_output import gen_questionnaire_output
+from combine_output import combine_output
 
 
 @click.command()

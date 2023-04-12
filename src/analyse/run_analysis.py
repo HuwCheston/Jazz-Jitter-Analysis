@@ -4,9 +4,9 @@ import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
-import src.analyse.analysis_utils as autils
-from src.analyse.phase_correction_models import *
-from src.analyse.simulations import *
+import analysis_utils as autils
+from phase_correction_models import *
+from simulations import *
 
 
 @click.command()

@@ -68,8 +68,7 @@ def get_data_from_pm_object(pm) -> list:
 def clean_pm_output(i: str, trial: list, dic_name: str = 'midi_bpm') -> list:
     """Clean raw prettymidi output: truncate start and stop times, map midi notes onto musical notes..."""
     # Get midi mappings for each instrument as dictionary
-    get_map = lambda s: pd.read_csv(f"{i}/midi_mappings/{s}_midi_mapping.csv", header=None,
-                                    index_col=0).squeeze("columns").to_dict()
+    get_map = lambda s: pd.read_csv(f"{i}/{s}_midi_mapping.csv", header=None, index_col=0).squeeze("columns").to_dict()
     keys_map = get_map('keys')
     drums_map = get_map('drums')
     # Iterate through all conditions and add clean data as key to dictionary
