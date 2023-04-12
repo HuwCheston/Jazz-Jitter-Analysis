@@ -1,4 +1,3 @@
-from pathlib import Path
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm, ListedColormap
 from matplotlib.cm import ScalarMappable
@@ -8,13 +7,13 @@ from datetime import timedelta
 import numpy as np
 import pandas as pd
 import functools
-import dill as pickle
 import sys
-import src.analyse.phase_correction_models
+import os
+import dill as pickle
+from pathlib import Path
 
-sys.path.append('src/analyse/phase_correction_models')
-
-
+# This is necessary to solve issues with unpickling our phase_correction_mds and phase_correction_sims
+sys.path.append(os.path.join(Path(__file__).parents[2], 'src\\analyse'))
 
 # Define constants
 WIDTH = 6.2677165
