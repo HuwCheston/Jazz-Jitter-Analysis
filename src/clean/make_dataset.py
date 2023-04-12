@@ -11,8 +11,8 @@ from combine_output import combine_output
 
 
 @click.command()
-@click.argument('input_filepath', type=click.Path(exists=True))
-@click.argument('output_filepath', type=click.Path(exists=True))
+@click.option('-i', 'input_filepath', type=click.Path(exists=True), default=r'data\raw')
+@click.option('-o', 'output_filepath', type=click.Path(exists=True), default='data\processed')
 def main(input_filepath, output_filepath):
     """
     Runs data processing scripts to turn raw data from (../raw) into
@@ -26,22 +26,22 @@ def main(input_filepath, output_filepath):
     # Generate and clean questionnaire data
     logger.info('generating questionnaire...')
     output['quest'] = gen_questionnaire_output(input_dir=input_filepath,)
-    logger.info('... questionnaire generated!')
+    logger.info('... done!')
 
     # Generate and clean raw MIDI data
     logger.info('generating raw MIDI data...')
     output['midi_raw'] = gen_raw_midi_output(input_dir=input_filepath)
-    logger.info('... generated raw MIDI data!')
+    logger.info('... done!')
 
     # Generate and clean MIDI BPM data
     logger.info('generating MIDI quarter note data...')
     output['midi_bpm'] = gen_pm_output(input_dir=input_filepath,)
-    logger.info('... generated MIDI quarter note data')
+    logger.info('... done!')
 
     # Combine outputs, save, and cleanup
-    logger.info('combining all outputs and saving...')
+    logger.info('combining all outputs and saving final dataset...')
     raw_data = combine_output(input_dir=input_filepath, output_dir=output_filepath, **output)
-    logger.info(f'... final data set saved in {output_filepath}')
+    logger.info(f'... saved in {output_filepath}')
     return raw_data
 
 

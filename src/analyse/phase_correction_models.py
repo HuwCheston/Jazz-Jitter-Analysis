@@ -664,7 +664,7 @@ def generate_phase_correction_models(
         # If we've successfully loaded models, return these straight away
         if mds is not None and isinstance(mds, list):
             if len(mds) != 0:
-                return mds, f'... skipping generation, models loaded from {output_dir}\\phase_correction_mds.p'
+                return mds, f'... skipping, models loaded from {output_dir}\\phase_correction_mds.p'
     # Create an empty list to store our models
     res = []
     # Iterate through each condition

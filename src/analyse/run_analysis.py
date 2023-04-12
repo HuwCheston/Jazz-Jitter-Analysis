@@ -12,8 +12,6 @@ from simulations import *
 @click.command()
 @click.option('-i', 'input_filepath', type=click.Path(exists=True), default='data\processed')
 @click.option('-o', 'output_filepath', type=click.Path(exists=True), default='models')
-# @click.argument('input_filepath', type=click.Path(exists=True))
-# @click.argument('output_filepath', type=click.Path(exists=True))
 def main(
         input_filepath: str, output_filepath: str
 ) -> None:
