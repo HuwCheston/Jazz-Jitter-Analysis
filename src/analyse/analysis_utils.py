@@ -459,6 +459,7 @@ def log_model(
     """
     if logger is not None:
         logger.info(
+            'modelling :-'
             f'duo: {md["trial"]}, '
             f'session: {md["block"]}, '
             f'latency: {md["latency"]}, '
@@ -474,6 +475,7 @@ def log_simulation(
     """
     if logger is not None:
         logger.info(
+            'simulating :-'
             f'duo: {int(sim.keys_pcm["trial"].iloc[0])}, '
             f'latency: {int(sim.keys_pcm["latency"].iloc[0])}, '
             f'jitter: {sim.keys_pcm["jitter"].iloc[0]}, '

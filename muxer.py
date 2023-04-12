@@ -1,10 +1,12 @@
 import subprocess
 import os
+from pathlib import Path
 import re
 import logging
 import datetime
 import time
 import math
+import click
 
 
 class AVMuxer:
@@ -26,9 +28,9 @@ class AVMuxer:
         }
 
         # Input directory where our performance audio + video is found
-        self.input_dir = input_dir
+        self.input_dir = str(Path(os.path.dirname(os.path.realpath(__file__)) + input_dir).resolve())
         # Output directory where we'll store our combined footage
-        self.output_dir = output_dir
+        self.output_dir = str(Path(os.path.dirname(os.path.realpath(__file__)) + output_dir).resolve())
         self.output_dir = self._create_output_folder()
         # A logger we can use to provide our own messages
         self.logger = kwargs.get('logger', None)
@@ -86,6 +88,7 @@ class AVMuxer:
         dic = {}
         # Walk through our input directory
         for (dirpath, dirnames, filenames) in os.walk(self.input_dir):
+
             # Iterate through each filename in our folder
             for filename in filenames:
                 # Get our complete filepath
@@ -287,25 +290,46 @@ class AVMuxer:
             self.logger.warning(f'{performance}: size is suspicously large ({fsize} MB), check output!')
 
 
+@click.command()
+@click.option('-i', 'input_dir', default=r'\\data\\raw\\avmanip_output',
+              help=r'Input directory, defaults to \data\raw\avmanip_output')
+@click.option('-o', 'output_dir', default=r'\\data\\raw\\muxed_performances',
+              help=r'Output directory, defaults to \data\raw\muxed_performances')
+@click.option('-preset', 'ffmpeg_preset', default='ultrafast', help='FFmpeg preset, defaults to "ultrafast"')
+@click.option('-b:v', 'video_bitrate', default='1500k', help='Video bitrate, defaults to "1500k"')
+@click.option('-c:v', 'video_codec', default='libx264', help='Video codec, defaults to "libx264"')
+@click.option('-c:a', 'audio_codec', default='aac', help='Audio codec, defaults to "aac"')
+@click.option('-format', 'video_format', default='yuv420p', help='Video pixel format, defaults to "yuv420p"')
+@click.option('-scale', 'video_resolution', default='1280:720', help='Video resolution, defaults to "1280:720"')
+@click.option('-crf', 'video_crf', default=28, help='Video crf, defaults to 28')
+@click.option('-r', 'video_fps', default=30, help='Video fps, defaults to 30')
+@click.option('-bw', 'video_border_width', default=5, help='Width of border separating videos, defaults to 5')
+@click.option('--keys', 'keys_ext', default='Delay',
+              help='Keyboard audio and video type (either "Delay" or "Live"), defaults to "Delay"')
+@click.option('--drums', 'drms_ext', default='Delay',
+              help='Drums audio and video type (either "Delay" or "Live"), defaults to "Delay"')
 def generate_muxed_performances(
-        input_dir: str, output_dir: str, logger=None, **kwargs
+        input_dir: str, output_dir: str, ffmpeg_preset: str, video_bitrate: str, video_codec: str, audio_codec: str,
+        video_format: str, video_resolution: str, video_crf: int, video_fps: int, video_border_width: int,
+        keys_ext: str, drms_ext: str
 ) -> None:
     """
     Generates all muxed performances from an input and output directory
     """
-    mux = AVMuxer(input_dir, output_dir, logger=logger, **kwargs)
+    # Initialise the logger
+    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    logging.basicConfig(level=logging.INFO, format=log_fmt)
+    logger = logging.getLogger(__name__)
+    # Create the AVMuxer with required settings
+    mux = AVMuxer(
+        input_dir, output_dir, logger=logger, ffmpeg_preset=ffmpeg_preset, video_bitrate=video_bitrate,
+        video_codec=video_codec, audio_codec=audio_codec, video_format=video_format, video_resolution=video_resolution,
+        video_crf=video_crf, video_fps=video_fps, video_border_width=video_border_width,
+        keys_ext=keys_ext, drms_ext=drms_ext
+    )
+    # Mux all the performances
     mux.mux_all_performances()
 
 
 if __name__ == '__main__':
-    # Initialise the logger
-    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    logging.basicConfig(level=logging.INFO, format=log_fmt)
-    logger_ = logging.getLogger(__name__)
-    # Initialise default input and output paths and mux performances
-    input_d = r"C:\Python Projects\jazz-jitter-analysis\data\raw\avmanip_output"
-    output_d = r"C:\Python Projects\jazz-jitter-analysis\data\raw\muxed_performances"
-    generate_muxed_performances(
-        input_d, output_d, logger_, keys_ext='Delay', drms_ext='Delay', video_crf=28, video_codec='libx264',
-        video_out_ftype='mp4', ffmpeg_preset='ultrafast', log_individual_progress=False, audio_codec='aac'
-    )
+    generate_muxed_performances()
