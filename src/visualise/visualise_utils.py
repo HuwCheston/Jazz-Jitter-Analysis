@@ -8,6 +8,7 @@ from datetime import timedelta
 import numpy as np
 import pandas as pd
 import functools
+import pickle
 
 
 # Define constants
@@ -232,3 +233,19 @@ def bootstrap_mean_difference(
     low = np.quantile(diff, quantile)
     high = np.quantile(diff, 1 - quantile)
     return low, high
+
+
+def load_from_disc(
+        output_dir: str, filename: str = 'phase_correction_mds.p'
+) -> list:
+    """
+    Try and load models from disc
+    """
+    try:
+        mds = pickle.load(open(f"{output_dir}\\{filename}", "rb"))
+    # If we haven't generated the models in the first place, return None
+    except FileNotFoundError:
+        return None
+    # Else, return the models
+    else:
+        return mds

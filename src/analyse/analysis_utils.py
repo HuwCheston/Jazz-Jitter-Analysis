@@ -465,6 +465,7 @@ def log_model(
             f'jitter: {md["jitter"]}'
         )
 
+
 def log_simulation(
     sim, logger=None,
 ) -> None:

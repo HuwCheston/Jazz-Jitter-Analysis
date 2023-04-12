@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
 # Import our helper objects
-import src.analyse.analysis_utils as autils
+import src.visualise.visualise_utils as vutils
 
 # Import all graphs for performance success
 from src.visualise.all_metrics_graphs import *
@@ -33,10 +33,10 @@ def main(input_filepath, output_filepath):
     # LOAD DATA AND PREPARE #
     # Load the data in as list of lists of dictionaries (one list per trial, one dictionary per condition)
     logger.info(f'loading models...')
-    mds = autils.load_from_disc(input_filepath, filename='phase_correction_mds.p')
+    mds = vutils.load_from_disc(input_filepath, filename='phase_correction_mds.p')
     logger.info(f'... loaded {len(mds)} models!')
     logger.info(f'loading simulations...')
-    sims_params = autils.load_from_disc(input_filepath, filename='phase_correction_sims.p')
+    sims_params = vutils.load_from_disc(input_filepath, filename='phase_correction_sims.p')
     logger.info(f'... loaded {len(sims_params)} simulations!')
 
     # GENERATE PERFORMANCE SUCCESS PLOTS #
