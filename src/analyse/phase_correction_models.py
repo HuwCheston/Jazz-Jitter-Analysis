@@ -3,7 +3,7 @@ import numpy as np
 import numba as nb
 import json
 import os
-import pickle
+import dill as pickle
 import warnings
 import statsmodels.formula.api as smf
 from sklearn.covariance import EllipticEnvelope

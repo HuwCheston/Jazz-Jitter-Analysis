@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import numba as nb
 from joblib import Parallel, delayed
-import pickle
+import dill as pickle
 from datetime import timedelta
 import statsmodels.formula.api as smf
 

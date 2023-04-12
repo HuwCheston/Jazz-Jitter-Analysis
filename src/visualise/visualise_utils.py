@@ -8,7 +8,12 @@ from datetime import timedelta
 import numpy as np
 import pandas as pd
 import functools
-import pickle
+import dill as pickle
+import sys
+import src.analyse.phase_correction_models
+
+sys.path.append('src/analyse/phase_correction_models')
+
 
 
 # Define constants
