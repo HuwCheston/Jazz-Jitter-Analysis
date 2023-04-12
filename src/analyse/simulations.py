@@ -384,18 +384,6 @@ class Simulation:
         }
 
 
-def _log_simulation(
-    sim: Simulation, logger=None,
-) -> None:
-    """
-    Helper function to log metadata for a particular simulation in our GUI, if we've passed a logger function
-    """
-    if logger is not None:
-        logger.info(f'... trial {sim.keys_pcm["trial"].iloc[0]}, block {sim.keys_pcm["block"].iloc[0]}, '
-                    f'latency {sim.keys_pcm["latency"].iloc[0]}, jitter {sim.keys_pcm["jitter"].iloc[0]}, '
-                    f'parameter {sim.parameter}, original_noise {sim.use_original_noise}')
-
-
 def generate_phase_correction_simulations_for_individual_conditions(
         mds: list[PhaseCorrectionModel], output_dir: str, logger=None, force_rebuild: bool = False,
         num_simulations: int = autils.NUM_SIMULATIONS
@@ -405,7 +393,7 @@ def generate_phase_correction_simulations_for_individual_conditions(
     """
     # Try and load the models from the disk to save time, unless we're forcing them to rebuild anyway
     if not force_rebuild:
-        all_sims = autils.load_from_disc(output_dir, filename='phase_correction_sims.p')
+        all_sims = autils.load_from_disc(output_dir, filename='phase_correction_sims_orig.p')
         # If we've successfully loaded models, return these straight away
         if all_sims is not None:
             return all_sims
@@ -416,13 +404,13 @@ def generate_phase_correction_simulations_for_individual_conditions(
         sim = Simulation(
             pcm=pcm, num_simulations=num_simulations, parameter='original', leader=None, use_original_noise=True
         )
-        _log_simulation(sim, logger)
+        autils.log_simulation(sim, logger)
         # Create all simulations for this parameter/leader combination
         sim.create_all_simulations()
         # Append the simulation to our list
         all_sims.append(sim)
     # Pickle the result -- this will be quite large, depending on the number of simulations!
-    pickle.dump(all_sims, open(f"{output_dir}\\phase_correction_sims.p", "wb"))
+    pickle.dump(all_sims, open(f"{output_dir}\\phase_correction_sims_orig.p", "wb"))
     return all_sims
 
 
@@ -444,11 +432,14 @@ def generate_phase_correction_simulations_for_coupling_parameters(
 
     # Try and load the models from the disk to save time, unless we're forcing them to rebuild anyway
     if not force_rebuild:
-        all_sims = autils.load_from_disc(output_dir, filename='phase_correction_sims_average.p')
+        all_sims = autils.load_from_disc(output_dir, filename='phase_correction_sims.p')
         # If we've successfully loaded models, return these straight away
         if all_sims is not None and isinstance(all_sims, list):
             if len(all_sims) != 0:
-                return all_sims, '...skipping generation, simulations loaded from disc!'
+                return (
+                    all_sims,
+                    f'... skipping generation, simulations loaded from {output_dir}\\phase_correction_sims.p'
+                )
     # Create the dataframe
     df = pd.concat(
         [pd.concat([pd.DataFrame([pcm.keys_dic]), pd.DataFrame([pcm.drms_dic])]) for pcm in mds]
@@ -468,7 +459,7 @@ def generate_phase_correction_simulations_for_coupling_parameters(
                 noise=avg_noise
             )
             # Log the current duo and condition in our GUI, if we've passed a logger
-            _log_simulation(sim, logger)
+            autils.log_simulation(sim, logger)
             # Create all simulations and append the simulation object to our list
             sim.create_all_simulations()
             all_sims.append(sim)
@@ -500,7 +491,7 @@ def generate_phase_correction_simulations_for_coupling_parameters(
                 noise=avg_noise
             )
             # Log the current simulation in our GUI
-            _log_simulation(sim, logger)
+            autils.log_simulation(sim, logger)
             # Create the simulation and append to our list
             sim.create_all_simulations()
             all_sims.append(sim)

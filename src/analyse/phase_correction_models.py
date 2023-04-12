@@ -664,24 +664,22 @@ def generate_phase_correction_models(
         # If we've successfully loaded models, return these straight away
         if mds is not None and isinstance(mds, list):
             if len(mds) != 0:
-                return mds, '...skipping generation, models loaded from disc!'
+                return mds, f'... skipping generation, models loaded from {output_dir}\\phase_correction_mds.p'
     # Create an empty list to store our models
     res = []
-    # Iterate through each conditions
+    # Iterate through each condition
     for z in autils.zip_same_conditions_together(raw_data=raw_data):
         # Iterate through keys and drums performances in a condition together
         for c1, c2 in z:
             # If we've passed a logger, start logging information to keep track of the analysis
-            if logger is not None:
-                logger.info(f'... trial {c1["trial"]}, block {c1["block"]}, '
-                            f'latency {c1["latency"]}, jitter {c1["jitter"]}')
+            autils.log_model(c1, logger)
             # Create the model
-            pcm = PhaseCorrectionModel(c1, c2, model='my_next_ioi_diff~my_prev_ioi_diff+asynchrony', centre=False)
+            pcm = PhaseCorrectionModel(c1, c2)
             # Append the raw phase correction model to our list
             res.append(pcm)
     # Pickle the results so we don't need to create them again
     pickle.dump(res, open(f"{output_dir}\\phase_correction_mds.p", "wb"))
-    return res, f'...models generated and saved as {output_dir}\\phase_correction_mds.p'
+    return res, f'...models generated and saved in {output_dir}\\phase_correction_mds.p'
 
 
 if __name__ == '__main__':

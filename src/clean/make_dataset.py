@@ -20,28 +20,28 @@ def main(input_filepath, output_filepath):
     """
     # Initialise logger and output dictionary
     logger = logging.getLogger(__name__)
-    logger.info(f'making final data set from raw data in {input_filepath}')
+    logger.info(f'making final data set from raw data in {input_filepath}...')
     output = {}
 
     # Generate and clean questionnaire data
-    logger.info('Questionnaire: generating...')
+    logger.info('generating questionnaire...')
     output['quest'] = gen_questionnaire_output(input_dir=input_filepath,)
-    logger.info('Questionnaire: DONE')
+    logger.info('... questionnaire generated!')
 
     # Generate and clean raw MIDI data
-    logger.info('MIDI raw: generating...')
+    logger.info('generating raw MIDI data...')
     output['midi_raw'] = gen_raw_midi_output(input_dir=input_filepath)
-    logger.info('MIDI raw: DONE')
+    logger.info('... generated raw MIDI data!')
 
     # Generate and clean MIDI BPM data
-    logger.info('MIDI bpm: generating...')
+    logger.info('generating MIDI quarter note data...')
     output['midi_bpm'] = gen_pm_output(input_dir=input_filepath,)
-    logger.info('MIDI bpm: DONE')
+    logger.info('... generated MIDI quarter note data')
 
     # Combine outputs, save, and cleanup
     logger.info('combining all outputs and saving...')
     raw_data = combine_output(input_dir=input_filepath, output_dir=output_filepath, **output)
-    logger.info(f'final data set saved in {output_filepath}')
+    logger.info(f'... final data set saved in {output_filepath}')
     return raw_data
 
 

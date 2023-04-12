@@ -449,3 +449,32 @@ def create_one_simulation(
         if keys_data['my_onset'][i] > 100 or drms_data['my_onset'][i] > 100:
             break
     return keys_data, drms_data
+
+
+def log_model(
+    md, logger=None
+) -> None:
+    """
+    Helper function to log metadata for a particular model in our GUI, if we've passsed a logger function
+    """
+    if logger is not None:
+        logger.info(
+            f'duo: {md["trial"]}, '
+            f'session: {md["block"]}, '
+            f'latency: {md["latency"]}, '
+            f'jitter: {md["jitter"]}'
+        )
+
+def log_simulation(
+    sim, logger=None,
+) -> None:
+    """
+    Helper function to log metadata for a particular simulation in our GUI, if we've passed a logger function
+    """
+    if logger is not None:
+        logger.info(
+            f'duo: {int(sim.keys_pcm["trial"].iloc[0])}, '
+            f'latency: {int(sim.keys_pcm["latency"].iloc[0])}, '
+            f'jitter: {sim.keys_pcm["jitter"].iloc[0]}, '
+            f'paradigm: {sim.parameter}'
+        )
