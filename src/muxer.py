@@ -2,7 +2,6 @@
 
 import subprocess
 import os
-from pathlib import Path
 import re
 import logging
 import datetime
@@ -29,9 +28,9 @@ class AVMuxer:
         }
 
         # Input directory where our performance audio + video is found
-        self.input_dir = str(Path(os.path.dirname(os.path.realpath(__file__)) + input_dir).resolve())
+        self.input_dir = input_dir
         # Output directory where we'll store our combined footage
-        self.output_dir = str(Path(os.path.dirname(os.path.realpath(__file__)) + output_dir).resolve())
+        self.output_dir = output_dir
         self.output_dir = self._create_output_folder()
         # A logger we can use to provide our own messages
         self.logger = kwargs.get('logger', None)
@@ -292,9 +291,9 @@ class AVMuxer:
 
 
 @click.command()
-@click.option('-i', 'input_dir', default=r'\\data\\raw\\avmanip_output',
+@click.option('-i', 'input_dir', default=os.path.abspath(r'..\\data\\raw\\avmanip_output'),
               help=r'Input directory, defaults to \data\raw\avmanip_output')
-@click.option('-o', 'output_dir', default=r'\\data\\raw\\muxed_performances',
+@click.option('-o', 'output_dir', default=os.path.abspath(r'..\\data\\raw\\muxed_performances'),
               help=r'Output directory, defaults to \data\raw\muxed_performances')
 @click.option('-preset', 'ffmpeg_preset', default='ultrafast', help='FFmpeg preset, defaults to "ultrafast"')
 @click.option('-b:v', 'video_bitrate', default='1500k', help='Video bitrate, defaults to "1500k"')
