@@ -320,7 +320,7 @@ def generate_muxed_performances(
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
     logger = logging.getLogger(__name__)
-    logging.info("Make sure you're accessing this script from the root directory of the repository!")
+    logging.info("Make sure you're accessing this script from the root directory of the repository")
     # Create the AVMuxer with required settings
     mux = AVMuxer(
         input_dir, output_dir, logger=logger, ffmpeg_preset=ffmpeg_preset, video_bitrate=video_bitrate,
