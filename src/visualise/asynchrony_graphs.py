@@ -1,3 +1,5 @@
+"""Code for generating plots using the ensemble asynchrony success metric"""
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -123,7 +125,7 @@ def generate_asynchrony_plots(
         mds: list, output_dir: str,
 ) -> None:
     """
-
+    Generates all plots in this file, with required arguments and inputs
     """
     df = []
     for pcm in mds:

@@ -1,7 +1,14 @@
+"""Combines all outputs together"""
+
 import numpy as np
 import collections
 import itertools
 import pickle
+
+# Define the modules we can import from this file in others
+__all__ = [
+    'combine_output'
+]
 
 
 def scale_array(array, latency, jitter):

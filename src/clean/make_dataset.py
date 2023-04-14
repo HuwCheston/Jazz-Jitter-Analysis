@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
+"""Central file for running all analysis functions, called by run.cmd"""
+
 import click
 import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
-from gen_pm_output import gen_pm_output
-from gen_raw_midi_output import gen_raw_midi_output
-from gen_questionnaire_output import gen_questionnaire_output
-from combine_output import combine_output
+from gen_pretty_midi import *
+from gen_questionnaire import *
+from combine import *
 
 
 @click.command()
@@ -35,7 +36,7 @@ def main(input_filepath, output_filepath):
 
     # Generate and clean MIDI BPM data
     logger.info('generating MIDI quarter note data...')
-    output['midi_bpm'] = gen_pm_output(input_dir=input_filepath,)
+    output['midi_bpm'] = gen_pm_output(input_dir=input_filepath, )
     logger.info('... done!')
 
     # Combine outputs, save, and cleanup

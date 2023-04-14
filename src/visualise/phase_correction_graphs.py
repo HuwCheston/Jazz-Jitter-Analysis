@@ -1,3 +1,5 @@
+"""Code for generating plots from the phase correction models"""
+
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -457,6 +459,9 @@ class SingleConditionAnimation:
 
 
 class RegPlot(vutils.BasePlot):
+    """
+    Deprecated(?) class for creating regression plots between multiple variables
+    """
     def __init__(self, df, **kwargs):
         super().__init__(**kwargs)
         self.xvars: list[str] = kwargs.get('xvars', ['tempo_slope', 'ioi_std'])
@@ -1265,6 +1270,9 @@ class ArrowPlotModelExplanation(vutils.BasePlot):
 
 
 class BarPlotCouplingStrengthAsymmetryComparison(vutils.BasePlot):
+    """
+    Creates grouped barplots showing comparisons of coupling strength and asymmetry between pairwise duo combinations
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.df = self._format_df()
@@ -1928,6 +1936,9 @@ class BarPlotMixedEffectsRegressionCoefficients(vutils.BasePlot):
 
 
 class PointPlotSelfPartnerCouplingByInstrument(vutils.BasePlot):
+    """
+    Creates a pointplot showing bootstrapped differences in coupling coefficients between members of each duo
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.n_boot = kwargs.get('n_boot', vutils.N_BOOT)
@@ -2020,7 +2031,7 @@ def generate_phase_correction_plots(
     mds: list[PhaseCorrectionModel], output_dir: str,
 ) -> None:
     """
-
+    Generates all plots in this file, with required arguments and inputs
     """
     df = []
     for pcm in mds:

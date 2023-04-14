@@ -1,3 +1,5 @@
+"""Code for generating plots using the self-reported success metric"""
+
 import pandas as pd
 import numpy as np
 from matplotlib import patches, pyplot as plt
@@ -119,6 +121,9 @@ class ScatterPlotQuestionnaire(vutils.BasePlot):
 
 
 class HeatmapQuestionnaire(vutils.BasePlot):
+    """
+    Creates a heatmap showing pairwise correlations between survey responses for members of each duo
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.data = self._format_df()
@@ -352,7 +357,7 @@ def generate_questionnaire_plots(
         mds: list, output_dir: str
 ) -> None:
     """
-
+    Generates all plots in this file, with required arguments and inputs
     """
     df = []
     for pcm in mds:

@@ -1,3 +1,5 @@
+"""Separate executable .py file for creating combined audio-video stimuli from all raw datasets"""
+
 import subprocess
 import os
 from pathlib import Path
@@ -11,8 +13,7 @@ import click
 
 class AVMuxer:
     """
-    This class is used to mux audio and video footage from each performance together.
-    Make sure that FFMPEG is installed and accessible via PATH
+    Uses FFmpeg to mux raw audio and video footage from each performance in the corpus together.
     """
     def __init__(
             self, input_dir, output_dir, keys_ext: str = 'Delay', drms_ext: str = 'Delay', **kwargs
@@ -241,7 +242,7 @@ class AVMuxer:
             self, perf: str,
     ) -> tuple:
         """
-
+        Gets the crop parameters from the given arguments
         """
         if int(perf[1]) == 1:
             return self.ffmpeg_filter.replace(f":ih-{self.video_crop}", f":ih-{self.duo_1_video_crop}")

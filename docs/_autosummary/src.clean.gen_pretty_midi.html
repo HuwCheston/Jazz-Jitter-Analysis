@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>src.clean.gen_pretty_midi &mdash; Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances 0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="src.clean.gen_questionnaire" href="src.clean.gen_questionnaire.html" />
+    <link rel="prev" title="src.clean.combine" href="src.clean.combine.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances
+          </a>
+              <div class="version">
+                0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting-started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="src.html">src</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="src.analyse.html">src.analyse</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="src.clean.html">src.clean</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="src.clean.combine.html">src.clean.combine</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">src.clean.gen_pretty_midi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.clean.gen_questionnaire.html">src.clean.gen_questionnaire</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.clean.make_dataset.html">src.clean.make_dataset</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="src.muxer.html">src.muxer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="src.visualise.html">src.visualise</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="src.html">src</a></li>
+          <li class="breadcrumb-item"><a href="src.clean.html">src.clean</a></li>
+      <li class="breadcrumb-item active">src.clean.gen_pretty_midi</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/src.clean.gen_pretty_midi.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="module-src.clean.gen_pretty_midi">
+<span id="src-clean-gen-pretty-midi"></span><h1>src.clean.gen_pretty_midi<a class="headerlink" href="#module-src.clean.gen_pretty_midi" title="Permalink to this heading"></a></h1>
+<p>Generates MIDI data in Python-compatible form and cleans</p>
+<p class="rubric">Functions</p>
+<table class="autosummary longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">clean_pm_output</span></code>(i, trial[, dic_name])</p></td>
+<td><p>Clean raw prettymidi output: truncate start and stop times, map midi notes onto musical notes...</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.clean.html#src.clean.gen_pretty_midi.gen_pm_output" title="src.clean.gen_pretty_midi.gen_pm_output"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gen_pm_output</span></code></a>(input_dir)</p></td>
+<td><p>Iterates through MIDI BPM files in input directory and extracts data (onset, pitch, velocity) using PrettyMIDI</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.clean.html#src.clean.gen_pretty_midi.gen_raw_midi_output" title="src.clean.gen_pretty_midi.gen_raw_midi_output"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gen_raw_midi_output</span></code></a>(input_dir)</p></td>
+<td><p>Iterates through raw MIDI files in input directory and extracts data (onset, pitch, velocity) using PrettyMIDI</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_data_from_pm_object</span></code>(pm)</p></td>
+<td><p>Returns a flat list of onset start positions, midi pitch numbers, and velocity from a PrettyMIDI object</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">return_formatted_dic_from_filename</span></code>(file[, ...])</p></td>
+<td><p>Returns a dictionary containing file metadata, e.g.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">return_list_of_files</span></code>(input_dir)</p></td>
+<td><p>Iterate through all folders in input directory and append MIDI files to list</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">return_list_of_raw_midi_files</span></code>(input_dir)</p></td>
+<td><p>Iterate through input directory, return formatted dictionary for every raw midi file</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">return_list_of_trials</span></code>(f_list)</p></td>
+<td><p>Returns list of lists corresponding to each trial</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">return_pm_output</span></code>(f)</p></td>
+<td><p>Loads a file into PrettyMIDI, then returns a dataframe ready for cleaning</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.clean.gen_pretty_midi.gen_pm_output">
+<span class="sig-prename descclassname"><span class="pre">src.clean.gen_pretty_midi.</span></span><span class="sig-name descname"><span class="pre">gen_pm_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dir</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="headerlink" href="#src.clean.gen_pretty_midi.gen_pm_output" title="Permalink to this definition"></a></dt>
+<dd><p>Iterates through MIDI BPM files in input directory and extracts data (onset, pitch, velocity) using PrettyMIDI</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.clean.gen_pretty_midi.gen_raw_midi_output">
+<span class="sig-prename descclassname"><span class="pre">src.clean.gen_pretty_midi.</span></span><span class="sig-name descname"><span class="pre">gen_raw_midi_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dir</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="headerlink" href="#src.clean.gen_pretty_midi.gen_raw_midi_output" title="Permalink to this definition"></a></dt>
+<dd><p>Iterates through raw MIDI files in input directory and extracts data (onset, pitch, velocity) using PrettyMIDI</p>
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="src.clean.combine.html" class="btn btn-neutral float-left" title="src.clean.combine" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="src.clean.gen_questionnaire.html" class="btn btn-neutral float-right" title="src.clean.gen_questionnaire" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Huw Cheston 2023.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

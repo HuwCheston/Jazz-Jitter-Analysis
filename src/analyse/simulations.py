@@ -1,3 +1,5 @@
+"""Code for generating simulations using phase correction models"""
+
 import numpy as np
 import pandas as pd
 import numba as nb
@@ -19,7 +21,7 @@ __all__ = [
 
 class Simulation:
     """
-    Creates X number of simulated performances from two given phase correction models.
+    Creates X number (default 500) of simulated performances from a given phase correction model.
 
     Number of simulations defaults to 500, the same number in Jacoby et al. (2021).
     """

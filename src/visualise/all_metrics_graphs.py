@@ -1,3 +1,5 @@
+"""Code for generating plots that combine all performance success metrics"""
+
 import pandas as pd
 import numpy as np
 import scipy.stats as stats
@@ -244,6 +246,9 @@ class PairPlotAllVariables(vutils.BasePlot):
 
 
 class RegressionTableAllMetrics:
+    """
+    Creates an R-style regression table for all performance success metrics.
+    """
 
     def __init__(self, df: pd.DataFrame, output_dir: str):
         self.df = self._format_df(df)
@@ -909,7 +914,7 @@ def generate_all_metrics_plots(
     mds: list[PhaseCorrectionModel], output_dir: str,
 ) -> None:
     """
-
+    Generates all plots in this file, with required arguments and inputs
     """
     df = []
     for pcm in mds:

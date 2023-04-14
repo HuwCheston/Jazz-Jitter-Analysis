@@ -1,3 +1,5 @@
+"""Code for generating plots using the tempo slope success metric"""
+
 import numpy as np
 import pandas as pd
 from datetime import timedelta
@@ -300,6 +302,9 @@ class BarPlotTempoSlope(vutils.BasePlot):
 def generate_tempo_slope_plots(
         mds: list, output_dir: str
 ):
+    """
+    Generates all plots in this file, with required arguments and inputs
+    """
     df = []
     for pcm in mds:
         df.append(pcm.keys_dic)

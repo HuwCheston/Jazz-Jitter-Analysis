@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+"""Central file for running all analysis functions, called by run.cmd"""
+
 import click
 import logging
 from pathlib import Path

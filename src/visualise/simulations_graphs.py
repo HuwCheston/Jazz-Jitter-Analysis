@@ -1,3 +1,5 @@
+"""Code for generating plots from the simulation objects"""
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -968,6 +970,9 @@ class RegPlotSlopeAsynchrony(vutils.BasePlot):
 def generate_plots_for_individual_performance_simulations(
     sims: list[Simulation], output_dir: str,
 ) -> None:
+    """
+    Deprecated(?)
+    """
     figures_output_dir = output_dir + '\\figures\\simulations_plots'
     df = pd.DataFrame([sim.results_dic for sim in sims])
     dp = DistPlotParams(df, output_dir=figures_output_dir)
@@ -983,6 +988,9 @@ def generate_plots_for_individual_performance_simulations(
 def generate_plots_for_simulations_with_coupling_parameters(
     sims_params: list[Simulation], output_dir: str
 ) -> None:
+    """
+    Generates all plots in this file, with required arguments and inputs
+    """
     figures_output_dir = output_dir + '\\figures\\simulations_plots'
     df_avg = pd.DataFrame([sim.results_dic for sim in sims_params])
     rp = RegPlotSlopeAsynchrony(df=df_avg, output_dir=figures_output_dir)

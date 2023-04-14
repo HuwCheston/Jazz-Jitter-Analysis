@@ -19,6 +19,10 @@ import sphinx_rtd_theme
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 # sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath(r'../src'))
+sys.path.insert(0, os.path.abspath(r'../src/clean'))
+sys.path.insert(0, os.path.abspath(r'../src/analyse'))
+sys.path.insert(0, os.path.abspath(r'../src/visualise'))
 
 # -- General configuration -----------------------------------------------------
 
@@ -31,12 +35,21 @@ extensions = [
     "myst_parser",
     'sphinx.ext.autosectionlabel',
     "sphinx_rtd_theme",
-    "sphinx.ext.githubpages"
+    "sphinx.ext.githubpages",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
+autosummary_generate = True
+autodoc_default_options = {
+    "members": True,
+    "undoc-members": True,
+    "private-members": True
+}
 
+# exclude_patterns = ['_build', '_templates']
 # The suffix of source filenames.
 source_suffix = '.rst'
 
@@ -71,6 +84,8 @@ release = '0.1'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 exclude_patterns = ['_build']
+
+autodoc_mock_imports = ['pretty_midi', 're', 'collections']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 # default_role = None

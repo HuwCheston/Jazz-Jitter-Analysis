@@ -1,3 +1,5 @@
+"""Unused code stub for analysis of questionnaire data"""
+
 import pandas as pd
 import numpy as np
 import scipy.stats as stats
@@ -7,7 +9,7 @@ from sklearn.metrics import cohen_kappa_score
 
 class InterRaterReliability:
     """
-
+    Deprecated
     """
     def __init__(self, **kwargs):
         self.df: pd.DataFrame = kwargs.get('df', None)
@@ -65,6 +67,9 @@ class InterRaterReliability:
 
 
 class TestRetestReliability:
+    """
+    Deprecated
+    """
     def __init__(self, **kwargs):
         self.df = kwargs.get('df', None)
         self.output_dir = kwargs.get('output_dir', None)
@@ -109,6 +114,9 @@ class TestRetestReliability:
 def questionnaire_analysis(
         raw_data: list[list], output_dir: str
 ) -> None:
+    """
+    Unused
+    """
 
     idx = ['trial', 'block', 'latency', 'jitter', 'instrument', 'thoughts']
     vrs = ['interaction', 'coordination', 'success']

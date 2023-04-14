@@ -71,7 +71,7 @@ The raw dataset contains separate audio and video files (both with and without l
 
 3. Open a new command prompt in the root directory of the repository and execute:
     ```
-    python mixer.py
+    python src\mixer.py
     ```
     
     This script will take all the delayed audio and video files from both musicians (located in `\data\raw\avmanip_output`) and mux them together into a new folder (default `\data\raw\muxed_performances\`). 

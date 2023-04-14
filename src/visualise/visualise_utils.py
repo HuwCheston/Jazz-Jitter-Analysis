@@ -1,3 +1,5 @@
+"""Utility functions, classes, and constants for creating figures and tables"""
+
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm, ListedColormap
 from matplotlib.cm import ScalarMappable
@@ -31,9 +33,17 @@ VIDEO_FPS = 30
 CBAR_BINS = np.linspace(-0.5, 0.3, 9, endpoint=True)
 N_BOOT = 10000
 
+
 # Define the colour palettes
-# Function used to shade a color map by given alpha value (can be used in color bars etc)
-alpha_func = lambda pal: ListedColormap(np.c_[pal.colors, np.full(len(pal.colors), fill_value=ALPHA)])
+def alpha_func(
+        pal
+) -> ListedColormap:
+    """
+    Shade a color map by given alpha value (can be used in color bars etc)
+    """
+    return ListedColormap(np.c_[pal.colors, np.full(len(pal.colors), fill_value=ALPHA)])
+
+
 SLOPES_CMAP = alpha_func(color_palette('vlag_r', as_cmap=True))     # Used for plotting tempo slopes
 INSTR_CMAP = ['#9933ff', '#00ff00']     # Palette used for plotting data that contrasts against slopes color map
 LINE_CMAP = ['#1f77b4', '#ff7f0e']     # Original matplotlib colour palette used for manual plotting
@@ -138,20 +148,6 @@ def interpolate_df_rows(df: pd.DataFrame) -> pd.DataFrame:
                            (df.shape[0] - 1) * (VIDEO_FPS - 1) + df.shape[0])
     # Reindex the input dataframe and interpolate according to it
     return df.reindex(new_indx).interpolate(method='index').reset_index(drop=False)
-
-
-def get_xrange(data, min_off: int = -OFFSET, max_off: int = -OFFSET) -> tuple:
-    return (
-        min([d[-1]['elapsed'].min() for d in data]) + min_off,
-        max([d[-1]['elapsed'].max() for d in data]) + max_off,
-    )
-
-
-def get_yrange(data, min_off: int = -OFFSET, max_off: int = -OFFSET) -> tuple:
-    return (
-        min([d[-1]['bpm_rolling'].min() for d in data]) + min_off,
-        max([d[-1]['bpm_rolling'].max() for d in data]) + max_off
-    )
 
 
 class BasePlot:

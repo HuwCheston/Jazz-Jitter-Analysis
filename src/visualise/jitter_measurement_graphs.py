@@ -1,3 +1,5 @@
+"""Code for generating plots from recordings of network latency and jitter"""
+
 import numpy as np
 import pandas as pd
 import os
@@ -190,6 +192,10 @@ class LinePlotJitterMeasurement(vutils.BasePlot):
 def generate_latency_measurement_plots(
         input_dir: str, output_dir: str, **kwargs
 ) -> None:
+    """
+    Generates all plots in this file, with required arguments and inputs
+    """
+
     jm = JitterMeasurementAnalysis(input_dir, **kwargs)
     lp = LinePlotJitterMeasurement(arrays=jm.arrs, output_dir=output_dir, **kwargs)
     lp.create_plot()

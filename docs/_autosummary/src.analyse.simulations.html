@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>src.analyse.simulations &mdash; Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances 0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="src.clean" href="src.clean.html" />
+    <link rel="prev" title="src.analyse.run_analysis" href="src.analyse.run_analysis.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances
+          </a>
+              <div class="version">
+                0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting-started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="src.html">src</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="src.analyse.html">src.analyse</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="src.analyse.analysis_utils.html">src.analyse.analysis_utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.analyse.phase_correction_models.html">src.analyse.phase_correction_models</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.analyse.questionnaire.html">src.analyse.questionnaire</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.analyse.run_analysis.html">src.analyse.run_analysis</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">src.analyse.simulations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="src.clean.html">src.clean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="src.muxer.html">src.muxer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="src.visualise.html">src.visualise</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="src.html">src</a></li>
+          <li class="breadcrumb-item"><a href="src.analyse.html">src.analyse</a></li>
+      <li class="breadcrumb-item active">src.analyse.simulations</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/src.analyse.simulations.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="module-src.analyse.simulations">
+<span id="src-analyse-simulations"></span><h1>src.analyse.simulations<a class="headerlink" href="#module-src.analyse.simulations" title="Permalink to this heading"></a></h1>
+<p>Code for generating simulations using phase correction models</p>
+<p class="rubric">Functions</p>
+<table class="autosummary longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.simulations.generate_phase_correction_simulations_for_coupling_parameters" title="src.analyse.simulations.generate_phase_correction_simulations_for_coupling_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">generate_phase_correction_simulations_for_coupling_parameters</span></code></a>(...)</p></td>
+<td><p>Create simulated performances across a range of artificial coupling parameters for every phase correction model</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.simulations.generate_phase_correction_simulations_for_individual_conditions" title="src.analyse.simulations.generate_phase_correction_simulations_for_individual_conditions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">generate_phase_correction_simulations_for_individual_conditions</span></code></a>(...)</p></td>
+<td><p>Create simulated performances using the coupling within every individual performance.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Classes</p>
+<table class="autosummary longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.simulations.Simulation" title="src.analyse.simulations.Simulation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Simulation</span></code></a>(pcm[, num_simulations])</p></td>
+<td><p>Creates X number (default 500) of simulated performances from a given phase correction model.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.analyse.simulations.</span></span><span class="sig-name descname"><span class="pre">Simulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pcm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="../src.analyse.html#src.analyse.phase_correction_models.PhaseCorrectionModel" title="src.analyse.phase_correction_models.PhaseCorrectionModel"><span class="pre">src.analyse.phase_correction_models.PhaseCorrectionModel</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">pandas.core.frame.DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_simulations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">500</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#src.analyse.simulations.Simulation" title="Permalink to this definition"></a></dt>
+<dd><p>Creates X number (default 500) of simulated performances from a given phase correction model.</p>
+<p>Number of simulations defaults to 500, the same number in Jacoby et al. (2021).</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation._append_timestamps_to_latency_array">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_append_timestamps_to_latency_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">latency_array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resample_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.75</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">array</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation._append_timestamps_to_latency_array" title="Permalink to this definition"></a></dt>
+<dd><p>Appends timestamps showing the onset time for each value in the latency array applied to a performance</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation._convert_musician_parameters_dict_to_numba">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_convert_musician_parameters_dict_to_numba</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">python_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation._convert_musician_parameters_dict_to_numba" title="Permalink to this definition"></a></dt>
+<dd><p>Converts a Python dictionary into a type that can be utilised by Numba</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation._create_summary_dictionary">
+<span class="sig-name descname"><span class="pre">_create_summary_dictionary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation._create_summary_dictionary" title="Permalink to this definition"></a></dt>
+<dd><p>Creates a summary dictionary with important simulation parameters</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation._format_simulated_data">
+<span class="sig-name descname"><span class="pre">_format_simulated_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation._format_simulated_data" title="Permalink to this definition"></a></dt>
+<dd><p>Formats data from one simulation by creating a dataframe, adding in the timedelta column, and resampling
+to get the mean IOI (defaults to every second)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation._get_average_var_for_one_simulation">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_get_average_var_for_one_simulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">all_perf</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">pandas.core.frame.DataFrame</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'my_next_ioi'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation._get_average_var_for_one_simulation" title="Permalink to this definition"></a></dt>
+<dd><p>Concatenate all simulations together and get the row-wise average (i.e. avg IOI every second)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation._get_number_of_beats_for_simulation">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_get_number_of_beats_for_simulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">kp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dp</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation._get_number_of_beats_for_simulation" title="Permalink to this definition"></a></dt>
+<dd><p>Averages the total number of beats across both keys and drums, then gets the upper ceiling.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation._get_raw_musician_parameters">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_get_raw_musician_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">init</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation._get_raw_musician_parameters" title="Permalink to this definition"></a></dt>
+<dd><p>Gets necessary simulation parameters from pandas dataframe and converts to a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation._get_rolling_standard_deviation_values">
+<span class="sig-name descname"><span class="pre">_get_rolling_standard_deviation_values</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cols</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">('my_prev_ioi',)</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation._get_rolling_standard_deviation_values" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation._initialise_empty_data">
+<span class="sig-name descname"><span class="pre">_initialise_empty_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">iois</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">(0.5,</span> <span class="pre">0.5)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">onset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation._initialise_empty_data" title="Permalink to this definition"></a></dt>
+<dd><p>Initialise an empty numba dictionary of string-array pairs, for storing data from one simulation in.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation._modify_musician_parameters_by_simulation_type">
+<span class="sig-name descname"><span class="pre">_modify_musician_parameters_by_simulation_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#src.analyse.simulations.Simulation._modify_musician_parameters_by_simulation_type" title="Permalink to this definition"></a></dt>
+<dd><p>Modifies a simulated musician’s parameters according to the given simulation type</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation.create_all_simulations">
+<span class="sig-name descname"><span class="pre">create_all_simulations</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#src.analyse.simulations.Simulation.create_all_simulations" title="Permalink to this definition"></a></dt>
+<dd><p>Run the simulations and create a list of dataframes for each individual performer</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation.get_average_ioi_variability">
+<span class="sig-name descname"><span class="pre">get_average_ioi_variability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func=&lt;function</span> <span class="pre">nanmean&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation.get_average_ioi_variability" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the average tempo slope for all simulations.</p>
+<p>Method:
+—
+-   For every simulation, get the median IOI standard deviation value over the window size
+-   Calculate the mean of all of these values.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation.get_average_pairwise_asynchrony">
+<span class="sig-name descname"><span class="pre">get_average_pairwise_asynchrony</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func=&lt;function</span> <span class="pre">nanmean&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">async_col:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'asynchrony'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation.get_average_pairwise_asynchrony" title="Permalink to this definition"></a></dt>
+<dd><p>Gets the average pairwise asynchrony (in milliseconds!) across all simulated performances</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation.get_average_tempo_slope">
+<span class="sig-name descname"><span class="pre">get_average_tempo_slope</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func=&lt;function</span> <span class="pre">nanmean&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation.get_average_tempo_slope" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the average tempo slope for all simulations.</p>
+<p>Method:
+—
+-   For every simulation, zip the corresponding keys and drums performance together.
+-   Then, get the average IOI for every second across both keys and drums.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>This is straightforward, because we resampled to average IOI per second in _format_simulated_data</p></li>
+</ul>
+</div></blockquote>
+<ul class="simple">
+<li><p>Convert average IOI to average BPM by dividing by 60, then regress against elapsed seconds</p></li>
+<li><p>Extract the slope coefficient, take the median across all simulations, and return</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.simulations.Simulation.get_simulation_data_for_plotting">
+<span class="sig-name descname"><span class="pre">get_simulation_data_for_plotting</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">plot_individual</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_average</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'my_next_ioi'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timespan</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">(7,</span> <span class="pre">101)</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">pandas.core.frame.DataFrame</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">pandas.core.frame.DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#src.analyse.simulations.Simulation.get_simulation_data_for_plotting" title="Permalink to this definition"></a></dt>
+<dd><p>Wrangles simulation data into a format that can be plotted and returns.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.simulations.generate_phase_correction_simulations_for_coupling_parameters">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.simulations.</span></span><span class="sig-name descname"><span class="pre">generate_phase_correction_simulations_for_coupling_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../src.analyse.html#src.analyse.phase_correction_models.PhaseCorrectionModel" title="src.analyse.phase_correction_models.PhaseCorrectionModel"><span class="pre">src.analyse.phase_correction_models.PhaseCorrectionModel</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force_rebuild</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_simulations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">500</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../src.analyse.html#src.analyse.simulations.Simulation" title="src.analyse.simulations.Simulation"><span class="pre">src.analyse.simulations.Simulation</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#src.analyse.simulations.generate_phase_correction_simulations_for_coupling_parameters" title="Permalink to this definition"></a></dt>
+<dd><p>Create simulated performances across a range of artificial coupling parameters for every phase correction model</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.simulations.generate_phase_correction_simulations_for_individual_conditions">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.simulations.</span></span><span class="sig-name descname"><span class="pre">generate_phase_correction_simulations_for_individual_conditions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../src.analyse.html#src.analyse.phase_correction_models.PhaseCorrectionModel" title="src.analyse.phase_correction_models.PhaseCorrectionModel"><span class="pre">src.analyse.phase_correction_models.PhaseCorrectionModel</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force_rebuild</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_simulations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">500</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="../src.analyse.html#src.analyse.simulations.Simulation" title="src.analyse.simulations.Simulation"><span class="pre">src.analyse.simulations.Simulation</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#src.analyse.simulations.generate_phase_correction_simulations_for_individual_conditions" title="Permalink to this definition"></a></dt>
+<dd><p>Create simulated performances using the coupling within every individual performance.</p>
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="src.analyse.run_analysis.html" class="btn btn-neutral float-left" title="src.analyse.run_analysis" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="src.clean.html" class="btn btn-neutral float-right" title="src.clean" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Huw Cheston 2023.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

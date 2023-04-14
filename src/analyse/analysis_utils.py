@@ -1,3 +1,5 @@
+"""Utility functions, classes, and constants for analysis and modelling"""
+
 import os
 import dill as pickle
 import pandas as pd
@@ -284,6 +286,8 @@ def extract_pairwise_asynchrony(
     keys_nn: pd.DataFrame, drms_nn: pd.DataFrame
 ) -> float:
     """
+    Extracts pairwise asynchrony from two matched dataframes.
+
     Rasch (2015) defines pairwise asynchrony as as the root-mean-square of the standard deviations of the onset time
     differences for all pairs of voice parts. We can calculate this for each condition, using the nearest-neighbour
     model for both the keyboard and drummer.

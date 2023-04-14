@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>src.muxer &mdash; Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances 0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="src.visualise" href="src.visualise.html" />
+    <link rel="prev" title="src.clean.make_dataset" href="src.clean.make_dataset.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances
+          </a>
+              <div class="version">
+                0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting-started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="src.html">src</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="src.analyse.html">src.analyse</a></li>
+<li class="toctree-l2"><a class="reference internal" href="src.clean.html">src.clean</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">src.muxer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="src.visualise.html">src.visualise</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="src.html">src</a></li>
+      <li class="breadcrumb-item active">src.muxer</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/src.muxer.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="module-src.muxer">
+<span id="src-muxer"></span><h1>src.muxer<a class="headerlink" href="#module-src.muxer" title="Permalink to this heading"></a></h1>
+<p>Separate executable .py file for creating combined audio-video stimuli from all raw datasets</p>
+<p class="rubric">Classes</p>
+<table class="autosummary longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.html#src.muxer.AVMuxer" title="src.muxer.AVMuxer"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AVMuxer</span></code></a>(input_dir, output_dir[, keys_ext, ...])</p></td>
+<td><p>Uses FFmpeg to mux raw audio and video footage from each performance in the corpus together.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.muxer.</span></span><span class="sig-name descname"><span class="pre">AVMuxer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keys_ext</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Delay'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drms_ext</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Delay'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#src.muxer.AVMuxer" title="Permalink to this definition"></a></dt>
+<dd><p>Uses FFmpeg to mux raw audio and video footage from each performance in the corpus together.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer._check_filesize">
+<span class="sig-name descname"><span class="pre">_check_filesize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fname</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">performance</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_fsize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">75</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#src.muxer.AVMuxer._check_filesize" title="Permalink to this definition"></a></dt>
+<dd><p>Checks size of a muxed video and raises a warning if it’s suspicously large (encoding issue)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer._create_output_folder">
+<span class="sig-name descname"><span class="pre">_create_output_folder</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#src.muxer.AVMuxer._create_output_folder" title="Permalink to this definition"></a></dt>
+<dd><p>Creates an output folder according to the given parameters</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer._get_audio_fpath">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_get_audio_fpath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#src.muxer.AVMuxer._get_audio_fpath" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the type of audio that is described by this filename</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer._get_dict_key">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_get_dict_key</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dirpath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chars</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">('d',</span> <span class="pre">'s',</span> <span class="pre">'l',</span> <span class="pre">'j')</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#src.muxer.AVMuxer._get_dict_key" title="Permalink to this definition"></a></dt>
+<dd><p>Gets the key for our dictionary of filenames.
+Format is in the form: duoX_sessionX_latencyX_jitterX</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer._get_matched_fnames">
+<span class="sig-name descname"><span class="pre">_get_matched_fnames</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#src.muxer.AVMuxer._get_matched_fnames" title="Permalink to this definition"></a></dt>
+<dd><p>For every performance, matches audio and video filenames for both performers</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer._get_video_crop_params">
+<span class="sig-name descname"><span class="pre">_get_video_crop_params</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">perf</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="headerlink" href="#src.muxer.AVMuxer._get_video_crop_params" title="Permalink to this definition"></a></dt>
+<dd><p>Gets the crop parameters from the given arguments</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer._get_video_fpath">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_get_video_fpath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#src.muxer.AVMuxer._get_video_fpath" title="Permalink to this definition"></a></dt>
+<dd><p>Returns the type of video that is described by this filename</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer._log_progress_bar">
+<span class="sig-name descname"><span class="pre">_log_progress_bar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">current</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">perf</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#src.muxer.AVMuxer._log_progress_bar" title="Permalink to this definition"></a></dt>
+<dd><p>Logs current progress of the ffmpeg conversion, including current time, overall duration, and a progress bar</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer._mux_performance">
+<span class="sig-name descname"><span class="pre">_mux_performance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">v</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fname</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#src.muxer.AVMuxer._mux_performance" title="Permalink to this definition"></a></dt>
+<dd><p>Combine both video files together</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer._read_ffmpeg_output">
+<span class="sig-name descname"><span class="pre">_read_ffmpeg_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">process</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Popen</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout_mins</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#src.muxer.AVMuxer._read_ffmpeg_output" title="Permalink to this definition"></a></dt>
+<dd><p>Reads the output from ffmpeg, line by line, and logs a progress bar</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer._read_timedelta">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_read_timedelta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">line</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#src.muxer.AVMuxer._read_timedelta" title="Permalink to this definition"></a></dt>
+<dd><p>Converts the reported time in ffmpeg to a Python timedelta object and gets number of seconds</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.muxer.AVMuxer.mux_all_performances">
+<span class="sig-name descname"><span class="pre">mux_all_performances</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">duos</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">(1,</span> <span class="pre">2,</span> <span class="pre">3,</span> <span class="pre">4,</span> <span class="pre">5)</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#src.muxer.AVMuxer.mux_all_performances" title="Permalink to this definition"></a></dt>
+<dd><p>Muxes all performances together. Duos should be an iterable containing the duo numbers we want to mux.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="src.clean.make_dataset.html" class="btn btn-neutral float-left" title="src.clean.make_dataset" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="src.visualise.html" class="btn btn-neutral float-right" title="src.visualise" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Huw Cheston 2023.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

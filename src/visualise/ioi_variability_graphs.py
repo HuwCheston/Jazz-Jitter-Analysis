@@ -1,3 +1,5 @@
+"""Code for generating plots using the timing irregularity success metric"""
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -362,6 +364,10 @@ class NumberLineIOIVariability(vutils.BasePlot):
 def generate_tempo_stability_plots(
         mds: list, output_dir: str
 ):
+    """
+    Generates all plots in this file, with required arguments and inputs
+    """
+
     df = []
     for pcm in mds:
         df.append(pcm.keys_dic)

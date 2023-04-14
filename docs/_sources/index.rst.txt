@@ -33,11 +33,20 @@ Contents:
 ---------
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    getting-started
    examples
    troubleshooting
+
+Documentation:
+--------------
+
+.. autosummary::
+   :toctree: _autosummary
+   :recursive:
+
+   src
 
 Indices and tables
 ------------------

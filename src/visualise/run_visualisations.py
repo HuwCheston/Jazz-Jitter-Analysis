@@ -1,3 +1,5 @@
+"""Central file for running all visualisation functions, called by run.cmd"""
+
 # -*- coding: utf-8 -*-
 import click
 import logging

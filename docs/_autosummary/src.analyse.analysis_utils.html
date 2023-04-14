@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>src.analyse.analysis_utils &mdash; Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances 0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="src.analyse.phase_correction_models" href="src.analyse.phase_correction_models.html" />
+    <link rel="prev" title="src.analyse" href="src.analyse.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances
+          </a>
+              <div class="version">
+                0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting-started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="src.html">src</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="src.analyse.html">src.analyse</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">src.analyse.analysis_utils</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.analyse.phase_correction_models.html">src.analyse.phase_correction_models</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.analyse.questionnaire.html">src.analyse.questionnaire</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.analyse.run_analysis.html">src.analyse.run_analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.analyse.simulations.html">src.analyse.simulations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="src.clean.html">src.clean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="src.muxer.html">src.muxer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="src.visualise.html">src.visualise</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="src.html">src</a></li>
+          <li class="breadcrumb-item"><a href="src.analyse.html">src.analyse</a></li>
+      <li class="breadcrumb-item active">src.analyse.analysis_utils</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/src.analyse.analysis_utils.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="module-src.analyse.analysis_utils">
+<span id="src-analyse-analysis-utils"></span><h1>src.analyse.analysis_utils<a class="headerlink" href="#module-src.analyse.analysis_utils" title="Permalink to this heading"></a></h1>
+<p>Utility functions, classes, and constants for analysis and modelling</p>
+<p class="rubric">Functions</p>
+<table class="autosummary longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.append_zoom_array" title="src.analyse.analysis_utils.append_zoom_array"><code class="xref py py-obj docutils literal notranslate"><span class="pre">append_zoom_array</span></code></a>(perf_df, zoom_arr[, onset_col])</p></td>
+<td><p>Appends a column to a dataframe showing the approx amount of latency by AV-Manip for each event in a performance</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.average_bpms" title="src.analyse.analysis_utils.average_bpms"><code class="xref py py-obj docutils literal notranslate"><span class="pre">average_bpms</span></code></a>(df1, df2[, window_size, elap, bpm])</p></td>
+<td><p>Returns a list of averaged BPMs from two performance.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.create_model_list" title="src.analyse.analysis_utils.create_model_list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_model_list</span></code></a>(df, avg_groupers[, md])</p></td>
+<td><p>Subset a dataframe of per-condition results and return a list of statsmodels regression outputs for use in a table.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.create_one_simulation" title="src.analyse.analysis_utils.create_one_simulation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_one_simulation</span></code></a>(keys_data, drms_data, ...)</p></td>
+<td><p>Create data for one simulation, using numba optimisations.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.extract_event_density" title="src.analyse.analysis_utils.extract_event_density"><code class="xref py py-obj docutils literal notranslate"><span class="pre">extract_event_density</span></code></a>(bpm, raw)</p></td>
+<td><p>Appends a column to performance dataframe showing number of actual notes per extracted crotchet</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.extract_interpolated_beats" title="src.analyse.analysis_utils.extract_interpolated_beats"><code class="xref py py-obj docutils literal notranslate"><span class="pre">extract_interpolated_beats</span></code></a>(c)</p></td>
+<td><p>Extracts the number of beats in the performance that required interpolation in REAPER.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.extract_npvi" title="src.analyse.analysis_utils.extract_npvi"><code class="xref py py-obj docutils literal notranslate"><span class="pre">extract_npvi</span></code></a>(s)</p></td>
+<td><p>Extracts the normalised pairwise variability index (nPVI) from a column of IOIs</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.extract_pairwise_asynchrony" title="src.analyse.analysis_utils.extract_pairwise_asynchrony"><code class="xref py py-obj docutils literal notranslate"><span class="pre">extract_pairwise_asynchrony</span></code></a>(keys_nn, drms_nn)</p></td>
+<td><p>Extracts pairwise asynchrony from two matched dataframes.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.generate_df" title="src.analyse.analysis_utils.generate_df"><code class="xref py py-obj docutils literal notranslate"><span class="pre">generate_df</span></code></a>(data[, iqr_range, threshold, ...])</p></td>
+<td><p>Create dataframe from MIDI performance data, either cleaned (just crotchet beats) or raw.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.generate_tempo_slopes" title="src.analyse.analysis_utils.generate_tempo_slopes"><code class="xref py py-obj docutils literal notranslate"><span class="pre">generate_tempo_slopes</span></code></a>(raw_data)</p></td>
+<td><p>Returns average tempo slope coefficients for all performances as list of tuples in the form (trial, block, latency, jitter, avg.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.iqr_filter" title="src.analyse.analysis_utils.iqr_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">iqr_filter</span></code></a>(col, df[, iqr_range])</p></td>
+<td><p>Filter duration values below a certain quartile to remove extraneous midi notes not cleaned in Reaper</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.load_data" title="src.analyse.analysis_utils.load_data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_data</span></code></a>(input_filepath)</p></td>
+<td><p>Loads all pickled data from the processed data folder</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.load_from_disc" title="src.analyse.analysis_utils.load_from_disc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_from_disc</span></code></a>(output_dir[, filename])</p></td>
+<td><p>Try and load models from disc</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.log_model" title="src.analyse.analysis_utils.log_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">log_model</span></code></a>(md[, logger])</p></td>
+<td><p>Helper function to log metadata for a particular model in our GUI, if we've passsed a logger function</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.log_simulation" title="src.analyse.analysis_utils.log_simulation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">log_simulation</span></code></a>(sim[, logger])</p></td>
+<td><p>Helper function to log metadata for a particular simulation in our GUI, if we've passed a logger function</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.reg_func" title="src.analyse.analysis_utils.reg_func"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reg_func</span></code></a>(df, xcol, ycol)</p></td>
+<td><p>Calculates linear regression between two given columns, returns results table</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.resample" title="src.analyse.analysis_utils.resample"><code class="xref py py-obj docutils literal notranslate"><span class="pre">resample</span></code></a>(perf[, func, col, resample_window, ...])</p></td>
+<td><p>Resamples an individual performance dataframe to get mean of every second.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.return_average_coeffs" title="src.analyse.analysis_utils.return_average_coeffs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">return_average_coeffs</span></code></a>(coeffs)</p></td>
+<td><p>Returns list of tuples containing average coefficient for keys/drums performance in a single trial Tuples take the form of those in generate_tempo_slopes, i.e. (trial, block, latency, jitter, avg.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.return_coeff_from_sm_output" title="src.analyse.analysis_utils.return_coeff_from_sm_output"><code class="xref py py-obj docutils literal notranslate"><span class="pre">return_coeff_from_sm_output</span></code></a>(results)</p></td>
+<td><p>Formats the table returned by statsmodel to return only the regression coefficient as an integer</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.test_stationary" title="src.analyse.analysis_utils.test_stationary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">test_stationary</span></code></a>(array)</p></td>
+<td><p>Tests if data is stationary, if not returns data with first difference calculated</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.analyse.html#src.analyse.analysis_utils.zip_same_conditions_together" title="src.analyse.analysis_utils.zip_same_conditions_together"><code class="xref py py-obj docutils literal notranslate"><span class="pre">zip_same_conditions_together</span></code></a>(raw_data)</p></td>
+<td><p>Iterates through raw data and zips keys/drums data from the same performance together Returns a list of zip objects, each element of which is a tuple containing</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.append_zoom_array">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">append_zoom_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">perf_df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zoom_arr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">onset_col</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'onset'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.append_zoom_array" title="Permalink to this definition"></a></dt>
+<dd><p>Appends a column to a dataframe showing the approx amount of latency by AV-Manip for each event in a performance</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.average_bpms">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">average_bpms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">df2</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">window_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">elap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'elapsed'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bpm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'bpm'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.average_bpms" title="Permalink to this definition"></a></dt>
+<dd><p>Returns a list of averaged BPMs from two performance.
+Data is grouped by every second in a performance.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.create_model_list">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">create_model_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">avg_groupers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">md</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'correction_partner_onset~C(latency)+C(jitter)+C(instrument)'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.create_model_list" title="Permalink to this definition"></a></dt>
+<dd><p>Subset a dataframe of per-condition results and return a list of statsmodels regression outputs for use in a table.
+By default, the regression will average results from the same condition across multiple measures. This can be
+overridden by setting the averaging argument to False.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.create_one_simulation">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">create_one_simulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">keys_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drms_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keys_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drms_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keys_noise</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drms_noise</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beats</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.create_one_simulation" title="Permalink to this definition"></a></dt>
+<dd><p>Create data for one simulation, using numba optimisations. This function is defined outside of the Simulation
+class to enable instances of the Simulation class to be pickled.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.extract_event_density">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">extract_event_density</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bpm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.extract_event_density" title="Permalink to this definition"></a></dt>
+<dd><p>Appends a column to performance dataframe showing number of actual notes per extracted crotchet</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.extract_interpolated_beats">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">extract_interpolated_beats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">c</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.extract_interpolated_beats" title="Permalink to this definition"></a></dt>
+<dd><p>Extracts the number of beats in the performance that required interpolation in REAPER. This was usually due to a
+performer ‘pushing’ ahead a crotchet beat by a swung quaver, or due to an implied metric modulation.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.extract_npvi">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">extract_npvi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Series</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.extract_npvi" title="Permalink to this definition"></a></dt>
+<dd><p>Extracts the normalised pairwise variability index (nPVI) from a column of IOIs</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.extract_pairwise_asynchrony">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">extract_pairwise_asynchrony</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">keys_nn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drms_nn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.extract_pairwise_asynchrony" title="Permalink to this definition"></a></dt>
+<dd><p>Extracts pairwise asynchrony from two matched dataframes.</p>
+<p>Rasch (2015) defines pairwise asynchrony as as the root-mean-square of the standard deviations of the onset time
+differences for all pairs of voice parts. We can calculate this for each condition, using the nearest-neighbour
+model for both the keyboard and drummer.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.generate_df">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">generate_df</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iqr_range</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">(0.05,</span> <span class="pre">0.95)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_pitch_vel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.generate_df" title="Permalink to this definition"></a></dt>
+<dd><p>Create dataframe from MIDI performance data, either cleaned (just crotchet beats) or raw.
+Optional keyword arguments:
+iqr_range: Upper and lower quartile to clean IOI values by.
+threshold: Value to remove IOI timings below
+keep_pitch_vel: Keep pitch and velocity columns</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.generate_tempo_slopes">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">generate_tempo_slopes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.generate_tempo_slopes" title="Permalink to this definition"></a></dt>
+<dd><p>Returns average tempo slope coefficients for all performances as list of tuples in the form
+(trial, block, latency, jitter, avg. slope coefficient)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.iqr_filter">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">iqr_filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">col</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">iqr_range</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">(0.05,</span> <span class="pre">0.95)</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Series</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.iqr_filter" title="Permalink to this definition"></a></dt>
+<dd><p>Filter duration values below a certain quartile to remove extraneous midi notes not cleaned in Reaper</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.load_data">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">load_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_filepath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.load_data" title="Permalink to this definition"></a></dt>
+<dd><p>Loads all pickled data from the processed data folder</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.load_from_disc">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">load_from_disc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'phase_correction_mds.p'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.load_from_disc" title="Permalink to this definition"></a></dt>
+<dd><p>Try and load models from disc</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.log_model">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">log_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">md</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.log_model" title="Permalink to this definition"></a></dt>
+<dd><p>Helper function to log metadata for a particular model in our GUI, if we’ve passsed a logger function</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.log_simulation">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">log_simulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.log_simulation" title="Permalink to this definition"></a></dt>
+<dd><p>Helper function to log metadata for a particular simulation in our GUI, if we’ve passed a logger function</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.reg_func">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">reg_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xcol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ycol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">RegressionResults</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.reg_func" title="Permalink to this definition"></a></dt>
+<dd><p>Calculates linear regression between two given columns, returns results table</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.resample">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">resample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">perf:</span> <span class="pre">~pandas.core.frame.DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">func=&lt;function</span> <span class="pre">nanmean&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'my_onset'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resample_window:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'1s'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolate:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.resample" title="Permalink to this definition"></a></dt>
+<dd><p>Resamples an individual performance dataframe to get mean of every second.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.return_average_coeffs">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">return_average_coeffs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coeffs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.return_average_coeffs" title="Permalink to this definition"></a></dt>
+<dd><p>Returns list of tuples containing average coefficient for keys/drums performance in a single trial
+Tuples take the form of those in generate_tempo_slopes, i.e. (trial, block, latency, jitter, avg. slope coefficient)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.return_coeff_from_sm_output">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">return_coeff_from_sm_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">RegressionResults</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.return_coeff_from_sm_output" title="Permalink to this definition"></a></dt>
+<dd><p>Formats the table returned by statsmodel to return only the regression coefficient as an integer</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.test_stationary">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">test_stationary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">array</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Series</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Series</span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.test_stationary" title="Permalink to this definition"></a></dt>
+<dd><p>Tests if data is stationary, if not returns data with first difference calculated</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.analyse.analysis_utils.zip_same_conditions_together">
+<span class="sig-prename descclassname"><span class="pre">src.analyse.analysis_utils.</span></span><span class="sig-name descname"><span class="pre">zip_same_conditions_together</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">zip</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#src.analyse.analysis_utils.zip_same_conditions_together" title="Permalink to this definition"></a></dt>
+<dd><p>Iterates through raw data and zips keys/drums data from the same performance together
+Returns a list of zip objects, each element of which is a tuple containing</p>
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="src.analyse.html" class="btn btn-neutral float-left" title="src.analyse" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="src.analyse.phase_correction_models.html" class="btn btn-neutral float-right" title="src.analyse.phase_correction_models" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Huw Cheston 2023.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,3 +1,5 @@
+"""Generates questionnaire data and formats"""
+
 import pandas as pd
 import warnings
 # pd.read_excel is buggy and gives us loads of warnings in the output, even though it works - so disable warnings
@@ -5,6 +7,11 @@ warnings.simplefilter("ignore")
 # Set options in pandas
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
+
+# Define the modules we can import from this file in others
+__all__ = [
+    'gen_questionnaire_output'
+]
 
 
 def format_qualtrics_output(df):

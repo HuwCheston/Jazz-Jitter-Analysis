@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>src.visualise.jitter_measurement_graphs &mdash; Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances 0.1 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="src.visualise.misc_graphs" href="src.visualise.misc_graphs.html" />
+    <link rel="prev" title="src.visualise.ioi_variability_graphs" href="src.visualise.ioi_variability_graphs.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances
+          </a>
+              <div class="version">
+                0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting-started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="src.html">src</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="src.analyse.html">src.analyse</a></li>
+<li class="toctree-l2"><a class="reference internal" href="src.clean.html">src.clean</a></li>
+<li class="toctree-l2"><a class="reference internal" href="src.muxer.html">src.muxer</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="src.visualise.html">src.visualise</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="src.visualise.all_metrics_graphs.html">src.visualise.all_metrics_graphs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.visualise.asynchrony_graphs.html">src.visualise.asynchrony_graphs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.visualise.ioi_variability_graphs.html">src.visualise.ioi_variability_graphs</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">src.visualise.jitter_measurement_graphs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.visualise.misc_graphs.html">src.visualise.misc_graphs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.visualise.phase_correction_graphs.html">src.visualise.phase_correction_graphs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.visualise.run_visualisations.html">src.visualise.run_visualisations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.visualise.simulations_graphs.html">src.visualise.simulations_graphs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.visualise.success_graphs.html">src.visualise.success_graphs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.visualise.tempo_slope_graphs.html">src.visualise.tempo_slope_graphs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="src.visualise.visualise_utils.html">src.visualise.visualise_utils</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="src.html">src</a></li>
+          <li class="breadcrumb-item"><a href="src.visualise.html">src.visualise</a></li>
+      <li class="breadcrumb-item active">src.visualise.jitter_measurement_graphs</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/src.visualise.jitter_measurement_graphs.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="module-src.visualise.jitter_measurement_graphs">
+<span id="src-visualise-jitter-measurement-graphs"></span><h1>src.visualise.jitter_measurement_graphs<a class="headerlink" href="#module-src.visualise.jitter_measurement_graphs" title="Permalink to this heading"></a></h1>
+<p>Code for generating plots from recordings of network latency and jitter</p>
+<p class="rubric">Functions</p>
+<table class="autosummary longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.visualise.html#src.visualise.jitter_measurement_graphs.generate_latency_measurement_plots" title="src.visualise.jitter_measurement_graphs.generate_latency_measurement_plots"><code class="xref py py-obj docutils literal notranslate"><span class="pre">generate_latency_measurement_plots</span></code></a>(...)</p></td>
+<td><p>Generates all plots in this file, with required arguments and inputs</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Classes</p>
+<table class="autosummary longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="../src.visualise.html#src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis" title="src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis"><code class="xref py py-obj docutils literal notranslate"><span class="pre">JitterMeasurementAnalysis</span></code></a>(directory, **kwargs)</p></td>
+<td><p>Measures inter-beat latency for recordings in Librosa</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../src.visualise.html#src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement" title="src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LinePlotJitterMeasurement</span></code></a>(arrays, **kwargs)</p></td>
+<td><p>Creates lineplots (with marginal histrograms) for multiple recordings</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py class">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.visualise.jitter_measurement_graphs.</span></span><span class="sig-name descname"><span class="pre">JitterMeasurementAnalysis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">directory</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis" title="Permalink to this definition"></a></dt>
+<dd><p>Measures inter-beat latency for recordings in Librosa</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._extract_iois">
+<span class="sig-name descname"><span class="pre">_extract_iois</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">onset_times</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">array</span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._extract_iois" title="Permalink to this definition"></a></dt>
+<dd><p>Extracts inter-onset intervals between real and delayed metronome clicks</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._extract_onsets">
+<span class="sig-name descname"><span class="pre">_extract_onsets</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">array</span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._extract_onsets" title="Permalink to this definition"></a></dt>
+<dd><p>Extracts onsets from audio file in Librosa</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._get_files">
+<span class="sig-name descname"><span class="pre">_get_files</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._get_files" title="Permalink to this definition"></a></dt>
+<dd><p>Returns strings of valid filepaths</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._get_minimum">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_get_minimum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">list_of_arrays</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.array</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._get_minimum" title="Permalink to this definition"></a></dt>
+<dd><p>Gets the minimum shape of multiple input arrays, used when subsetting</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._load_audio">
+<span class="sig-name descname"><span class="pre">_load_audio</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.array</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._load_audio" title="Permalink to this definition"></a></dt>
+<dd><p>Loads audio into librosa</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._match_latency_onset_and_ioi">
+<span class="sig-name descname"><span class="pre">_match_latency_onset_and_ioi</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">pandas.core.frame.DataFrame</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.JitterMeasurementAnalysis._match_latency_onset_and_ioi" title="Permalink to this definition"></a></dt>
+<dd><p>Matches each inter-onset interval together with the initial onset time</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">src.visualise.jitter_measurement_graphs.</span></span><span class="sig-name descname"><span class="pre">LinePlotJitterMeasurement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arrays</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement" title="Permalink to this definition"></a></dt>
+<dd><p>Creates lineplots (with marginal histrograms) for multiple recordings</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._create_plot">
+<span class="sig-name descname"><span class="pre">_create_plot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._create_plot" title="Permalink to this definition"></a></dt>
+<dd><p>Creates the line plot and histogram for each array</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._format_array">
+<span class="sig-name descname"><span class="pre">_format_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arrs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.array</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Generator</span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._format_array" title="Permalink to this definition"></a></dt>
+<dd><p>Formats array returned from each recording</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._format_ax">
+<span class="sig-name descname"><span class="pre">_format_ax</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._format_ax" title="Permalink to this definition"></a></dt>
+<dd><p>Formats all axis</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._format_fig">
+<span class="sig-name descname"><span class="pre">_format_fig</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._format_fig" title="Permalink to this definition"></a></dt>
+<dd><p>Formats figure-level attributes</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._format_main_ax">
+<span class="sig-name descname"><span class="pre">_format_main_ax</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._format_main_ax" title="Permalink to this definition"></a></dt>
+<dd><p>Formats the main line plots</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._format_marginal_ax">
+<span class="sig-name descname"><span class="pre">_format_marginal_ax</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement._format_marginal_ax" title="Permalink to this definition"></a></dt>
+<dd><p>Formats the marginal histograms</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement.create_plot">
+<span class="sig-name descname"><span class="pre">create_plot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">matplotlib.figure.Figure</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.LinePlotJitterMeasurement.create_plot" title="Permalink to this definition"></a></dt>
+<dd><p>Called from outside the class and generates the plot, then saves in decorator</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.visualise.jitter_measurement_graphs.generate_latency_measurement_plots">
+<span class="sig-prename descclassname"><span class="pre">src.visualise.jitter_measurement_graphs.</span></span><span class="sig-name descname"><span class="pre">generate_latency_measurement_plots</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#src.visualise.jitter_measurement_graphs.generate_latency_measurement_plots" title="Permalink to this definition"></a></dt>
+<dd><p>Generates all plots in this file, with required arguments and inputs</p>
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="src.visualise.ioi_variability_graphs.html" class="btn btn-neutral float-left" title="src.visualise.ioi_variability_graphs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="src.visualise.misc_graphs.html" class="btn btn-neutral float-right" title="src.visualise.misc_graphs" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Huw Cheston 2023.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

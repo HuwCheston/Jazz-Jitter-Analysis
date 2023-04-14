@@ -1,3 +1,5 @@
+"""Code for generating plots that don't fit anywhere else"""
+
 import numpy as np
 import pandas as pd
 from datetime import timedelta
@@ -460,6 +462,9 @@ class BarPlotCouplingPieceParts(vutils.BasePlot):
 
 
 class BarPlotHigherOrderModelComparison(vutils.BasePlot):
+    """
+    Creates a barplot comparing model quality and fit for higher order phase correction models
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.vars: list[str] = kwargs.get('vars', ['rsquared_adj', 'aic', 'bic', ])
@@ -628,6 +633,10 @@ class BarPlotQuestionnaireCorrelation(vutils.BasePlot):
 
 
 class HeatmapNoteChoice(vutils.BasePlot):
+    """
+    Creates a heatmap representation of a piano and drum kit showing notes that musicians played most frequently
+    """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.cmap_obj = kwargs.get('cmap', cm.Reds)
@@ -825,7 +834,7 @@ def generate_misc_plots(
     mds: list, output_dir: str,
 ) -> None:
     """
-
+    Generates all plots in this file, with required arguments and inputs
     """
     df = []
     for pcm in mds:
