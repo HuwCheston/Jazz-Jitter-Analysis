@@ -510,6 +510,6 @@ if __name__ == '__main__':
         mds=raw, output_dir=output, force_rebuild=True
     )
     # Generate simulations for each individual performance and pickle
-    generate_phase_correction_simulations_for_individual_conditions(
-        mds=raw, output_dir=output, force_rebuild=True
-    )
+    # generate_phase_correction_simulations_for_individual_conditions(
+    #     mds=raw, output_dir=output, force_rebuild=True
+    # )

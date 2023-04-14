@@ -104,7 +104,6 @@ target/
 *.rpp-bak
 *.p
 *.iom
-*.html
 *.svg
 *.cff
 *.rar
