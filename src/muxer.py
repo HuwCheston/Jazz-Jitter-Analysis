@@ -291,9 +291,9 @@ class AVMuxer:
 
 
 @click.command()
-@click.option('-i', 'input_dir', default=os.path.abspath(r'..\\data\\raw\\avmanip_output'),
+@click.option('-i', 'input_dir', default=os.path.abspath(r'.\\data\\raw\\avmanip_output'),
               help=r'Input directory, defaults to \data\raw\avmanip_output')
-@click.option('-o', 'output_dir', default=os.path.abspath(r'..\\data\\raw\\muxed_performances'),
+@click.option('-o', 'output_dir', default=os.path.abspath(r'.\\data\\raw\\muxed_performances'),
               help=r'Output directory, defaults to \data\raw\muxed_performances')
 @click.option('-preset', 'ffmpeg_preset', default='ultrafast', help='FFmpeg preset, defaults to "ultrafast"')
 @click.option('-b:v', 'video_bitrate', default='1500k', help='Video bitrate, defaults to "1500k"')
@@ -320,6 +320,7 @@ def generate_muxed_performances(
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
     logger = logging.getLogger(__name__)
+    logging.info("Make sure you're accessing this script from the root directory of the repository!")
     # Create the AVMuxer with required settings
     mux = AVMuxer(
         input_dir, output_dir, logger=logger, ffmpeg_preset=ffmpeg_preset, video_bitrate=video_bitrate,
