@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Examples &mdash; Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances 0.1 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Troubleshooting" href="troubleshooting.html" />
+    <link rel="prev" title="Getting started" href="getting-started.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances
+          </a>
+              <div class="version">
+                0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="getting-started.html">Getting started</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#loading-serialised-objects">Loading serialised objects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#working-with-phasecorrectionmodel-instances">Working with <code class="docutils literal notranslate"><span class="pre">PhaseCorrectionModel</span></code> instances</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#phasecorrectionmodel-attributes"><code class="docutils literal notranslate"><span class="pre">PhaseCorrectionModel</span></code> attributes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#printing-a-summary-dataframe">Printing a summary dataframe</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#accessing-ensemble-level-characteristics">Accessing ensemble-level characteristics</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#working-with-simulation-instances">Working with <code class="docutils literal notranslate"><span class="pre">Simulation</span></code> instances</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#simulation-attributes"><code class="docutils literal notranslate"><span class="pre">Simulation</span></code> attributes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#simulation-helper-functions"><code class="docutils literal notranslate"><span class="pre">Simulation</span></code> helper functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Printing a summary dataframe</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#working-with-the-graphs">Working with the graphs</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Examples</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/examples.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="examples">
+<h1>Examples<a class="headerlink" href="#examples" title="Permalink to this heading"></a></h1>
+<div class="section" id="loading-serialised-objects">
+<h2>Loading serialised objects<a class="headerlink" href="#loading-serialised-objects" title="Permalink to this heading"></a></h2>
+<p>If you want to work with the serialised dataset, models, or simulations in a Python session, you’ll first need to temporarily add the directory to where these classes are defined to your PATH:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;PATH_TO_\src</span><span class="se">\a</span><span class="s2">nalyse&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Now, to unserialise the models and simulations:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">dill</span>
+<span class="n">mds</span> <span class="o">=</span> <span class="n">dill</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;PATH_TO\models\phase_correction_mds.p&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">))</span>
+<span class="n">sims</span> <span class="o">=</span> <span class="n">dill</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">&quot;PATH_TO\models\phase_correction_sims.p&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="working-with-phasecorrectionmodel-instances">
+<h2>Working with <code class="docutils literal notranslate"><span class="pre">PhaseCorrectionModel</span></code> instances<a class="headerlink" href="#working-with-phasecorrectionmodel-instances" title="Permalink to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">mds</span></code> variable we defined above is an interable containing an instance of the <code class="docutils literal notranslate"><span class="pre">PhaseCorrectionModel</span></code> class for each performance in the corpus. We can access the model <code class="docutils literal notranslate"><span class="pre">md</span></code> for each individual performance, therefore, with code like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">md</span> <span class="ow">in</span> <span class="n">mds</span><span class="p">:</span>
+    <span class="n">do</span> <span class="n">something</span>
+</pre></div>
+</div>
+<div class="section" id="phasecorrectionmodel-attributes">
+<h3><code class="docutils literal notranslate"><span class="pre">PhaseCorrectionModel</span></code> attributes<a class="headerlink" href="#phasecorrectionmodel-attributes" title="Permalink to this heading"></a></h3>
+<p>There are a number of helpful attributes within this class that we can access to gain more information about each performance. For example, to print the results of the nearest neighbour matching process, you can access the <code class="docutils literal notranslate"><span class="pre">md.keys_nn</span></code> or <code class="docutils literal notranslate"><span class="pre">md.drms_nn</span></code> attribute. If you want to access the underlying <a class="reference external" href="https://www.statsmodels.org/dev/generated/statsmodels.regression.linear_model.OLS.html">regression object in StatsModels</a>, you can use the <code class="docutils literal notranslate"><span class="pre">md.keys_md</span></code> and <code class="docutils literal notranslate"><span class="pre">md.drms_md</span></code> attributes, for example <code class="docutils literal notranslate"><span class="pre">md.keys_md.summary()</span></code> or <code class="docutils literal notranslate"><span class="pre">md.drms_md.params</span></code>.</p>
+</div>
+<div class="section" id="printing-a-summary-dataframe">
+<h3>Printing a summary dataframe<a class="headerlink" href="#printing-a-summary-dataframe" title="Permalink to this heading"></a></h3>
+<p>We can print a dataframe containing summary statistics for all the performances in the corpus (e.g. the individual coupling coefficients) by accessing the <code class="docutils literal notranslate"><span class="pre">md.keys_dic</span></code> and <code class="docutils literal notranslate"><span class="pre">md.drms_dic</span></code> attributes in a loop, for example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="n">res</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">md</span> <span class="ow">in</span> <span class="n">mds</span><span class="p">:</span>
+    <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">md</span><span class="o">.</span><span class="n">keys_dic</span><span class="p">)</span> <span class="c1"># Results dictionary for pianist</span>
+    <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">md</span><span class="o">.</span><span class="n">drms_dic</span><span class="p">)</span> <span class="c1"># Results dictionary for drummer</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+<span class="n">df</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="accessing-ensemble-level-characteristics">
+<h3>Accessing ensemble-level characteristics<a class="headerlink" href="#accessing-ensemble-level-characteristics" title="Permalink to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">df</span></code> contained above will contain one row for each performer, meaning that the data for a single performance in the corpus occupies two rows (given two performers in each ensemble).</p>
+<p>Certain characteristics referred to in the paper are instead measured across an ensemble; for instance, coupling asymmetry is calculated as the absolute difference between coupling coefficients obtained from both musicians. To obtain these characteristics, we will need to group <code class="docutils literal notranslate"><span class="pre">df</span></code>, e.g.:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">res</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">grp_vars</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;trial&#39;</span><span class="p">,</span> <span class="s1">&#39;block&#39;</span><span class="p">,</span> <span class="s1">&#39;latency&#39;</span><span class="p">,</span> <span class="s1">&#39;jitter&#39;</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">grp</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">grp_vars</span><span class="p">):</span>
+    <span class="n">dr</span> <span class="o">=</span> <span class="n">grp</span><span class="p">[</span><span class="n">grp</span><span class="p">[</span><span class="s1">&#39;instrument&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;Keys&#39;</span><span class="p">][</span><span class="s1">&#39;correction_partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">ke</span> <span class="o">=</span> <span class="n">grp</span><span class="p">[</span><span class="n">grp</span><span class="p">[</span><span class="s1">&#39;instrument&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;Keys&#39;</span><span class="p">][</span><span class="s1">&#39;correction_partner&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">di</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;coupling_strength&#39;</span><span class="p">:</span> <span class="n">dr</span> <span class="o">+</span> <span class="n">ke</span><span class="p">,</span> <span class="s1">&#39;coupling_asymmetry&#39;</span><span class="p">:</span> <span class="nb">abs</span><span class="p">(</span><span class="n">dr</span> <span class="o">-</span> <span class="n">ke</span><span class="p">)}</span>
+    <span class="n">di</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">grp_vars</span><span class="p">,</span> <span class="n">idx</span><span class="p">)})</span>
+    <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">di</span><span class="p">)</span>
+<span class="n">df_ensemble</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The resulting <code class="docutils literal notranslate"><span class="pre">df_ensemble</span></code> will have 6 columns, containing the duo and session number, the latency and jitter values of the condition, and the coupling asymmetry and strength values obtained across both members of the duo. Note that this grouping is carried out automatically when creating figures and visualisations.</p>
+<p>For more information on the <code class="docutils literal notranslate"><span class="pre">PhaseCorrectionModel</span></code> class, consult the documentation and code.</p>
+</div>
+</div>
+<div class="section" id="working-with-simulation-instances">
+<h2>Working with <code class="docutils literal notranslate"><span class="pre">Simulation</span></code> instances<a class="headerlink" href="#working-with-simulation-instances" title="Permalink to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">sims</span></code> list, likewise, is an iterable of <code class="docutils literal notranslate"><span class="pre">Simulation</span></code> class instances, where each instance corresponds to one condition and simulation paradigm. Taking the 45 ms latency, 0.5x jitter experimental condition as an example, we’d have one Simulation instance for all the individual simulations made under using the <code class="docutils literal notranslate"><span class="pre">democracy</span></code> paradigm and another instance for the simulations made using the <code class="docutils literal notranslate"><span class="pre">anarchy</span></code> paradigm.</p>
+<p>Just as before, we can access each individual Simulation <code class="docutils literal notranslate"><span class="pre">sim</span></code> instance by iterating like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">sim</span> <span class="ow">in</span> <span class="n">sims</span><span class="p">:</span>
+    <span class="n">do</span> <span class="n">something</span>
+</pre></div>
+</div>
+<div class="section" id="simulation-attributes">
+<h3><code class="docutils literal notranslate"><span class="pre">Simulation</span></code> attributes<a class="headerlink" href="#simulation-attributes" title="Permalink to this heading"></a></h3>
+<p>Inside each <code class="docutils literal notranslate"><span class="pre">sim</span></code> instance, we can access every individual keyboard simulation with <code class="docutils literal notranslate"><span class="pre">sim.keys_simulations</span></code> and every drum simulation with <code class="docutils literal notranslate"><span class="pre">sim.drms_simulations</span></code>. These attributes are lists of dataframes, with each dataframe corresponding to one simulation. So, to match the data for one ensemble simulation together:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">matched</span> <span class="o">=</span> <span class="p">[(</span><span class="n">drms_sim</span><span class="p">,</span> <span class="n">keys_sim</span><span class="p">)</span> <span class="k">for</span> <span class="n">drms_sim</span><span class="p">,</span> <span class="n">keys_sim</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">sim</span><span class="o">.</span><span class="n">keys_simulations</span><span class="p">,</span> <span class="n">sim</span><span class="o">.</span><span class="n">drms_simulations</span><span class="p">)]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="simulation-helper-functions">
+<h3><code class="docutils literal notranslate"><span class="pre">Simulation</span></code> helper functions<a class="headerlink" href="#simulation-helper-functions" title="Permalink to this heading"></a></h3>
+<p>There are three helper functions provided to obtain averages across all the simulations contained within a single <code class="docutils literal notranslate"><span class="pre">sim</span></code> instance, which can be used when comparing across paradigms. These are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">sim.get_average_tempo_slope()</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sim.get_average_ioi_variability()</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sim.get_average_pairwise_asynchrony()</span></code></p></li>
+</ul>
+<p>Each function takes in a keyword argument <code class="docutils literal notranslate"><span class="pre">func</span></code>, which can be used to define the method used to obtain the average. Any function should be compatible here, as long as it returns a single value from a Pandas series of dtype <code class="docutils literal notranslate"><span class="pre">float</span></code>. Additional keyword arguments passed into these helper functions will be passed as <code class="docutils literal notranslate"><span class="pre">**kwargs</span></code> to <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+</div>
+<div class="section" id="id1">
+<h3>Printing a summary dataframe<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h3>
+<p>As with the <code class="docutils literal notranslate"><span class="pre">PhaseCorrectionModel</span></code> class, you can print a dataframe containing summary statistics for all the simulations by accessing <code class="docutils literal notranslate"><span class="pre">sim.results_dic</span></code> in a loop, for example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">res</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">sim</span><span class="o">.</span><span class="n">results_dic</span> <span class="k">for</span> <span class="n">sim</span> <span class="ow">in</span> <span class="n">sims</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="working-with-the-graphs">
+<h2>Working with the graphs<a class="headerlink" href="#working-with-the-graphs" title="Permalink to this heading"></a></h2>
+<p>The code for generating the graphs, contained within the <code class="docutils literal notranslate"><span class="pre">\src\visualise</span></code> directory, is generally provided <em>as-is</em>, and not intended to be accessed or imported directly outside this project or used for different datasets. However, some small changes can still be made.</p>
+<p>Aesthetic changes to the plots can be made by altering the constant variables defined at the start of <code class="docutils literal notranslate"><span class="pre">visualise_utils.py</span></code> contained in <code class="docutils literal notranslate"><span class="pre">src\visualise\</span></code>. You can also make aesthetic &amp; statistic changes to the plots by adjusting various keyword arguments used in the individual plotting functions called in <code class="docutils literal notranslate"><span class="pre">src\visualise\run_visualisations.py</span></code>.</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="getting-started.html" class="btn btn-neutral float-left" title="Getting started" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="troubleshooting.html" class="btn btn-neutral float-right" title="Troubleshooting" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Huw Cheston 2023.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

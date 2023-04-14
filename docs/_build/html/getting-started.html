@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Getting started &mdash; Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances 0.1 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Examples" href="examples.html" />
+    <link rel="prev" title="Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances
+          </a>
+              <div class="version">
+                0.1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#reproduce-models-simulations-and-figures">Reproduce models, simulations, and figures</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reproduce-combined-audio-visual-stimuli">Reproduce combined audio-visual stimuli</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Getting started</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/getting-started.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="getting-started">
+<h1>Getting started<a class="headerlink" href="#getting-started" title="Permalink to this heading"></a></h1>
+<p>This page contains instructions for reproducing the data structures used in the original paper.</p>
+<div class="section" id="reproduce-models-simulations-and-figures">
+<h2>Reproduce models, simulations, and figures<a class="headerlink" href="#reproduce-models-simulations-and-figures" title="Permalink to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>First, clone this repository to a new directory on your local machine:</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">HuwCheston</span><span class="o">/</span><span class="n">Jazz</span><span class="o">-</span><span class="n">Jitter</span><span class="o">-</span><span class="n">Analysis</span>
+</pre></div>
+</div>
+<ol class="arabic" start="2">
+<li><p>Download our data from <a class="reference external" href="https://doi.org/10.5281/zenodo.7773824">Zenodo</a>. You’ll need the <code class="docutils literal notranslate"><span class="pre">data.zip</span></code> file and the 6 corresponding volumes, <code class="docutils literal notranslate"><span class="pre">data.z01</span></code> to <code class="docutils literal notranslate"><span class="pre">data.z06</span></code></p>
+<p><em>You do not need to download the file perceptual_study_videos.rar unless you wish to replicate the perceptual component of the paper, the code for which is hosted in a separate repository acccessible <a class="reference external" href="https://github.com/HuwCheston/2023-duo-success-analysis">via this link</a>.</em></p>
+</li>
+<li><p>Open the <code class="docutils literal notranslate"><span class="pre">data.zip</span></code> file (you may need to install a tool for opening multi-part zip files, such as <a class="reference external" href="https://www.win-rar.com/">WinRAR</a>) and extract the contents into <code class="docutils literal notranslate"><span class="pre">\data\raw</span></code>. This folder should then look like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>├── avmanip_output     &lt;- The raw MIDI, audio, and video output from each performance
+│   ├── trial_1  
+│   │   ├── Block 1    &lt;- Folders inside correspond to each performance for this session.
+│   │   ├── Block 2
+│   │   └── Warm-Up
+│   ├── trial_2 
+│   │   ├── Block 1
+│   │   ├── Block 2
+│   │   ├── Warm-Up
+│   │   └── Polar Data &lt;- Note that this folder will not be present for every duo.
+│   ├── trial_3
+│   ├── trial_4
+│   └── trial_5
+├── midi_bpm_cleaning  &lt;- The cleaned MIDI files (quarter note onset positions)
+│   ├── trial_1  
+│   │   ├── block_1    &lt;- Individual MIDI files inside correspond to each performance.    
+│   │   └── block_2
+│   ├── trial_2
+│   ├── trial_3
+│   ├── trial_4
+│   └── trial_5
+├── muxed_performances &lt;- Audio-video .mp4 files, not used in analysis
+├── drums_midi_mapping.csv
+├── keys_midi_mapping.csv
+├── latency_array.csv
+└── questionnaire_anonymised.xlsx    
+</pre></div>
+</div>
+</li>
+<li><p>Open a new command prompt in the root directory of the repository and execute:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">run</span><span class="o">.</span><span class="n">cmd</span>
+</pre></div>
+</div>
+<p>This script will:</p>
+<ul class="simple">
+<li><p>Create a new virtual environment in the repository root folder and install the required dependencies into it.</p></li>
+<li><p>Generate the final dataset from the raw data dump downloaded above</p></li>
+<li><p>Generate the models and simulations from the dataset</p></li>
+<li><p>Generate the figures used in the original paper and supplementary material.</p></li>
+</ul>
+<p>Reproducing the models is fairly quick and optimised (on a system with a 2.6GHz CPU and 16GB of RAM, it takes about three minutes), but reproducing the simulations will typically take a lot longer; probably <em>at least twenty minutes</em> with the default number of simulations per paradigm/condition (<code class="docutils literal notranslate"><span class="pre">500</span></code>). The script will log each model or simulation it creates with a timestamp so you can be sure that the process hasn’t stalled.</p>
+</li>
+<li><p>Once the command has finished, you can access the final dataset in <code class="docutils literal notranslate"><span class="pre">\data\processed</span></code>, the models and simulations in <code class="docutils literal notranslate"><span class="pre">\models</span></code>, and the figures in <code class="docutils literal notranslate"><span class="pre">\figures\reports</span></code>. The dataset, models, and simulations are saved as <a class="reference external" href="https://docs.python.org/3/library/pickle.html">Python pickle files</a> and should be unserialised using the <code class="docutils literal notranslate"><span class="pre">dill.load()</span></code> function in the <a class="reference external" href="https://dill.readthedocs.io/en/latest/">Dill</a> module. Note that trying to unserialise using the Pickle module itself (i.e. with the <code class="docutils literal notranslate"><span class="pre">pickle.load()</span></code> function) is not supported and will more than likely produce errors due to how the custom classes are serialised. The figures are saved as <code class="docutils literal notranslate"><span class="pre">.png</span></code> and <code class="docutils literal notranslate"><span class="pre">.svg</span></code> files which can be opened in many different applications.</p></li>
+<li><p>The script will not attempt to rebuild the processed dataset, models, or simulations if it detects that these have already been created. This can help e.g. if you wish to adjust simulation parameters without rebuilding the entire set of models. To force a rebuild you’ll need to delete or rename the processed files in the above folders and then run the script again.</p></li>
+</ol>
+</div>
+<div class="section" id="reproduce-combined-audio-visual-stimuli">
+<h2>Reproduce combined audio-visual stimuli<a class="headerlink" href="#reproduce-combined-audio-visual-stimuli" title="Permalink to this heading"></a></h2>
+<p>The raw dataset contains separate audio and video files (both with and without latency/jitter) for each performer inside the <code class="docutils literal notranslate"><span class="pre">\data\raw\avmanip_output</span></code> folder. These can be combined to create muxed audio-video recordings, i.e. a single video file containing both audio and video tracks, sync’ed together, with any combination of live or delayed audio/video. The perceptual component of this study used the delayed audio and video from both the pianist and drummer.</p>
+<ol class="arabic">
+<li><p>Follow steps 1–3 in the section <strong>Reproduce models, simulations, and figures from original paper</strong> above. You don’t need to build the models or simulations, just get the data into the correct place within the overall filestructure.</p></li>
+<li><p>Download and install <a class="reference external" href="https://ffmpeg.org/">FFmpeg</a> and ensure that it can be accessed on your <code class="docutils literal notranslate"><span class="pre">PATH</span></code>. To check this, open a command prompt and type in</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ffmpeg</span>
+</pre></div>
+</div>
+<p>If you don’t see any errors, you’re good to go!</p>
+</li>
+<li><p>Open a new command prompt in the root directory of the repository and execute:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">mixer</span><span class="o">.</span><span class="n">py</span>
+</pre></div>
+</div>
+<p>This script will take all the delayed audio and video files from both musicians (located in <code class="docutils literal notranslate"><span class="pre">\data\raw\avmanip_output</span></code>) and mux them together into a new folder (default <code class="docutils literal notranslate"><span class="pre">\data\raw\muxed_performances\</span></code>).</p>
+</li>
+<li><p>By default, the script will recreate the stimuli used in the perceptual component of our paper, i.e. with delay applied to the audio and video footage from both performers. You can customize the output by setting the <code class="docutils literal notranslate"><span class="pre">--keys</span></code> and <code class="docutils literal notranslate"><span class="pre">--drums</span></code> flags to either <code class="docutils literal notranslate"><span class="pre">&quot;Live&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;Delay&quot;</span></code>. So, to recreate the experience that the keyboard player had in the experiment (i.e. live keyboard audio and video, delayed drummer audio and video), you’d use:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">mixer</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">drums</span> <span class="s2">&quot;Delay&quot;</span> <span class="o">--</span><span class="n">keys</span> <span class="s2">&quot;Live&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p>You can also change a few other options related to how the videos look by passing in further FFmpeg commands and flags. Not all of the commands supported by FFmpeg are currently implemented here. You can see those that are by typing:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">mixer</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">help</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Huw Cheston 2023.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
