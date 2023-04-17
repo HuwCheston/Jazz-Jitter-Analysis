@@ -134,6 +134,7 @@ def generate_asynchrony_plots(
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\asynchrony_plots'
 
+    # TODO: this shouldn't be hardcoded
     corpus_dir = r"C:\Python Projects\jazz-jitter-analysis\references\corpus.xlsx"
     nl = NumberLinePairwiseAsynchrony(
         df=df, output_dir=figures_output_dir, corpus_filepath=corpus_dir
@@ -143,6 +144,7 @@ def generate_asynchrony_plots(
 
 if __name__ == '__main__':
     # Default location for phase correction models
+    # TODO: this shouldn't be hardcoded
     raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p')
     # Default location to save plots
     output = r"C:\Python Projects\jazz-jitter-analysis\reports"

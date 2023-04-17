@@ -155,6 +155,7 @@ class BoxPlot(vutils.BasePlot):
     given variable (defaults to jitter scale). By default, the control condition is included in this plot,
     but this can be excluded by setting optional argument subset to True.
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.subset: bool = kwargs.get('subset', False)
@@ -230,6 +231,7 @@ class SingleConditionPlot:
     Generate a nice plot of a single performance, showing actual and predicted tempo slope, relative phase adjustments,
     phase correction coefficients to partner and self for both performers
     """
+
     def __init__(self, **kwargs):
         plt.rcParams.update({'font.size': vutils.FONTSIZE})
         # Get pianist data
@@ -251,7 +253,6 @@ class SingleConditionPlot:
         self.polar_num_bins = 15
         self.polar_xt = np.pi / 180 * np.linspace(-90, 90, 5, endpoint=True)
 
-    @vutils.plot_decorator
     def create_plot(self) -> tuple[plt.Figure, str]:
         """
         Called from outside the class to generate and save the image.
@@ -261,7 +262,7 @@ class SingleConditionPlot:
         self._plot_polar()
         self._plot_slopes()
         # Format the figure and save
-        self.fig.suptitle(f'Duo {self.metadata[0]} (repeat {self.metadata[1]}): '
+        self.fig.suptitle(f'Duo {self.metadata[0]} (session {self.metadata[1]}): '
                           f'latency {self.metadata[2]}ms, jitter {self.metadata[3]}x')
         fname = f'{self.output_dir}\\duo{self.metadata[0]}_repeat{self.metadata[1]}' \
                 f'_latency{self.metadata[2]}_jitter{self.metadata[3]}'
@@ -276,7 +277,7 @@ class SingleConditionPlot:
             pd.concat([self.keys_md.params, self.drms_md.params], axis=1)
               .rename(columns={0: 'Keys', 1: 'Drums'})
               .transpose()
-              .rename(columns={'my_prev_ioi': 'Self', 'asynchrony': 'Partner'})
+              .rename(columns={'my_prev_ioi_diff': 'Self', 'asynchrony': 'Partner'})
               .reset_index(drop=False)
         )
         self.ax[1, 1].sharex(self.ax[1, 0])
@@ -295,10 +296,10 @@ class SingleConditionPlot:
             g.text(0.05, 0.9, s=st, transform=g.transAxes, ha='center', )
             g.set_ylabel('')
             if num == 0:
-                g.axes.set_yticks(g.axes.get_yticks(), g.axes.get_yticklabels())
+                g.axes.set_yticks(g.axes.get_yticks())
                 g.axes.set_yticklabels(labels=g.axes.get_yticklabels(), va='center')
                 g.set_title('Phase Correction', x=1)
-                g.set_xlabel('Coefficient', x=1)
+                g.set_xlabel('Coupling', x=1)
             else:
                 g.axes.set_yticklabels('')
                 g.set_xlabel('')
@@ -333,13 +334,16 @@ class SingleConditionPlot:
         result into given number of bins, getting the square-root density of these bins.
         """
         # Calculate the amount of phase correction for each beat
-        corr = df.asynchrony * -1
+        corr = df['asynchrony'] * -1
         # Cut into bins
         cut = pd.cut(corr, self.polar_num_bins, include_lowest=False).value_counts().sort_index()
         # Format the dataframe
         cut.index = pd.IntervalIndex(cut.index.get_level_values(0)).mid
-        cut = pd.DataFrame(cut, columns=['asynchrony']).reset_index(drop=False).rename(
-            columns={'asynchrony': 'val', 'index': 'idx'})
+        cut = (
+            pd.DataFrame(cut, columns=['asynchrony'])
+              .reset_index(drop=False)
+              .rename(columns={'asynchrony': 'val', 'index': 'idx'})
+        )
         # Multiply the bin median by pi to get number of degrees
         cut['idx'] = cut['idx'] * np.pi
         # Take the square root of the density for plotting
@@ -370,17 +374,15 @@ class SingleConditionPlot:
         """
         ax = self.ax[2, 0]
         # Get actual and predicted rolling slopes
-        actual = autils.average_bpms(self.keys_o, self.drms_o)
-        predicted = autils.average_bpms(self.keys_df, self.drms_df, elap='elapsed', bpm='predicted_bpm')
+        bpm = autils.average_bpms(self.keys_o, self.drms_o)
         # Plot actual and predicted slopes
-        for df, lab in zip((actual, predicted), ('Actual', 'Fitted')):
-            ax.plot(df['elapsed'], df['bpm_rolling'], label=lab, linewidth=2)
+        ax.plot(
+            bpm['elapsed'], bpm['bpm_rolling'], linewidth=2, label='Performance Tempo'
+        )
         # Add metronome line to 120BPM
         ax.axhline(y=120, color=vutils.BLACK, linestyle='--', alpha=vutils.ALPHA, label='Metronome Tempo', linewidth=2)
-        ax.text(8, 40, s=f'$r^2$ = {round(self.rsquared, 2)}',
-                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
         ax.legend(ncol=3, loc='lower center', bbox_to_anchor=(0.48, -0.28), title=None, frameon=False, )
-        ax.set(xlabel='Performance duration (s)', ylabel='Average tempo (BPM, 8-seconds rolling)', ylim=(30, 160),
+        ax.set(xlabel='Duration (s)', ylabel='Average tempo (BPM, 8-seconds rolling)', ylim=(30, 160),
                title='Tempo Slope')
 
 
@@ -2089,6 +2091,7 @@ def generate_phase_correction_plots(
 
 if __name__ == '__main__':
     # Default location for phase correction models
+    # TODO: this shouldn't be hardcoded
     raw: list[PhaseCorrectionModel] = autils.load_from_disc(
         r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p'
     )

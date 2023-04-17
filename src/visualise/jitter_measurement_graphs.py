@@ -203,6 +203,7 @@ def generate_latency_measurement_plots(
 
 if __name__ == '__main__':
     # Default location for phase correction models
+    # TODO: this shouldn't be hardcoded
     input_ = r"C:\Python Projects\jazz-jitter-analysis\data\raw\jitter_measurement_bounces"
     # Default location to save plots
     output_ = r"C:\Python Projects\jazz-jitter-analysis\reports\figures\misc_plots"

@@ -33,7 +33,7 @@ class LinePlotAllParameters(vutils.BasePlot):
         # Our original performances
         self.keys_orig, self.drms_orig = kwargs.get('keys_orig', None), kwargs.get('drms_orig', None)
         self.params = kwargs.get('params', None)
-        self.fig, self.ax = plt.subplots(2, 1, sharex=True, figsize=(18.8, 15))
+        self.fig, self.ax = plt.subplots(2, 1, sharex=True, figsize=(9.4, 15))
         self.ax[1].set_yscale('log')
 
     def _plot_all_simulations(
@@ -59,11 +59,11 @@ class LinePlotAllParameters(vutils.BasePlot):
             # Plot average simulations
             self.ax[0].plot(
                 ioi_avg.index.seconds, (60 / ioi_avg['my_next_ioi']).rolling(window='4s').mean(), alpha=1, linewidth=4,
-                ls='-', color=col, label=f'{sim.parameter.title()} {sim.leader if sim.leader is not None else ""}'
+                ls='-', color=col, label=f'{sim.parameter.title()}'
             )
             self.ax[1].plot(
                 async_avg.index.seconds, (async_avg['asynchrony']).rolling(window='4s').mean(), alpha=1, linewidth=4,
-                ls='-', color=col, label=f'{sim.parameter.title()} {sim.leader if sim.leader is not None else ""}'
+                ls='-', color=col, label=f'{sim.parameter.title()}'
             )
 
     def _plot_original_performance(
@@ -87,10 +87,9 @@ class LinePlotAllParameters(vutils.BasePlot):
             # Plot onto the required axis
             self.ax[num].plot(
                 conc['my_onset'], conc[s].rolling(window='4s').mean(), alpha=1, color=vutils.BLACK,
-                label='Actual performance', linewidth=4, ls='--'
+                label='Original\nperformance', linewidth=4, ls='--'
             )
 
-    @vutils.plot_decorator
     def create_plot(
             self
     ) -> tuple[plt.Figure, str]:
@@ -102,8 +101,6 @@ class LinePlotAllParameters(vutils.BasePlot):
             self._plot_original_performance()
         self._format_ax()
         self._format_fig()
-        self.fig.suptitle(f"Duo {self.params['trial']}, block {self.params['block']}, "
-                          f"latency {self.params['latency']}, jitter {self.params['jitter']}")
         fname = f"{self.output_dir}\\lineplot_all_parameters_{self.params['trial']}_" \
                 f"{self.params['block']}_{self.params['latency']}_{self.params['jitter']}"
         return self.fig, fname
@@ -131,7 +128,7 @@ class LinePlotAllParameters(vutils.BasePlot):
         # Calculate x limit
         xlim = (self._get_min_max_x_val(min), self._get_min_max_x_val(max))
         # Format top axes (BPM)
-        ticks_ax0 = np.linspace(0, 200, 6)
+        ticks_ax0 = np.linspace(0, 200, 6, dtype=int)
         self.ax[0].set(xlabel='', ylim=(0, 200), xlim=xlim, yticks=ticks_ax0, yticklabels=ticks_ax0)
         self.ax[0].set_ylabel('Tempo (BPM)', fontsize='large')
         self.ax[0].axhline(y=120, linestyle='--', alpha=vutils.ALPHA, color=vutils.BLACK, linewidth=2)
@@ -152,14 +149,21 @@ class LinePlotAllParameters(vutils.BasePlot):
         """
         Formats figure, setting title, legend etc.
         """
-        self.fig.suptitle(f"Duo {self.params['trial']}, block {self.params['block']}, "
-                          f"latency {self.params['latency']}, jitter {self.params['jitter']}")
-        handles, labels = self.ax[0].get_legend_handles_labels()
-        self.fig.legend(
-            handles[:len(self.simulations) + 1], labels[:len(self.simulations) + 1], ncol=1,
-            loc='right', title=None, frameon=False, fontsize='large', columnspacing=1, handletextpad=0.3
+        from matplotlib.lines import Line2D
+        self.fig.suptitle(
+            f"Duo {self.params['trial']}, block {self.params['block']}, "
+            f"latency {self.params['latency']}, jitter {self.params['jitter']}",
+            x=0.5, fontsize=vutils.FONTSIZE + 5
         )
-        self.fig.subplots_adjust(bottom=0.07, top=0.93, left=0.09, right=0.78)
+        handles, labels = self.ax[0].get_legend_handles_labels()
+        handles.insert(4, Line2D([],[],linestyle=''))
+        labels.insert(4, '')
+        lgnd = self.fig.legend(
+            handles, labels, ncol=1, loc='right', title='Simulation\nparadigm',
+            frameon=False, fontsize='large', columnspacing=1, handletextpad=0.3
+        )
+        plt.setp(lgnd.get_title(), fontsize=vutils.FONTSIZE + 5)
+        self.fig.subplots_adjust(bottom=0.07, top=0.93, left=0.03, right=0.66)
 
 
 class BarPlotSimulationParameters(vutils.BasePlot):
@@ -693,7 +697,6 @@ class DistPlotAverage(vutils.BasePlot):
         Create each plot individually
         """
         for y, (lat, jit) in zip(range(0, 5), self.conditions):
-
             # Subset to get required condition
             condition = self.df[(self.df['latency'] == lat) & (self.df['jitter'] == jit)]
             # Plot anarchy, democracy, leadership results
@@ -1002,6 +1005,7 @@ def generate_plots_for_simulations_with_coupling_parameters(
 
 
 if __name__ == '__main__':
+    # TODO: this shouldn't be hardcoded
     raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", "phase_correction_sims.p")
     raw_av = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", "phase_correction_sims_average.p")
     # Default location to save plots

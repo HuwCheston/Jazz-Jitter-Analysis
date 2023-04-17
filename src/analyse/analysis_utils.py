@@ -327,7 +327,8 @@ def resample(
     # Set the index, resample to every second, and take the mean
     if interpolate:
         return (
-            perf.set_index(idx)
+            perf.drop(['pitch'], axis=1, errors='ignore')
+                .set_index(idx)
                 .resample(resample_window, offset=offset)
                 .apply(func)
                 .interpolate(limit_direction='backward')

@@ -26,7 +26,7 @@ class Simulation:
     Number of simulations defaults to 500, the same number in Jacoby et al. (2021).
     """
     def __init__(
-            self, pcm: PhaseCorrectionModel | pd.DataFrame, num_simulations: int = 500, **kwargs
+            self, pcm: PhaseCorrectionModel, num_simulations: int = 500, **kwargs
     ):
         # Default parameters
         self._resample_interval: timedelta = timedelta(seconds=1)  # Get mean of IOIs within this window
@@ -173,7 +173,7 @@ class Simulation:
 
     def create_all_simulations(
             self
-    ):
+    ) -> None:
         """
         Run the simulations and create a list of dataframes for each individual performer
         """
@@ -230,7 +230,7 @@ class Simulation:
         # Iterate through the required columns
         for col in cols:
             # Extract the standard deviation and convert into milliseconds
-            df[f'{col}_std'] = roll[col].std(skipna=True) * 1000
+            df[f'{col}_std'] = roll[col].std() * 1000
         return df
 
     @staticmethod
@@ -249,7 +249,7 @@ class Simulation:
 
     def get_average_tempo_slope(
             self, func=np.nanmean, **kwargs
-    ) -> float | None:
+    ) -> float:
         """
         Returns the average tempo slope for all simulations.
 
@@ -280,7 +280,7 @@ class Simulation:
 
     def get_average_ioi_variability(
             self, func=np.nanmean, **kwargs
-    ) -> float | None:
+    ) -> float:
         """
         Returns the average tempo slope for all simulations.
 
@@ -296,7 +296,7 @@ class Simulation:
 
     def get_average_pairwise_asynchrony(
             self, func=np.nanmean, async_col: str = 'asynchrony', **kwargs
-    ) -> float | None:
+    ) -> float:
         """
         Gets the average pairwise asynchrony (in milliseconds!) across all simulated performances
         """
@@ -314,8 +314,8 @@ class Simulation:
 
     def get_simulation_data_for_plotting(
             self, plot_individual: bool = True, plot_average: bool = True, var: str = 'my_next_ioi',
-            timespan: tuple[int] = (7, 101),
-    ) -> tuple[list[pd.DataFrame], pd.DataFrame | None]:
+            timespan: tuple = (7, 101),
+    ) -> tuple:
         """
         Wrangles simulation data into a format that can be plotted and returns.
         """
@@ -504,6 +504,7 @@ def generate_phase_correction_simulations_for_coupling_parameters(
 
 if __name__ == '__main__':
     # Default location for phase correction models
+    # TODO: this shouldn't be hardcoded
     raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename="phase_correction_mds.p")
     # Default location to save output simulations
     output = r"C:\Python Projects\jazz-jitter-analysis\models"

@@ -46,7 +46,9 @@ autosummary_generate = True
 autodoc_default_options = {
     "members": True,
     "undoc-members": True,
-    "private-members": True
+    "private-members": True,
+    "inherited-members": True,
+    'show-inheritance': True
 }
 
 # exclude_patterns = ['_build', '_templates']

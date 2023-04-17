@@ -451,7 +451,7 @@ class PhaseCorrectionModel:
     def _get_rolling_coefficients(
             self, nn_df: pd.DataFrame, func=None, ind_var: str = 'latency', dep_var: str = 'my_prev_ioi',
             cov: str = 'their_prev_ioi'
-    ) -> list[float | int]:
+    ) -> list:
         """
         Centralised function for calculating the relationship between IOI and latency variancy. Takes in a single
         independent and dependent variable and covariants, as well as a function to apply to these.
@@ -492,7 +492,7 @@ class PhaseCorrectionModel:
         # Iterate through the required columns
         for col in cols:
             # Extract the standard deviation and convert into milliseconds
-            temp[f'{col}_std'] = roll[col].std(skipna=True) * 1000
+            temp[f'{col}_std'] = roll[col].std() * 1000
         # Resample to the desired frequency, get the mean value, and interpolate from previous values to fill NaNs
         return temp.resample('1s', offset=offset).apply(np.nanmean).interpolate(limit_direction='backward')
 
@@ -512,7 +512,7 @@ class PhaseCorrectionModel:
     def _partial_corr_shifted_rolling_variables(
             self, lagged: pd.DataFrame, dep_var: str = 'my_prev_ioi_std',
             ind_var: str = 'latency_std', cov_var: str = 'their_prev_ioi_std'
-    ) -> list[float | int]:
+    ) -> list:
         """
         Gets the partial correlation between dep_var and ind_var, controlling for covariate cov_var
         """
@@ -686,6 +686,7 @@ def generate_phase_correction_models(
 
 if __name__ == '__main__':
     # Default location for processed raw data
+    # TODO: this shouldn't be hardcoded
     raw = autils.load_data(r"C:\Python Projects\jazz-jitter-analysis\data\processed")
     # Default location to save output models
     output = r"C:\Python Projects\jazz-jitter-analysis\models"

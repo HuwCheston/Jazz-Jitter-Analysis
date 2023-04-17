@@ -91,8 +91,9 @@ def clean_pm_output(i: str, trial: list, dic_name: str = 'midi_bpm') -> list:
     return sorted(l1, key=lambda k: (k['block'], k['condition'],))
 
 
-def gen_pm_output(input_dir, ) -> list:
+def gen_pm_output(input_dir, **kwargs) -> list:
     """Iterates through MIDI BPM files in input directory and extracts data (onset, pitch, velocity) using PrettyMIDI"""
+    midi_mapping_fpath = kwargs.get('midi_mapping_fpath', input_dir)
     # Get all .MIDI BPM files from our input directory
     f_list = return_list_of_files(input_dir)
     # For each .MIDI file, extract metadata from filename - trial, condition, block number, amount of latency...
@@ -102,7 +103,7 @@ def gen_pm_output(input_dir, ) -> list:
     # Create a new list of lists containing metadata & pretty_midi output for every condition in all trials
     pm_output = [[(file, return_pm_output(f=file)) for file in trial] for num, trial in enumerate(t_list, 1)]
     # Clean our pretty_midi output list and return
-    clean_pm = [clean_pm_output(i=input_dir, trial=t) for t in pm_output]
+    clean_pm = [clean_pm_output(i=midi_mapping_fpath, trial=t) for t in pm_output]
     return clean_pm
 
 
@@ -117,8 +118,10 @@ def return_list_of_raw_midi_files(input_dir):
                                                          block_pat=fr'Block (\d+)')
 
 
-def gen_raw_midi_output(input_dir) -> list:
+def gen_raw_midi_output(input_dir, **kwargs) -> list:
     """Iterates through raw MIDI files in input directory and extracts data (onset, pitch, velocity) using PrettyMIDI"""
+    # TODO: this should be located in 'references', not 'data/raw'
+    midi_mapping_fpath = kwargs.get('midi_mapping_fpath', input_dir)
     # Get all .MIDI BPM files from our input directory
     f_list = return_list_of_raw_midi_files(input_dir)
     # Format d_list into list of lists, each list corresponding to data from each trial
@@ -126,5 +129,5 @@ def gen_raw_midi_output(input_dir) -> list:
     # Create a new list of lists containing metadata & pretty_midi output for every condition in all trials
     pm_output = [[(file, return_pm_output(f=file)) for file in trial] for num, trial in enumerate(t_list, 1)]
     # Clean our pretty_midi output list and return
-    clean_pm = [clean_pm_output(i=input_dir, trial=t, dic_name='midi_raw') for t in pm_output]
+    clean_pm = [clean_pm_output(i=midi_mapping_fpath, trial=t, dic_name='midi_raw') for t in pm_output]
     return clean_pm

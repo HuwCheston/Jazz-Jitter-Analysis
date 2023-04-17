@@ -862,6 +862,7 @@ def generate_misc_plots(
 
 if __name__ == '__main__':
     # Default location for phase correction models
+    # TODO: this shouldn't be hardcoded
     raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p')
     # Default location to save plots
     output = r"C:\Python Projects\jazz-jitter-analysis\reports"
