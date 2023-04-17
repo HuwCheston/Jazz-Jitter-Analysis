@@ -113,9 +113,11 @@ def return_list_of_raw_midi_files(input_dir):
     for r, d, f in os.walk(fol, topdown=False):
         for n in f:
             if n.endswith(('.mid', '.MID')) and 'Warm-Up' not in r and 'Delay' not in n:
-                yield return_formatted_dic_from_filename(os.path.join(r, n),
-                                                         lat_pat=r'- (\d+) (\d+)\\',
-                                                         block_pat=fr'Block (\d+)')
+                yield return_formatted_dic_from_filename(
+                  os.path.join(r, n),
+                  lat_pat=r'- (\d+) (\d+)',
+                  block_pat=fr'Block (\d+)'
+                )
 
 
 def gen_raw_midi_output(input_dir, **kwargs) -> list:
