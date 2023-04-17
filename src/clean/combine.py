@@ -25,14 +25,15 @@ def scale_array(array, latency, jitter):
 
 
 def combine_output(
-        input_dir: str, output_dir: str, **kwargs
+        input_dir: str, output_dir: str, zoom_arr=None, **kwargs
 ) -> list:
     """
     Combines data streams together into list of dictionaries per trial (one dictionary per condition/performer)
     """
     # Get from kwargs
     dump_pickle = kwargs.get('dump_pickle', True)   # Whether to dump raw data to pickle files
-    zoom_arr = np.genfromtxt(f'{input_dir}\\latency_array.csv')
+    if zoom_arr is not None:
+        zoom_arr = np.genfromtxt(f'{input_dir}/latency_array.csv')
     raw_data = []
     # Zip all iterables in kwargs together
     for num, values in enumerate(zip(*[a for a in kwargs.values()]), 1):
