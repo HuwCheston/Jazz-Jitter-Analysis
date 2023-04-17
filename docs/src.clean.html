@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="getting-started.html">Getting started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notebooks.html">Notebooks</a></li>
 </ul>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="_autosummary/src.html">src</a></li>
@@ -85,7 +86,7 @@
 <p>Combines all outputs together</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="src.clean.combine.combine_output">
-<span class="sig-prename descclassname"><span class="pre">src.clean.combine.</span></span><span class="sig-name descname"><span class="pre">combine_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_dir</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#src.clean.combine.combine_output" title="Permalink to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">src.clean.combine.</span></span><span class="sig-name descname"><span class="pre">combine_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zoom_arr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dump_pickle</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="headerlink" href="#src.clean.combine.combine_output" title="Permalink to this definition"></a></dt>
 <dd><p>Combines data streams together into list of dictionaries per trial (one dictionary per condition/performer)</p>
 </dd></dl>
 
@@ -95,13 +96,13 @@
 <p>Generates MIDI data in Python-compatible form and cleans</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="src.clean.gen_pretty_midi.gen_pm_output">
-<span class="sig-prename descclassname"><span class="pre">src.clean.gen_pretty_midi.</span></span><span class="sig-name descname"><span class="pre">gen_pm_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dir</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="headerlink" href="#src.clean.gen_pretty_midi.gen_pm_output" title="Permalink to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">src.clean.gen_pretty_midi.</span></span><span class="sig-name descname"><span class="pre">gen_pm_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dir</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="headerlink" href="#src.clean.gen_pretty_midi.gen_pm_output" title="Permalink to this definition"></a></dt>
 <dd><p>Iterates through MIDI BPM files in input directory and extracts data (onset, pitch, velocity) using PrettyMIDI</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="src.clean.gen_pretty_midi.gen_raw_midi_output">
-<span class="sig-prename descclassname"><span class="pre">src.clean.gen_pretty_midi.</span></span><span class="sig-name descname"><span class="pre">gen_raw_midi_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dir</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="headerlink" href="#src.clean.gen_pretty_midi.gen_raw_midi_output" title="Permalink to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">src.clean.gen_pretty_midi.</span></span><span class="sig-name descname"><span class="pre">gen_raw_midi_output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_dir</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="headerlink" href="#src.clean.gen_pretty_midi.gen_raw_midi_output" title="Permalink to this definition"></a></dt>
 <dd><p>Iterates through raw MIDI files in input directory and extracts data (onset, pitch, velocity) using PrettyMIDI</p>
 </dd></dl>
 

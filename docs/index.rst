@@ -17,9 +17,13 @@ Quick start
 
 To build the dataset, models, simulations, figures, and audio-visual stimuli used in the original paper, follow the instructions in :ref:`Getting started`.
 
-After building, for examples on how to use the dataset in your own Python sessions, see :ref:`Examples`.
+After building, for examples on how to use the dataset in your own Python sessions, take a look at :ref:`Examples`.
 
 For help, including advice on building the dataset on slower systems, see :ref:`Troubleshooting`.
+
+For the source code documentation (not comprehensive or pretty), go to :ref:`modindex`
+
+Finally, to explore the models and data created here without having to install or run anything locally, check out :ref:`Notebooks`.
 
 Requirements
 ------------
@@ -38,6 +42,7 @@ Contents:
    getting-started
    examples
    troubleshooting
+   notebooks
 
 Documentation:
 --------------

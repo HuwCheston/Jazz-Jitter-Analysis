@@ -7,11 +7,13 @@ This repository is associated with the paper “Leader-Follower Relationships Op
 
 To build the dataset, models, simulations, figures, and audio-visual stimuli used in the original paper, follow the instructions in [Getting started](https://huwcheston.github.io/Jazz-Jitter-Analysis/getting-started.html).
 
-After building, for examples on how to use the dataset in your own Python sessions, see [Examples](https://huwcheston.github.io/Jazz-Jitter-Analysis/examples.html).
+After building, for examples on how to use the dataset in your own Python sessions, take a look at [Examples](https://huwcheston.github.io/Jazz-Jitter-Analysis/examples.html).
 
 For help, including advice on building the dataset on slower systems, see [Troubleshooting](https://huwcheston.github.io/Jazz-Jitter-Analysis/troubleshooting.html).
 
 For the source code documentation (not comprehensive or pretty), go to [Documentation](https://huwcheston.github.io/Jazz-Jitter-Analysis/_autosummary/src.html#).
+
+Finally, to explore the models and data created here without having to install or run anything locally, check out [Notebooks](https://huwcheston.github.io/Jazz-Jitter-Analysis/notebooks.html).
 
 ## Requirements
 
