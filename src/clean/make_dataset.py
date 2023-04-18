@@ -4,6 +4,7 @@
 import click
 import logging
 from pathlib import Path
+from numpy import genfromtxt
 from dotenv import find_dotenv, load_dotenv
 
 from gen_pretty_midi import *
@@ -14,10 +15,11 @@ from combine import *
 @click.command()
 @click.option('-i', 'input_filepath', type=click.Path(exists=True), default=r'data\raw')
 @click.option('-o', 'output_filepath', type=click.Path(exists=True), default='data\processed')
-def main(input_filepath, output_filepath):
+@click.option('-r', 'references_filepath', type=click.Path(exists=True), default='references')
+def main(input_filepath, output_filepath, references_filepath):
     """
-    Runs data processing scripts to turn raw data from (../raw) into
-    cleaned data ready to be analyzed (saved in ../processed).
+    Runs data processing scripts to turn raw data from (../raw) into cleaned data ready to be analyzed
+    (saved in ../processed). Uses reference objects (saved in ../references)
     """
     # Initialise logger and output dictionary
     logger = logging.getLogger(__name__)
@@ -30,18 +32,25 @@ def main(input_filepath, output_filepath):
     logger.info('... done!')
 
     # Generate and clean raw MIDI data
-    logger.info('generating raw MIDI data...')
-    output['midi_raw'] = gen_raw_midi_output(input_dir=input_filepath)
+    logger.info(f'generating raw MIDI data using mappings in {references_filepath}...')
+    output['midi_raw'] = gen_raw_midi_output(
+        input_dir=input_filepath, midi_mapping_fpath=references_filepath
+    )
     logger.info('... done!')
 
     # Generate and clean MIDI BPM data
-    logger.info('generating MIDI quarter note data...')
-    output['midi_bpm'] = gen_pm_output(input_dir=input_filepath, )
+    logger.info(f'generating MIDI quarter note data using mappings in {references_filepath}...')
+    output['midi_bpm'] = gen_pm_output(
+        input_dir=input_filepath, midi_mapping_fpath=references_filepath
+    )
     logger.info('... done!')
 
     # Combine outputs, save, and cleanup
     logger.info('combining all outputs and saving final dataset...')
-    raw_data = combine_output(input_dir=input_filepath, output_dir=output_filepath, **output)
+    raw_data = combine_output(
+        input_dir=input_filepath, output_dir=output_filepath,
+        zoom_arr=genfromtxt(fr"{references_filepath}/latency_array.csv"), **output
+    )
     logger.info(f'... saved in {output_filepath}')
     return raw_data
 

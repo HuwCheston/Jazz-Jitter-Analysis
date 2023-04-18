@@ -11,8 +11,13 @@ __all__ = [
 ]
 
 
-def scale_array(array, latency, jitter):
-    """Function imported from AV-Manip to scale array to given latency and jitter values for each condition"""
+def scale_array(
+        array: np.array, latency: float, jitter: float
+) -> np.array:
+    """
+    Function imported from AV-Manip to scale array to given latency and jitter values for each condition
+    """
+
     # Scale the array by the jitter value
     scale = lambda x: (x * jitter)
     scaled_array = scale(array)

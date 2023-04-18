@@ -75,7 +75,7 @@ def get_data_from_pm_object(pm) -> list:
 def clean_pm_output(i: str, trial: list, dic_name: str = 'midi_bpm') -> list:
     """Clean raw prettymidi output: truncate start and stop times, map midi notes onto musical notes..."""
     # Get midi mappings for each instrument as dictionary
-    get_map = lambda s: pd.read_csv(f"{i}/{s}_midi_mapping.csv", header=None, index_col=0).squeeze("columns").to_dict()
+    get_map = lambda s: pd.read_csv(os.path.normpath(f"{i}/{s}_midi_mapping.csv"), header=None, index_col=0).squeeze("columns").to_dict()
     keys_map = get_map('keys')
     drums_map = get_map('drums')
     # Iterate through all conditions and add clean data as key to dictionary
@@ -120,8 +120,13 @@ def return_list_of_raw_midi_files(input_dir):
                 )
 
 
-def gen_raw_midi_output(input_dir, **kwargs) -> list:
-    """Iterates through raw MIDI files in input directory and extracts data (onset, pitch, velocity) using PrettyMIDI"""
+def gen_raw_midi_output(
+        input_dir, **kwargs
+) -> list:
+    """
+    Iterates through raw MIDI files in input directory and extracts data (onset, pitch, velocity) using PrettyMIDI
+    """
+
     # TODO: this should be located in 'references', not 'data/raw'
     midi_mapping_fpath = kwargs.get('midi_mapping_fpath', input_dir)
     # Get all .MIDI BPM files from our input directory
