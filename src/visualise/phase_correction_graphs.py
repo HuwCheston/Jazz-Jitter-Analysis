@@ -788,7 +788,9 @@ class RegPlotGrid(vutils.BasePlot):
         self._format_fig()
         # Format the marginal axes after the figure, otherwise this will affect their position
         self._format_marginal_ax()
-        fname = f'{self.output_dir}\\regplot_grid_{self.error_bar}' + '_abs_slope' if self.abs_slope else ''
+        fname = f'{self.output_dir}\\regplot_grid_{self.error_bar}'
+        if self.abs_slope:
+            fname += '_abs_slope'
         return self.fig, fname
 
     def _create_plot(

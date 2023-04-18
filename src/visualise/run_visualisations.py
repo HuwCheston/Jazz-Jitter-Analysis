@@ -48,7 +48,7 @@ def main(input_filepath, output_filepath, references_filepath):
     generate_all_metrics_plots(mds, output_filepath)
     logger.info(f'... done!')
     # TEMPO SLOPE #
-    logger.info(f'generating plots for tempo slope metric using corpus {references_filepath}\corpus.xlsx...')
+    logger.info(f'generating plots for tempo slope metric using {references_filepath}\corpus.xlsx...')
     generate_tempo_slope_plots(mds, output_filepath, corpus_dir=f'{references_filepath}\corpus.xlsx')
     logger.info(f'... done!')
     # TIMING IRREGULARITY #
@@ -56,7 +56,7 @@ def main(input_filepath, output_filepath, references_filepath):
     generate_tempo_stability_plots(mds, output_filepath)
     logger.info(f'... done!')
     # ASYNCHRONY #
-    logger.info(f'generating plots for asynchrony metric using corpus {references_filepath}\corpus.xlsx...')
+    logger.info(f'generating plots for asynchrony metric using {references_filepath}\corpus.xlsx...')
     generate_asynchrony_plots(mds, output_filepath, corpus_dir=f'{references_filepath}\corpus.xlsx')
     logger.info(f'... done!')
     # SUCCESS #
