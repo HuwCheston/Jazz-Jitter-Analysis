@@ -29,7 +29,7 @@ Requirements
 ------------
 
 - Windows 10 (other operating systems may work but are not tested)
-- Python 3
+- Python 3.10+
 - Git
 - FFmpeg (**only for reproducing combined audio-visual stimuli**)
 
