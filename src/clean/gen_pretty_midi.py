@@ -127,7 +127,6 @@ def gen_raw_midi_output(
     Iterates through raw MIDI files in input directory and extracts data (onset, pitch, velocity) using PrettyMIDI
     """
 
-    # TODO: this should be located in 'references', not 'data/raw'
     midi_mapping_fpath = kwargs.get('midi_mapping_fpath', input_dir)
     # Get all .MIDI BPM files from our input directory
     f_list = return_list_of_raw_midi_files(input_dir)

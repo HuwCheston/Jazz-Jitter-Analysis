@@ -300,7 +300,7 @@ class BarPlotTempoSlope(vutils.BasePlot):
 
 
 def generate_tempo_slope_plots(
-        mds: list, output_dir: str
+        mds: list, output_dir: str, corpus_dir: str
 ):
     """
     Generates all plots in this file, with required arguments and inputs
@@ -322,9 +322,19 @@ def generate_tempo_slope_plots(
 
 
 if __name__ == '__main__':
+    import logging
+    import os
+
+    # Configure logger
+    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    logging.basicConfig(level=logging.INFO, format=log_fmt)
+    logger = logging.getLogger(__name__)
     # Default location for phase correction models
-    # TODO: this shouldn't be hardcoded
-    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p')
+    logger.info(f"Making graphs from data in {os.path.abspath(r'../../models')}")
+    raw = autils.load_from_disc(
+        r'..\..\models', filename='phase_correction_mds.p'
+    )
     # Default location to save plots
-    output = r"C:\Python Projects\jazz-jitter-analysis\reports"
-    generate_tempo_slope_plots(raw, output)
+    output = r"..\..\reports"
+    corpus = r"..\..\references\corpus.xlsx"
+    generate_tempo_slope_plots(raw, output, corpus_dir=corpus)

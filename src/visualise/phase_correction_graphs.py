@@ -2090,12 +2090,19 @@ def generate_phase_correction_plots(
 
 
 if __name__ == '__main__':
+    import logging
+    import os
+
+    # Configure logger
+    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    logging.basicConfig(level=logging.INFO, format=log_fmt)
+    logger = logging.getLogger(__name__)
     # Default location for phase correction models
-    # TODO: this shouldn't be hardcoded
+    logger.info(f"Making graphs from data in {os.path.abspath(r'../../models')}")
     raw: list[PhaseCorrectionModel] = autils.load_from_disc(
-        r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p'
+        r'..\..\models', filename='phase_correction_mds.p'
     )
     # Default location to save plots
-    output = r"C:\Python Projects\jazz-jitter-analysis\reports"
+    output = r"..\..\reports"
     # Generate phase correction plots from models
     generate_phase_correction_plots(mds=raw, output_dir=output)

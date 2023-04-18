@@ -88,7 +88,7 @@ def reg_func(
         df: pd.DataFrame, xcol: str, ycol: str
 ) -> sm.regression.linear_model.RegressionResults:
     """
-    Calculates linear regression between two given columns, returns results table
+    Calculates linear regression between two given columns, returns results table. Deprecated.
     """
     # We can't have NA values in our regression
     df = df.dropna()
@@ -98,7 +98,6 @@ def reg_func(
     x = sm.add_constant(x)
     model = sm.OLS(y, x)
     # Use HAC standard errors w/ 8 seconds max lag to account for any autocorrelation
-    # TODO: check this!
     results = model.fit(cov_type='HAC', cov_kwds={'maxlags': 8})
     return results
 
@@ -166,7 +165,7 @@ def generate_tempo_slopes(
 ) -> list[tuple]:
     """
     Returns average tempo slope coefficients for all performances as list of tuples in the form
-    (trial, block, latency, jitter, avg. slope coefficient)
+    (trial, block, latency, jitter, avg. slope coefficient). Deprecated?
     """
     cs = []
     # Iterate through all trials

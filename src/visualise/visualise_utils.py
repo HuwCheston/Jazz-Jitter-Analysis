@@ -17,6 +17,9 @@ from pathlib import Path
 # This is necessary to solve issues with unpickling our phase_correction_mds and phase_correction_sims
 sys.path.append(os.path.join(Path(__file__).parents[2], 'src\\analyse'))
 
+# Ignore annoying matplotlib INFO warnings created even though I'm doing nothing wrong
+plt.set_loglevel('WARNING')
+
 # Define constants
 WIDTH = 6.2677165
 HEIGHT = 10.446194166666666666666666666667

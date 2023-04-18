@@ -503,16 +503,21 @@ def generate_phase_correction_simulations_for_coupling_parameters(
 
 
 if __name__ == '__main__':
+    import logging
+    import os
+
+    # Configure logger
+    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    logging.basicConfig(level=logging.INFO, format=log_fmt)
+    logger = logging.getLogger(__name__)
     # Default location for phase correction models
-    # TODO: this shouldn't be hardcoded
-    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename="phase_correction_mds.p")
+    logger.info(f"Making simulations from models in {os.path.abspath(r'../../models')}")
+
+    # Default location for phase correction models
+    raw = autils.load_from_disc(r"..\..\models", filename="phase_correction_mds.p")
     # Default location to save output simulations
-    output = r"C:\Python Projects\jazz-jitter-analysis\models"
+    output = r"..\..\models"
     # Generate simulations using coupling parameters and pickle
     generate_phase_correction_simulations_for_coupling_parameters(
-        mds=raw, output_dir=output, force_rebuild=True
+        mds=raw, output_dir=output, force_rebuild=True, logger=logger
     )
-    # Generate simulations for each individual performance and pickle
-    # generate_phase_correction_simulations_for_individual_conditions(
-    #     mds=raw, output_dir=output, force_rebuild=True
-    # )

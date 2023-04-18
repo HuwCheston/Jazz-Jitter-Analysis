@@ -385,9 +385,18 @@ def generate_tempo_stability_plots(
 
 
 if __name__ == '__main__':
+    import logging
+    import os
+
+    # Configure logger
+    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    logging.basicConfig(level=logging.INFO, format=log_fmt)
+    logger = logging.getLogger(__name__)
     # Default location for phase correction models
-    # TODO: this shouldn't be hardcoded
-    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p')
+    logger.info(f"Making graphs from data in {os.path.abspath(r'../../models')}")
+    raw = autils.load_from_disc(
+        r'..\..\models', filename='phase_correction_mds.p'
+    )
     # Default location to save plots
-    output = r"C:\Python Projects\jazz-jitter-analysis\reports"
+    output = r"..\..\reports"
     generate_tempo_stability_plots(mds=raw, output_dir=output)

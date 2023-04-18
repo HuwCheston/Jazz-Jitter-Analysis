@@ -122,7 +122,7 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
 
 
 def generate_asynchrony_plots(
-        mds: list, output_dir: str,
+        mds: list, output_dir: str, corpus_dir: str
 ) -> None:
     """
     Generates all plots in this file, with required arguments and inputs
@@ -134,8 +134,6 @@ def generate_asynchrony_plots(
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\asynchrony_plots'
 
-    # TODO: this shouldn't be hardcoded
-    corpus_dir = r"C:\Python Projects\jazz-jitter-analysis\references\corpus.xlsx"
     nl = NumberLinePairwiseAsynchrony(
         df=df, output_dir=figures_output_dir, corpus_filepath=corpus_dir
     )
@@ -143,10 +141,20 @@ def generate_asynchrony_plots(
 
 
 if __name__ == '__main__':
+    import logging
+    import os
+
+    # Configure logger
+    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    logging.basicConfig(level=logging.INFO, format=log_fmt)
+    logger = logging.getLogger(__name__)
     # Default location for phase correction models
-    # TODO: this shouldn't be hardcoded
-    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", filename='phase_correction_mds.p')
+    logger.info(f"Making graphs from data in {os.path.abspath(r'../../models')}")
+    raw = autils.load_from_disc(
+        r'..\..\models', filename='phase_correction_mds.p'
+    )
     # Default location to save plots
-    output = r"C:\Python Projects\jazz-jitter-analysis\reports"
+    output = r"..\..\reports"
+    corpus = r"..\..\references\corpus.xlsx"
     # Generate phase correction plots from models
-    generate_asynchrony_plots(mds=raw, output_dir=output)
+    generate_asynchrony_plots(mds=raw, output_dir=output, corpus_dir=corpus)

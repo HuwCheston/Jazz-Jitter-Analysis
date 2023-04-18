@@ -84,7 +84,6 @@ class PhaseCorrectionModel:
         """
         if default is not None:
             return default
-        # TODO: investigate proper pathing here
         cwd = os.path.dirname(os.path.abspath(__file__)) + r'\contamination_params.json'
         js = json.load(open(cwd))
         return [
@@ -685,10 +684,18 @@ def generate_phase_correction_models(
 
 
 if __name__ == '__main__':
+    import logging
+    import os
+
+    # Configure logger
+    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    logging.basicConfig(level=logging.INFO, format=log_fmt)
+    logger = logging.getLogger(__name__)
+    # Default location for phase correction models
+    logger.info(f"Making models from data in {os.path.abspath(r'../../data/processed')}")
     # Default location for processed raw data
-    # TODO: this shouldn't be hardcoded
-    raw = autils.load_data(r"C:\Python Projects\jazz-jitter-analysis\data\processed")
+    raw = autils.load_data(r"..\..\data\processed")
     # Default location to save output models
-    output = r"C:\Python Projects\jazz-jitter-analysis\models"
+    output = r"..\..\models"
     # Generate models and pickle
-    mds = generate_phase_correction_models(raw_data=raw, output_dir=output, force_rebuild=True)
+    mds = generate_phase_correction_models(raw_data=raw, output_dir=output, force_rebuild=True, logger=logger)

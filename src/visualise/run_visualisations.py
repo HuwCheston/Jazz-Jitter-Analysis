@@ -24,7 +24,8 @@ from src.visualise.simulations_graphs import *
 @click.command()
 @click.option('-i', 'input_filepath', type=click.Path(exists=True), default='models')
 @click.option('-o', 'output_filepath', type=click.Path(exists=True), default=r'reports\figures')
-def main(input_filepath, output_filepath):
+@click.option('-r', 'references_filepath', type=click.Path(exists=True), default=r'references')
+def main(input_filepath, output_filepath, references_filepath):
     """
     Runs data processing scripts to turn raw data from (../raw) into
     cleaned data ready to be analyzed (saved in ../processed).
@@ -47,16 +48,16 @@ def main(input_filepath, output_filepath):
     generate_all_metrics_plots(mds, output_filepath)
     logger.info(f'... done!')
     # TEMPO SLOPE #
-    logger.info(f'generating plots for tempo slope metric...')
-    generate_tempo_slope_plots(mds, output_filepath)
+    logger.info(f'generating plots for tempo slope metric using corpus {references_filepath}\corpus.xlsx...')
+    generate_tempo_slope_plots(mds, output_filepath, corpus_dir=f'{references_filepath}\corpus.xlsx')
     logger.info(f'... done!')
     # TIMING IRREGULARITY #
     logger.info(f'generating plots for timing irregularity metric...')
     generate_tempo_stability_plots(mds, output_filepath)
     logger.info(f'... done!')
     # ASYNCHRONY #
-    logger.info(f'generating plots for asynchrony metric...')
-    generate_asynchrony_plots(mds, output_filepath)
+    logger.info(f'generating plots for asynchrony metric using corpus {references_filepath}\corpus.xlsx...')
+    generate_asynchrony_plots(mds, output_filepath, corpus_dir=f'{references_filepath}\corpus.xlsx')
     logger.info(f'... done!')
     # SUCCESS #
     logger.info(f'generating plots for self-reported success metric...')

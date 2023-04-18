@@ -4,10 +4,12 @@ import numpy as np
 import collections
 import itertools
 import pickle
+import pandas as pd
 
 # Define the modules we can import from this file in others
 __all__ = [
-    'combine_output'
+    'combine_output',
+    'save_questionnaire'
 ]
 
 
@@ -55,3 +57,15 @@ def combine_output(
             pickle.dump(li, open(f"{output_dir}/trial_{num}.p", "wb"))
         raw_data.append(li)
     return raw_data
+
+
+def save_questionnaire(
+        xls_path: str, df_list: list
+) -> None:
+    """
+    Saves the questionnaire to the processed data folder
+    """
+
+    with pd.ExcelWriter(xls_path) as writer:
+        for (n, df) in enumerate(df_list, 1):
+            df.to_excel(writer, f'trial{n}')

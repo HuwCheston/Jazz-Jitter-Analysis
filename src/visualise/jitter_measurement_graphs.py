@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-import os
 import librosa
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -197,15 +196,22 @@ def generate_latency_measurement_plots(
     """
 
     jm = JitterMeasurementAnalysis(input_dir, **kwargs)
-    lp = LinePlotJitterMeasurement(arrays=jm.arrs, output_dir=output_dir, **kwargs)
+    lp = LinePlotJitterMeasurement(arrays=jm.arrs, output_dir=output_dir + r"\figures\misc_plots", **kwargs)
     lp.create_plot()
 
 
 if __name__ == '__main__':
+    import logging
+    import os
+
+    # Configure logger
+    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    logging.basicConfig(level=logging.INFO, format=log_fmt)
+    logger = logging.getLogger(__name__)
     # Default location for phase correction models
-    # TODO: this shouldn't be hardcoded
-    input_ = r"C:\Python Projects\jazz-jitter-analysis\data\raw\jitter_measurement_bounces"
+    logger.info(f"Making graphs from data in {os.path.abspath(r'../../data/raw/jitter_measurement_bounces')}")
+    raw = r"..\..\data\raw\jitter_measurement_bounces"
     # Default location to save plots
-    output_ = r"C:\Python Projects\jazz-jitter-analysis\reports\figures\misc_plots"
+    output = r"..\..\reports"
     # Create the plots
-    generate_latency_measurement_plots(input_, output_, sr=192000)
+    generate_latency_measurement_plots(raw, output, sr=192000)

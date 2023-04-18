@@ -44,14 +44,6 @@ def format_dataframe_per_trial(df, trial_num) -> pd.DataFrame:
     return df
 
 
-def save_questionnaire(xls_path, df_list):
-    """Saves the questionnaire to the processed data folder"""
-    # TODO: this should be moved into combine_outputs.py
-    with pd.ExcelWriter(xls_path) as writer:
-        for (n, df) in enumerate(df_list, 1):
-            df.to_excel(writer, f'trial{n}')
-
-
 def gen_questionnaire_output(input_dir) -> list:
     """Clean questionnaire output: return as list of dataframes, one dataframe per trial (both participants)"""
     # Read the excel spreadsheet created by Qualtrics
