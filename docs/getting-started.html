@@ -94,10 +94,10 @@
 </pre></div>
 </div>
 <ol class="arabic" start="2">
-<li><p>Download our data from <a class="reference external" href="https://doi.org/10.5281/zenodo.7773824">Zenodo</a>. You’ll need the <code class="docutils literal notranslate"><span class="pre">data.zip</span></code> file and the 6 corresponding volumes, <code class="docutils literal notranslate"><span class="pre">data.z01</span></code> to <code class="docutils literal notranslate"><span class="pre">data.z06</span></code></p>
+<li><p>Download our data from <a class="reference external" href="https://doi.org/10.5281/zenodo.7773824">Zenodo</a>. You’ll need the <code class="docutils literal notranslate"><span class="pre">data.zip</span></code> file and all the corresponding volumes (in the form <code class="docutils literal notranslate"><span class="pre">data.z**</span></code>)</p>
 <p><em>You do not need to download the file perceptual_study_videos.rar unless you wish to replicate the perceptual component of the paper, the code for which is hosted in a separate repository acccessible <a class="reference external" href="https://github.com/HuwCheston/2023-duo-success-analysis">via this link</a>.</em></p>
 </li>
-<li><p>Open the <code class="docutils literal notranslate"><span class="pre">data.zip</span></code> file (you may need to install a tool for opening multi-part zip files, such as <a class="reference external" href="https://www.win-rar.com/">WinRAR</a>) and extract the contents into <code class="docutils literal notranslate"><span class="pre">\data\raw</span></code>. This folder should then look like:</p>
+<li><p>Open the <code class="docutils literal notranslate"><span class="pre">data.zip</span></code> file (you may need to install a tool for opening multi-part zip files, such as <a class="reference external" href="https://www.win-rar.com/">WinRAR</a>) and extract all the contents (three folders + one file) into <code class="docutils literal notranslate"><span class="pre">\data\raw</span></code>. This folder should then look like:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>├── avmanip_output     &lt;- The raw MIDI, audio, and video output from each performance
 │   ├── trial_1  
 │   │   ├── Block 1    &lt;- Folders inside correspond to each performance for this session.
@@ -119,10 +119,7 @@
 │   ├── trial_3
 │   ├── trial_4
 │   └── trial_5
-├── muxed_performances &lt;- Audio-video .mp4 files, not used in analysis
-├── drums_midi_mapping.csv
-├── keys_midi_mapping.csv
-├── latency_array.csv
+├── muxed_performances &lt;- Audio-video .mp4 files, not used currently but might be in the future
 └── questionnaire_anonymised.xlsx    
 </pre></div>
 </div>
@@ -133,7 +130,7 @@
 </div>
 <p>This script will:</p>
 <ul class="simple">
-<li><p>Create a new virtual environment in the repository root folder and install the required dependencies into it.</p></li>
+<li><p>Create a new virtual environment in the repository root folder, set some environment variables, then install the required dependencies.</p></li>
 <li><p>Generate the final dataset from the raw data dump downloaded above</p></li>
 <li><p>Generate the models and simulations from the dataset</p></li>
 <li><p>Generate the figures used in the original paper and supplementary material.</p></li>

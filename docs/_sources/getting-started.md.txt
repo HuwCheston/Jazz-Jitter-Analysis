@@ -7,11 +7,11 @@ This page contains instructions for reproducing the data structures used in the 
 git clone https://github.com/HuwCheston/Jazz-Jitter-Analysis
 ```
 
-2. Download our data from [Zenodo](https://doi.org/10.5281/zenodo.7773824). You'll need the `data.zip` file and the 6 corresponding volumes, `data.z01` to `data.z06`
+2. Download our data from [Zenodo](https://doi.org/10.5281/zenodo.7773824). You'll need the `data.zip` file and all the corresponding volumes (in the form `data.z**`)
     
     *You do not need to download the file perceptual_study_videos.rar unless you wish to replicate the perceptual component of the paper, the code for which is hosted in a separate repository acccessible [via this link](https://github.com/HuwCheston/2023-duo-success-analysis).*
     
-3. Open the `data.zip` file (you may need to install a tool for opening multi-part zip files, such as [WinRAR](https://www.win-rar.com/)) and extract the contents into `\data\raw`. This folder should then look like:
+3. Open the `data.zip` file (you may need to install a tool for opening multi-part zip files, such as [WinRAR](https://www.win-rar.com/)) and extract all the contents (three folders + one file) into `\data\raw`. This folder should then look like:
     ```
     ├── avmanip_output     <- The raw MIDI, audio, and video output from each performance
     │   ├── trial_1  
@@ -34,10 +34,7 @@ git clone https://github.com/HuwCheston/Jazz-Jitter-Analysis
     │   ├── trial_3
     │   ├── trial_4
     │   └── trial_5
-    ├── muxed_performances <- Audio-video .mp4 files, not used in analysis
-    ├── drums_midi_mapping.csv
-    ├── keys_midi_mapping.csv
-    ├── latency_array.csv
+    ├── muxed_performances <- Audio-video .mp4 files, not used currently but might be in the future
     └── questionnaire_anonymised.xlsx    
     ```
 
@@ -47,7 +44,7 @@ git clone https://github.com/HuwCheston/Jazz-Jitter-Analysis
     ```
 
     This script will:
-    - Create a new virtual environment in the repository root folder and install the required dependencies into it. 
+    - Create a new virtual environment in the repository root folder, set some environment variables, then install the required dependencies. 
     - Generate the final dataset from the raw data dump downloaded above
     - Generate the models and simulations from the dataset
     - Generate the figures used in the original paper and supplementary material. 

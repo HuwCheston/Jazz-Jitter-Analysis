@@ -32,7 +32,7 @@ As this repository relates to a research paper, I don't envisage making many fut
     ├── data
     │   ├── processed      <- The final, canonical data sets for modeling.
     │   └── raw            <- The original, immutable data dump.
-    ├── docs               <- The Sphinx .html docs, accessible at [via GitHub pages](https://huwcheston.github.io/Jazz-Jitter-Analysis/)
+    ├── docs               <- The Sphinx .html docs, accessible at https://huwcheston.github.io/Jazz-Jitter-Analysis/
     ├── models             <- Serialized models and model predictions (simulations)
     ├── notebooks          <- Jupyter notebooks used in data exploration.
     ├── references         <- Data dictionaries, manuals, and all other explanatory materials.

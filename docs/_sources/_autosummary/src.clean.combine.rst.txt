@@ -1,4 +1,4 @@
-src.clean.combine
+﻿src.clean.combine
 =================
 
 .. automodule:: src.clean.combine
@@ -14,6 +14,7 @@ src.clean.combine
    .. autosummary::
    
       combine_output
+      save_questionnaire
       scale_array
    
    
