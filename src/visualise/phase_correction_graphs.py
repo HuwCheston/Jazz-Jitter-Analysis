@@ -1560,7 +1560,8 @@ class BarPlotCouplingStrengthAsymmetry(vutils.BasePlot):
 
 class BarPlotPhaseCorrectionModelComparison(vutils.BasePlot):
     """
-    Creates barplots showing the difference in R2 between models
+    Creates barplots showing the difference in R2 between models. This takes absolutely ages to complete, so by default
+    run.cmd and src/visualise/run_visualisations.py won't call it.
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -2051,13 +2052,12 @@ def generate_phase_correction_plots(
     pp.create_plot()
     pp = PointPlotSelfPartnerCouplingByInstrument(df=df, output_dir=figures_output_dir)
     pp.create_plot()
-    bp = BarPlotPhaseCorrectionModelComparison(df=df, output_dir=figures_output_dir, n_boot=500)
-    bp.create_plot()
+    # bp = BarPlotPhaseCorrectionModelComparison(df=df, output_dir=figures_output_dir, n_boot=500)
+    # bp.create_plot()
     bp = BarPlotMixedEffectsRegressionCoefficients(df=df, output_dir=figures_output_dir)
     bp.create_plot()
     ap = ArrowPlotPhaseCorrection(df=df, output_dir=figures_output_dir)
     ap.create_plot()
-
     # Create box plot
     bp = BoxPlot(df=df, output_dir=figures_output_dir, yvar='correction_partner', ylim=(-0.2, 1.5))
     bp.create_plot()
