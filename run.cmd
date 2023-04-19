@@ -1,6 +1,6 @@
 @echo off
 echo Installing required packages...
-pip install pip virtualenv virtualenvwrapper
+pip install pip virtualenv virtualenvwrapper wheel click
 echo Creating and activating a fresh virtual environment...
 python -m venv venv
 echo set "OUTDATED_IGNORE=1" >> venv\Scripts\activate.bat
