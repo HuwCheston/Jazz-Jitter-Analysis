@@ -15,5 +15,3 @@ install or run anything locally.
 <a target="_blank" href="https://colab.research.google.com/github/HuwCheston/Jazz-Jitter-Analysis/blob/main/notebooks/0.1-cheston-sempre-video-graphs.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
-- Working with muxer.py (*coming soon!*)
-
