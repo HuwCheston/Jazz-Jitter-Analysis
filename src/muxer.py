@@ -8,12 +8,14 @@ import datetime
 import time
 import math
 import click
+import json
 
 
 class AVMuxer:
     """
     Uses FFmpeg to mux raw audio and video footage from each performance in the corpus together.
     """
+
     def __init__(
             self, input_dir, output_dir, keys_ext: str = 'Delay', drms_ext: str = 'Delay', **kwargs
     ):
@@ -35,9 +37,13 @@ class AVMuxer:
         # A logger we can use to provide our own messages
         self.logger = kwargs.get('logger', None)
         self.log_individual_progress = kwargs.get('log_individual_progress', False)
+        self.verbose: bool = kwargs.get('verbose', False)
         # Audio attributes
         self.audio_in_ftype: tuple[str] = kwargs.get('audio_in_ftype', '.wav')
         self.audio_codec: str = kwargs.get('audio_codec', 'aac')
+        # Timestamps for seeking
+        self.input_ts = time.strftime('%H:%M:%S', time.strptime(kwargs.get('input_ts', "00:00:06"), '%H:%M:%S'))
+        self.output_ts = time.strftime('%H:%M:%S', time.strptime(kwargs.get('output_ts', "00:00:53"), '%H:%M:%S'))
         # Video attributes
         self.video_in_ftype: tuple[str] = kwargs.get('video_in_ftype', ('.mkv', '.avi'))
         self.video_out_ftype: str = kwargs.get('video_out_ftype', 'mp4')
@@ -149,15 +155,23 @@ class AVMuxer:
             return 'drms_wav'
 
     def mux_all_performances(
-            self, duos: tuple = (1, 2, 3, 4, 5),
+            self, duos: tuple = (1, 2, 3, 4, 5), sessions: tuple = (1, 2), latency: tuple = (0, 23, 45, 90, 180),
+            jitter: tuple = (0, 0.5, 1.0)
     ) -> None:
         """
         Muxes all performances together. Duos should be an iterable containing the duo numbers we want to mux.
         """
+        fmt = lambda it: ", ".join(str(i) for i in it)
         if self.logger is not None:
-            self.logger.info(f'Muxing performances by duos {duos}!')
+            self.logger.info(f'Muxing performances by duos: {fmt(duos)}')
+            self.logger.info(f'Muxing sessions: {fmt(sessions)}')
+            self.logger.info(f'Muxing latency values: {fmt(latency)} ms')
+            self.logger.info(f'Muxing jitter values: {fmt(jitter)} x')
+            self.logger.info(f'Muxing keys {self.keys_ext}, drums {self.drms_ext}')
         # Get the performances we want to mux
-        performances_to_mux = {k: v for k, v in self.fname_dic.items() if int(k[1]) in duos}
+        performances_to_mux = self._get_performances_to_mux(duos, jitter, latency, sessions)
+        if self.logger is not None:
+            self.logger.info(f"Found {len(performances_to_mux)} performances to mux!")
         for num, (k, v) in enumerate(performances_to_mux.items()):
             self._log_progress_bar(current=num, end=len(performances_to_mux), perf=f'Muxing ({k})')
             # Get the filename
@@ -166,6 +180,26 @@ class AVMuxer:
             self._mux_performance(k, v, fname, )
         if self.logger is not None:
             self.logger.info(f'Muxing finished!')
+
+    def _get_performances_to_mux(
+            self, duos: tuple, jitter: tuple, latency: tuple, sessions: tuple
+    ) -> dict:
+        """
+        Gets the filenames of performances to mux from given input iterables
+        """
+
+        performances_to_mux = {}
+        # We need to convert our jitter values to integers, as we can't have full stops (.) in our file names!
+        jitter = tuple(int(float(i) * 10) for i in jitter)
+        latency = tuple(int(i) for i in latency)
+        # Iterate through all of our filenames
+        for k, v in self.fname_dic.items():
+            # Remove unnecessary characters from filenames to get list of integers
+            p = [int(v.translate({ord(c): None for c in 'dslj'})) for v in k.split('_')]
+            # Add filename and values to our dictionary if we want it
+            if p[0] in duos and p[1] in sessions and p[2] in latency and p[3] in jitter:
+                performances_to_mux[k] = v
+        return performances_to_mux
 
     def _create_output_folder(
             self
@@ -186,6 +220,7 @@ class AVMuxer:
         """
         Logs current progress of the ffmpeg conversion, including current time, overall duration, and a progress bar
         """
+
         def bar() -> str:
             # Get our current progress percentage
             perc = (current / end) * 100
@@ -225,6 +260,8 @@ class AVMuxer:
                 break
             # Read a line from the subprocess
             line = process.stdout.readline()
+            if self.verbose:
+                self.logger.info(line)
             # Break out of the loop once we no longer receive lines from ffmpeg
             if not line:
                 break
@@ -248,6 +285,32 @@ class AVMuxer:
         else:
             return self.ffmpeg_filter
 
+    @staticmethod
+    def _get_video_duration(
+            filename: str
+    ) -> str:
+        """
+        Gets the duration of an input video using ffprobe, in the format HH:MM:SS
+        """
+        command = f'ffprobe -v quiet -show_streams -select_streams v:0 -of json "{filename}"'
+        result = subprocess.check_output(command, shell=True).decode()
+        fields = json.loads(result)['streams'][0]
+        try:
+            return time.strftime('%H:%M:%S', time.gmtime(float(fields['duration'])))
+        except KeyError:
+            return fields['tags']['DURATION'][:8]
+
+    def _get_output_timestamp(
+            self, v: dict
+    ) -> None:
+        """
+        If the given output timestamp video is longer than the duration of the input videos, set this to the duration
+        """
+        keys_dur = self._get_video_duration(v['keys_vid'])
+        drms_dur = self._get_video_duration(v['drms_vid'])
+        if self.output_ts > max([keys_dur, drms_dur]):
+            self.output_ts = max([keys_dur, drms_dur])
+
     def _mux_performance(
             self, k: str, v: dict, fname: str,
     ) -> None:
@@ -255,21 +318,24 @@ class AVMuxer:
         Combine both video files together
         """
         filt = self._get_video_crop_params(perf=k)
+        self._get_output_timestamp(v)
         # Initialise our ffmpeg command
         command = [
-            'ffmpeg',   # Opens FFMPEG
-            '-i', v["keys_vid"],    # Keys video filepath
-            '-i', v["drms_vid"],    # Drums video filepath
-            '-i', v['keys_wav'],    # Keys audio filepath
-            '-i', v['drms_wav'],    # Drums audio filepath
-            '-filter_complex', filt,    # Ffmpeg filter
-            '-map', '[vid]',    # Maps video files
-            '-map', '[aud]',    # Maps audio files
-            '-b:v', self.video_bitrate,     # Sets video bitrate, default 1200kbps
-            '-c:a', self.audio_codec,   # Select audio codec, default aac
-            '-c:v', self.video_codec,   # Select video codec, default libx264
+            'ffmpeg',  # Opens FFMPEG
+            '-i', v["keys_vid"],  # Keys video filepath
+            '-i', v["drms_vid"],  # Drums video filepath
+            '-i', v['keys_wav'],  # Keys audio filepath
+            '-i', v['drms_wav'],  # Drums audio filepath,
+            '-ss', self.input_ts,
+            '-to', self.output_ts,
+            '-filter_complex', filt,  # Ffmpeg filter
+            '-map', '[vid]',  # Maps video files
+            '-map', '[aud]',  # Maps audio files
+            '-b:v', self.video_bitrate,  # Sets video bitrate, default 1200kbps
+            '-c:a', self.audio_codec,  # Select audio codec, default aac
+            '-c:v', self.video_codec,  # Select video codec, default libx264
             '-crf', self.video_crf if int(k[1]) != 1 else str(int(self.video_crf) + self.duo_1_crf_mod),
-            '-preset', self.ffmpeg_preset,   # Select video output preset, default ultrafast
+            '-preset', self.ffmpeg_preset,  # Select video output preset, default ultrafast
             '-r', self.video_fps,
             fname, '-y'
         ]
@@ -291,27 +357,84 @@ class AVMuxer:
 
 
 @click.command()
-@click.option('-i', 'input_dir', default=os.path.abspath(r'.\\data\\raw\\avmanip_output'),
-              help=r'Input directory, defaults to \data\raw\avmanip_output')
-@click.option('-o', 'output_dir', default=os.path.abspath(r'.\\data\\raw\\muxed_performances'),
-              help=r'Output directory, defaults to \data\raw\muxed_performances')
-@click.option('-preset', 'ffmpeg_preset', default='ultrafast', help='FFmpeg preset, defaults to "ultrafast"')
-@click.option('-b:v', 'video_bitrate', default='1500k', help='Video bitrate, defaults to "1500k"')
-@click.option('-c:v', 'video_codec', default='libx264', help='Video codec, defaults to "libx264"')
-@click.option('-c:a', 'audio_codec', default='aac', help='Audio codec, defaults to "aac"')
-@click.option('-format', 'video_format', default='yuv420p', help='Video pixel format, defaults to "yuv420p"')
-@click.option('-scale', 'video_resolution', default='1280:720', help='Video resolution, defaults to "1280:720"')
-@click.option('-crf', 'video_crf', default=28, help='Video crf, defaults to 28')
-@click.option('-r', 'video_fps', default=30, help='Video fps, defaults to 30')
-@click.option('-bw', 'video_border_width', default=5, help='Width of border separating videos, defaults to 5')
-@click.option('--keys', 'keys_ext', default='Delay',
-              help='Keyboard audio and video type (either "Delay" or "Live"), defaults to "Delay"')
-@click.option('--drums', 'drms_ext', default='Delay',
-              help='Drums audio and video type (either "Delay" or "Live"), defaults to "Delay"')
+@click.option(
+    '-i', 'input_dir', default=os.path.abspath(r'.\\data\\raw\\avmanip_output'), type=str,
+    help=r'The path to your \avmanip_output directory, containing the raw input files',
+)
+@click.option(
+    '-o', 'output_dir', default=os.path.abspath(r'.\\data\\raw\\muxed_performances'), type=str,
+    help=r'The path to save the output files. A new folder will be created in this location',
+)
+@click.option(
+    '-preset', 'ffmpeg_preset', default='ultrafast', help='FFmpeg preset, defaults to "ultrafast"', type=str
+)
+@click.option(
+    '-b:v', 'video_bitrate', default='1500k', help='Video bitrate, defaults to "1500k"', type=str
+)
+@click.option(
+    '-c:v', 'video_codec', default='libx264', help='Video codec, defaults to "libx264"', type=str
+)
+@click.option(
+    '-c:a', 'audio_codec', default='aac', help='Audio codec, defaults to "aac"', type=str
+)
+@click.option(
+    '-format', 'video_format', default='yuv420p', help='Video pixel format, defaults to "yuv420p"', type=str
+)
+@click.option(
+    '-scale', 'video_resolution', default='1280:720', help='Video resolution, defaults to "1280:720"', type=str
+)
+@click.option(
+    '-crf', 'video_crf', default=28, help='Video crf, defaults to 28', type=int
+)
+@click.option(
+    '-r', 'video_fps', default=30, help='Video fps, defaults to 30', type=int
+)
+@click.option(
+    '-bw', 'video_border_width', default=5, help='Width of border separating videos, defaults to 5', type=int,
+)
+@click.option(
+    '-ss', 'input_ts', default="00:00:06", help='Input timestamp in the form HH:MM:SS, defaults to 00:00:06', type=str,
+)
+@click.option(
+    '-to', 'output_ts', default="00:00:53", type=str,
+    help='Output timestamp in the form HH:MM:SS, defaults to 00:00:53',
+)
+@click.option(
+    '-verbose', 'verbose', is_flag=True, default=False, show_default=True, help="Pipe ffmpeg output to console",
+)
+@click.option(
+    '--keys', 'keys_ext', default='Delay', type=click.Choice(['Delay', 'Live']),
+    help='Keyboard audio and video type, defaults to "Delay"'
+)
+@click.option(
+    '--drums', 'drms_ext', default='Delay', type=click.Choice(['Delay', 'Live'], case_sensitive=False),
+    help='Drums audio and video type, defaults to "Delay"'
+)
+@click.option(
+    '--d', 'duos', default=(1, 2, 3, 4, 5), type=click.IntRange(1, 5, clamp=False), multiple=True,
+    help="A duo to mux. Pass multiple arguments (e.g. --d 1, --d 3) to mux multiple duos. "
+         "Defaults to all available duos."
+)
+@click.option(
+    '--s', 'sessions', default=(1, 2), type=click.IntRange(1, 2, clamp=False), multiple=True,
+    help="A session to mux. Pass multiple arguments (e.g. --s 1, --s 2) to mux multiple sessions. "
+         "Defaults to all available sessions."
+)
+@click.option(
+    '--l', 'latency', default=("0", "23", "45", "90", "180"), type=click.Choice(["0", "23", "45", "90", "180"]), multiple=True,
+    help="Latency values to mux. Pass multiple arguments (e.g. --l 0, --l 45) to mux multiple values. "
+         "Defaults to all latency values."
+)
+@click.option(
+    '--j', 'jitter', default=("0.0", "0.5", "1.0"), type=click.Choice(["0.0", "0.5", "1.0"]), multiple=True,
+    help="Jitter values to mux. Pass multiple arguments (e.g. --j 0.5, --j 1.0) to mux multiple values. "
+         "Defaults to all jitter values."
+)
 def generate_muxed_performances(
-        input_dir: str, output_dir: str, ffmpeg_preset: str, video_bitrate: str, video_codec: str, audio_codec: str,
-        video_format: str, video_resolution: str, video_crf: int, video_fps: int, video_border_width: int,
-        keys_ext: str, drms_ext: str
+        input_dir: str, output_dir: str, ffmpeg_preset: str, video_bitrate: str, video_codec: str,
+        audio_codec: str, video_format: str, video_resolution: str, video_crf: int, video_fps: int,
+        video_border_width: int, input_ts: str, output_ts: str, verbose: bool, keys_ext: str, drms_ext: str,
+        duos: tuple, sessions: tuple, latency: tuple, jitter: tuple
 ) -> None:
     """
     Generates all muxed performances from an input and output directory
@@ -320,16 +443,18 @@ def generate_muxed_performances(
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
     logger = logging.getLogger(__name__)
-    logging.info("Make sure you're accessing this script from the root directory of the repository")
+    logging.info(f'Input directory: {input_dir}')
+
     # Create the AVMuxer with required settings
-    mux = AVMuxer(
+    muxer = AVMuxer(
         input_dir, output_dir, logger=logger, ffmpeg_preset=ffmpeg_preset, video_bitrate=video_bitrate,
         video_codec=video_codec, audio_codec=audio_codec, video_format=video_format, video_resolution=video_resolution,
-        video_crf=video_crf, video_fps=video_fps, video_border_width=video_border_width,
-        keys_ext=keys_ext, drms_ext=drms_ext
+        video_crf=video_crf, video_fps=video_fps, video_border_width=video_border_width, input_ts=input_ts,
+        keys_ext=keys_ext, drms_ext=drms_ext, verbose=verbose, output_ts=output_ts
     )
+    logging.info(f'Output directory: {muxer.output_dir}')
     # Mux all the performances
-    mux.mux_all_performances()
+    muxer.mux_all_performances(duos=duos, sessions=sessions, latency=latency, jitter=jitter)
 
 
 if __name__ == '__main__':
