@@ -6,13 +6,16 @@ This page contains instructions for reproducing the data structures used in the 
 </a>
 
 ## Reproduce models, simulations, and figures
-1. First, clone this repository to a new directory on your local machine:
+0. Make sure you have Python 3.10 installed and accessible at the top of your `PATH`, before any other versions of Python. Running `python` on a command terminal should open a new Python 3.10 session, not any other version of Python.
+
+
+1. Clone our repository to a new directory on your local machine:
 ```
 git clone https://github.com/HuwCheston/Jazz-Jitter-Analysis
 ```
 
 
-2. Download our data from [Zenodo](https://doi.org/10.5281/zenodo.7773824). You'll need the `data.zip` file and all the corresponding volumes (in the form `data.z**`)
+2. Download our raw data from [Zenodo](https://doi.org/10.5281/zenodo.7773824). You'll need the `data.zip` file and all the corresponding volumes (in the form `data.z**`)
     
     *You do not need to download the file perceptual_study_videos.rar unless you wish to replicate the perceptual component of the paper, the code for which is hosted in a separate repository acccessible [via this link](https://github.com/HuwCheston/2023-duo-success-analysis).*
   
@@ -72,13 +75,13 @@ The raw dataset contains separate audio and video files (both with and without l
 1. Follow steps 1–3 in the section **Reproduce models, simulations, and figures from original paper** above. You don't need to build the models or simulations, just get the data into the correct place within the overall filestructure.
 
 
-2. Download and install [FFmpeg](https://ffmpeg.org/) and ensure that it can be accessed on your `PATH`. To check this, open a command prompt and type in
+2. Download and install [FFmpeg](https://ffmpeg.org/). Any recent version should work: versions `6.0` and `5.1.2` have both been tested. You then need to ensure that FFmpeg can be accessed on your `PATH`. To check this, open a command prompt and type in
     
    ```
-   ffmpeg
+   ffmpeg -version
    ```
 
-   If you don't see any errors, you're good to go!
+   If you don't see any errors, you're good to go! Otherwise, you may need to manually add the containing `ffmpeg.exe` (usually `ffmpeg\bin`) to your `PATH`.
 
 
 3. Open a new command prompt in the root directory of the repository and execute:
@@ -90,7 +93,7 @@ The raw dataset contains separate audio and video files (both with and without l
    This script will take all the delayed audio and video files from both musicians (located in `\data\raw\avmanip_output`) and mux them together into a new folder (default `\data\raw\muxed_performances\`). You can choose a custom input and output directory by passing the `-i` and `-o` flags when calling `muxer.py`.
 
     
-4. By default, the script will recreate all of the stimuli used in the perceptual component of our paper, i.e. a 47-second excerpt with delay applied to the audio and video footage from both performers. You can customize the output by setting the `--keys` and `--drums` flags to either `"Live"` or `"Delay"` when callinc `muxer.py`. So, to recreate the experience that the keyboard player had in the experiment (i.e. live keyboard audio and video, delayed drummer audio and video), you'd use:
+4. By default, the script will recreate all of the stimuli used in the perceptual component of our paper, i.e. a 47-second excerpt with delay applied to the audio and video footage from both performers. You can customize the output by setting the `--keys` and `--drums` flags to either `"Live"` or `"Delay"` when calling `muxer.py`. So, to recreate the experience that the keyboard player had in the experiment (i.e. live keyboard audio and video, delayed drummer audio and video), you'd use:
    
    ```
    python src\muxer.py --drums "Delay" --keys "Live"
