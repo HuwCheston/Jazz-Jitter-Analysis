@@ -43,12 +43,30 @@ As this repository relates to a research paper, I don't envisage making many fut
     │   ├── analysis       <- Scripts to turn final dataset into models and simulations
     │   ├── visualise      <- Scripts to create exploratory and results oriented visualisations
     │   └── muxer.py       <- Executable python script for reproducing audio-visual stimuli
+    ├── CITATION.cff       <- The citation for referencing this code
     ├── LICENSE
     ├── README.md
     ├── run.cmd            <- Batch file to run all required scripts, generate models & graphs
     ├── requirements.txt   <- The requirements file for reproducing the analysis environment
     ├── setup.py           <- Makes src installable            
-    └── test_environment   <- Used in process of chec
+    └── test_environment   <- Used in process of checking venv created by run.cmd
     ```
 
 Project based on the [cookiecutter data science project template](https://drivendata.github.io/cookiecutter-data-science/). #cookiecutterdatascience
+
+## Citation
+
+If you use our code, please cite it in the format given in `CITATION.cff` in this repository. 
+
+If you use our dataset, please cite it in the format given in the `CITATION.cff` file contained in the [Zenodo deposit](https://doi.org/10.5281/zenodo.7773824)
+
+If you reference our paper, “Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances”, please cite it in the format below:
+
+```
+@unpublished{jazz-jitter-analysis,
+  author = "Cheston, H. and Cross, I. and Harrison, P.",
+  title  = "Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances",
+  note   = "In preparation",
+  year   = "2023"
+}
+```
