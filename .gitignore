@@ -105,7 +105,6 @@ target/
 *.rpp-bak
 *.p
 *.svg
-*.cff
 *.rar
 *.pdf
 *.sib

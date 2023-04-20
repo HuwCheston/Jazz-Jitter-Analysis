@@ -1,0 +1,63 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: >-
+  Code from: Leader-Follower Relationships Optimize
+  Coordination in Networked Jazz Performances
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Huw
+    family-names: Cheston
+    email: hwc31@cam.ac.uk
+    affiliation: >-
+      Centre for Music and Science, Faculty of Music,
+      University of Cambridge
+    orcid: 'https://orcid.org/0000-0001-7891-5532'
+  - given-names: Ian
+    family-names: Cross
+    email: ic108@cam.ac.uk
+    affiliation: >-
+      Centre for Music and Science, Faculty of Music,
+      University of Cambridge
+    orcid: 'https://orcid.org/0000-0002-2404-7765'
+  - given-names: Peter
+    family-names: Harrison
+    email: pmch2@cam.ac.uk
+    orcid: 'https://orcid.org/0000-0002-9851-9462'
+    affiliation: >-
+      Centre for Music and Science, Faculty of Music,
+      University of Cambridge
+identifiers:
+  - type: url
+    value: 'https://github.com/HuwCheston/Jazz-Jitter-Analysis'
+    description: The URL to the project GitHub repository
+  - type: doi
+    value: 10.5281/zenodo.7773824
+    description: The DOI of the corresponding dataset
+abstract: >-
+  This code analyses data from approximately four hours of
+  live, improvised musical duo performances over a simulated
+  network environment collected in Cambridge, United Kingdom
+  between April-July 2022 as part of a doctoral research
+  project. Data includes audio and video recordings of 130
+  individual performances, biometric data, and subjective
+  evaluations and comments from the musicians. The primary
+  aim of the project was to collect data via a novel
+  performance capture and manipulation system for use in the
+  empirical modelling of ensemble coordination strategies
+  during networked music-making. The corresponding dataset
+  that this code analyses can be found at the DOI
+  10.5281/zenodo.7773824
+keywords:
+  - joint action
+  - music performance
+  - networking
+  - synchronization modeling
+  - rhythm
+  - improvisation
+  - timing
+license: MIT
