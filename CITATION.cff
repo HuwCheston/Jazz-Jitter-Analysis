@@ -9,6 +9,7 @@ message: >-
   If you use this software, please cite it using the
   metadata from this file.
 type: software
+date-released: "2023-04-01"
 authors:
   - given-names: Huw
     family-names: Cheston
