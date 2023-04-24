@@ -650,6 +650,16 @@ class PhaseCorrectionModel:
             # Coupling comparison between first and second half of performance
             'coupling_1st': self._create_phase_correction_model(nn[nn['my_onset'] <= 53]).params.loc['asynchrony'],
             'coupling_2nd': self._create_phase_correction_model(nn[nn['my_onset'] >= 53]).params.loc['asynchrony'],
+            # Perceptual study data: this is a list of dictionaries, each dictionary corresponding to one rating
+            # for this particular condition. The 'answer' variable is the rating itself, the remaining variables
+            # contain demographic/meta data for that participant, e.g. age, country, time taken to respond etc. etc.
+            'perceptual_answers': c['perceptual_answers'],
+            # These variables provide quick summaries of the answers in perceptual_answers
+            'perceptual_answer_mean': np.nanmean([int(ans['answer']) for ans in c['perceptual_answers']]),
+            'perceptual_answer_median': np.nanmedian([int(ans['answer']) for ans in c['perceptual_answers']]),
+            'perceptual_answer_std': np.nanstd([int(ans['answer']) for ans in c['perceptual_answers']]),
+            'perceptual_answer_25': np.nanquantile([int(ans['answer']) for ans in c['perceptual_answers']], 0.25),
+            'perceptual_answer_75': np.nanquantile([int(ans['answer']) for ans in c['perceptual_answers']], 0.75),
         }
 
 

@@ -31,6 +31,38 @@ def scale_array(
     return np.rint(scaled_array)
 
 
+def _format_perceptual_data_with_condition_numbers(
+        perceptual_data: list, midi_data: list
+) -> list:
+    """
+    Formats perceptual data with extra information, e.g. condition numbers, that we couldn't add earlier
+    """
+
+    res = []
+    for trial in midi_data:
+        res.append([])
+        p_t = perceptual_data[trial[0]['trial'] - 1]
+        for perf in trial:
+            match = next(
+                (item for item in p_t if
+                 item["trial"] == perf['trial'] and
+                 item['block'] == perf['block'] and
+                 item['latency'] == perf['latency'] and
+                 item['jitter'] == perf['jitter']),
+                {
+                    'trial': perf['trial'],
+                    'block': perf['block'],
+                    'latency': perf['latency'],
+                    'jitter': perf['jitter'],
+                    'perceptual_answers': []
+                }
+            )
+            match['instrument'] = perf['instrument']
+            match['condition'] = perf['condition']
+            res[trial[0]['trial'] - 1].append(match.copy())
+    return res
+
+
 def combine_output(
         input_dir: str, output_dir: str, zoom_arr=None, dump_pickle: bool = True, **kwargs
 ) -> list:
@@ -40,6 +72,7 @@ def combine_output(
     if zoom_arr is None:
         zoom_arr = np.genfromtxt(f'{input_dir}/latency_array.csv')
     raw_data = []
+    kwargs['perceptual'] = _format_perceptual_data_with_condition_numbers(kwargs['perceptual'], kwargs['midi_raw'])
     # Zip all iterables in kwargs together
     for num, values in enumerate(zip(*[a for a in kwargs.values()]), 1):
         # Merge all data into one dictionary

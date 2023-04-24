@@ -31,6 +31,11 @@ def main(input_filepath, output_filepath, references_filepath):
     output['quest'] = gen_questionnaire_output(input_dir=input_filepath,)
     logger.info('... done!')
 
+    # Generate and clean perceptual study data
+    logger.info('generating perceptual study data...')
+    output['perceptual'] = gen_perceptual_study_output(input_dir=input_filepath,)
+    logger.info('... done!')
+
     # Generate and clean raw MIDI data
     logger.info(f'generating raw MIDI data using mappings in {references_filepath}...')
     output['midi_raw'] = gen_raw_midi_output(
