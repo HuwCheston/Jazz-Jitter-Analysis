@@ -98,7 +98,7 @@ def _clean_perceptual_data(
         (merge['time_taken'] > 45) &    # If below this value, participant finished the task too quickly
         (merge['complete_y'] == True) &
         (merge['failed_y'] == False) &
-        (merge['progress'] == 1) &
+        (merge['progress'] == 1) &    # Equivalent to having finished the entire study
         (merge['status'] == 'approved')
     ]
 
@@ -110,18 +110,18 @@ def _format_perceptual_data(
     Formats perceptual study data by dropping unnecessary columns and setting correct datatypes
     """
 
+    # Convert our stimuli definition from a dictionary to individual columns
     big = pd.concat([clean['definition'].map(eval).apply(pd.Series), clean], axis=1)
-    int_cols = [
-        'latency', 'jitter', 'hours_of_daily_music_listening',
-        'years_of_formal_training', 'age', 'answer_x',
-    ]
-    for col in int_cols:
+    # Convert required columns into integers
+    for col in ['latency', 'jitter', 'hours_of_daily_music_listening', 'years_of_formal_training', 'age', 'answer_x']:
         big[col] = big[col].astype(np.int64)
+    # We stored jitter in the form 0/5/10, so we convert it back to 0.0/0.5/1.0 here.
     big['jitter'] = big['jitter'] / 10
+    # These are the columns we want to keep from our data, we'll drop everything else
     to_keep = [
-        'duo', 'session', 'latency', 'jitter', 'id', 'participant_id', 'answer_x',
-        'time_taken', 'age', 'gender', 'country', 'formal_education', 'years_of_formal_training',
-        'hours_of_daily_music_listening', 'money_from_playing_music', 'feedback',
+        'duo', 'session', 'latency', 'jitter', 'id', 'participant_id', 'answer_x', 'time_taken', 'age', 'gender',
+        'country', 'formal_education', 'years_of_formal_training', 'hours_of_daily_music_listening', 'feedback',
+        'money_from_playing_music',
     ]
     return (
         big.drop(columns=[col for col in big.columns if col not in to_keep])
@@ -138,16 +138,21 @@ def _perceptual_data_to_dict(
     Returns perceptual study data as a dictionary, with conditions as the keys and answers as the values (as a list)
     """
 
+    # This is our main list
     res = []
     for idx_, grp_ in fmt.groupby('trial'):
+        # For each duo, we create a new empty list to hold their results
         res.append([])
         for idx, grp in grp_.groupby(['block', 'latency', 'jitter']):
-            idx = list(idx)
+            idx = list(idx)    # This just prevents PyCharm warnings
+            # Initialise an empty list to hold all of our ratings for a particular condition
             answers = []
+            # Now, we append all of our ratings as individual dictionaries to our answers list
             for i_, g_ in grp.iterrows():
                 answers.append(
                     g_[[col for col in fmt.columns if col not in ['trial', 'block', 'latency', 'jitter']]].to_dict()
                 )
+            # Finally, we append all of the results as a new dictionary
             res[idx_ - 1].append(
                 {'trial': idx_, 'block': idx[0], 'latency': idx[1], 'jitter': idx[2], 'perceptual_answers': answers}
             )
@@ -161,9 +166,15 @@ def gen_perceptual_study_output(
     Clean perceptual study output: return as dictionary, with experimental conditions as keys and answers as values
     """
 
+    # Load in our ratings dataframe, containing the individual responses to each stimuli
     ratings_df = pd.read_csv(rf"{input_dir}\{file_pre}SuccessTrial{file_post}.csv")
+    # Load in the participants dataframe, containing the demographic/meta data from each participant, e.g. age, country
     participants_df = pd.read_csv(rf"{input_dir}\{file_pre}Participant{file_post}.csv")
+    # Merge participants and ratings dataframes together, on the participant_id column shared between both
     merge = ratings_df.merge(participants_df.rename(columns={'id': 'participant_id'}), on='participant_id')
+    # Clean the merged data by removing incomplete answers, participants who failed the pre-screening etc.
     clean = _clean_perceptual_data(merge)
+    # Format the cleaned data, setting the correct datatypes etc.
     fmt = _format_perceptual_data(clean)
+    # Convert the perceptual data to the required format: list of list of dictionaries
     return _perceptual_data_to_dict(fmt)
