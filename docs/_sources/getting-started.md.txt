@@ -44,7 +44,10 @@ git clone https://github.com/HuwCheston/Jazz-Jitter-Analysis
     │   ├── trial_4
     │   └── trial_5
     ├── muxed_performances <- Audio-video .mp4 files, not used currently but might be in the future
-    └── questionnaire_anonymised.xlsx    
+    ├── Database View Participant -  Dashboard.csv
+    ├── Database View SuccessTrial -  Dashboard.csv
+    └── questionnaire_anonymised.xlsx
+   
     ```
 
 

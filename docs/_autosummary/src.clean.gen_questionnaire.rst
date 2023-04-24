@@ -13,8 +13,7 @@
 
    .. autosummary::
    
-      format_dataframe_per_trial
-      format_qualtrics_output
+      gen_perceptual_study_output
       gen_questionnaire_output
    
    
