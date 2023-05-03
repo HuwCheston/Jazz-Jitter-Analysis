@@ -46,8 +46,15 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Getting started</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#reproduce-models-simulations-and-figures">Reproduce models, simulations, and figures</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#reproduce-combined-audio-visual-stimuli">Reproduce combined audio-visual stimuli</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reproduce-models-simulations-and-figures">Reproduce models, simulations, and figures</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#windows-10-installation">Windows 10 installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#linux-installation">Linux installation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#reproduce-combined-audio-visual-stimuli">Reproduce combined audio-visual stimuli</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#these-instructions-should-work-on-most-operating-systems">These instructions should work on most operating systems</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#reproduce-latency-measurement-array">Reproduce latency measurement array</a></li>
 </ul>
 </li>
@@ -91,6 +98,8 @@
 </a></p>
 <div class="section" id="reproduce-models-simulations-and-figures">
 <h2>Reproduce models, simulations, and figures<a class="headerlink" href="#reproduce-models-simulations-and-figures" title="Permalink to this heading"></a></h2>
+<div class="section" id="windows-10-installation">
+<h3>Windows 10 installation<a class="headerlink" href="#windows-10-installation" title="Permalink to this heading"></a></h3>
 <ol class="arabic simple" start="0">
 <li><p>Make sure you have Python 3.10 installed and accessible at the top of your <code class="docutils literal notranslate"><span class="pre">PATH</span></code>, before any other versions of Python. Running <code class="docutils literal notranslate"><span class="pre">python</span></code> on a command terminal should open a new Python 3.10 session, not any other version of Python.</p></li>
 <li><p>Clone our repository to a new directory on your local machine:</p></li>
@@ -150,16 +159,27 @@
 </ol>
 <p>Now that you’ve built the dataset, models, and simulations, see <a class="reference download internal" download="" href="_downloads/4d4ae5806e55eb94637fcaeae0ff9c2b/examples.html"><span class="xref download myst">Examples</span></a> for guidance on how to work with these files in your own Python sessions.</p>
 </div>
+<div class="section" id="linux-installation">
+<h3>Linux installation<a class="headerlink" href="#linux-installation" title="Permalink to this heading"></a></h3>
+<p><strong>Forthcoming!</strong></p>
+</div>
+</div>
 <div class="section" id="reproduce-combined-audio-visual-stimuli">
 <h2>Reproduce combined audio-visual stimuli<a class="headerlink" href="#reproduce-combined-audio-visual-stimuli" title="Permalink to this heading"></a></h2>
+<div class="section" id="these-instructions-should-work-on-most-operating-systems">
+<h3>These instructions should work on most operating systems<a class="headerlink" href="#these-instructions-should-work-on-most-operating-systems" title="Permalink to this heading"></a></h3>
 <p>The raw dataset contains separate audio and video files (both with and without latency/jitter) for each performer inside the <code class="docutils literal notranslate"><span class="pre">\data\raw\avmanip_output</span></code> folder. These can be combined to create muxed audio-video recordings, i.e. a single video file containing both audio and video tracks, sync’ed together, with any combination of live or delayed audio/video. The perceptual component of this study used the delayed audio and video from both the pianist and drummer.</p>
 <ol class="arabic">
 <li><p>Follow steps 1–3 in the section <strong>Reproduce models, simulations, and figures from original paper</strong> above. You don’t need to build the models or simulations, just get the data into the correct place within the overall filestructure.</p></li>
-<li><p>Download and install <a class="reference external" href="https://ffmpeg.org/">FFmpeg</a>. Any recent version should work: versions <code class="docutils literal notranslate"><span class="pre">6.0</span></code> and <code class="docutils literal notranslate"><span class="pre">5.1.2</span></code> have both been tested. You then need to ensure that FFmpeg can be accessed on your <code class="docutils literal notranslate"><span class="pre">PATH</span></code>. To check this, open a command prompt and type in</p>
+<li><p>Download and install <a class="reference external" href="https://ffmpeg.org/">FFmpeg</a>. Any recent version should work: versions <code class="docutils literal notranslate"><span class="pre">6.0</span></code> and <code class="docutils literal notranslate"><span class="pre">5.1.2</span></code> have both been tested. You then need to ensure that FFmpeg can be accessed via the command line. On Linux, this should happen automatically when you install FFmpeg via:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span> <span class="n">install</span> <span class="n">ffmpeg</span>
+</pre></div>
+</div>
+<p>On Windows, the process can be a bit more complicated, and involves adding ffmpeg.exe (usually found in (usually <code class="docutils literal notranslate"><span class="pre">ffmpeg\bin</span></code>) manually to your <code class="docutils literal notranslate"><span class="pre">PATH</span></code> system environment variable. Instructions on how to do this are out-of-scope for this project; but the instructions <a class="reference external" href="https://stackoverflow.com/a/41895179">available here</a> should suffice. Regardless of which OS you’re using, if you can run:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ffmpeg</span> <span class="o">-</span><span class="n">version</span>
 </pre></div>
 </div>
-<p>If you don’t see any errors, you’re good to go! Otherwise, you may need to manually add the containing <code class="docutils literal notranslate"><span class="pre">ffmpeg.exe</span></code> (usually <code class="docutils literal notranslate"><span class="pre">ffmpeg\bin</span></code>) to your <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
+<p>in a CLI without any errors, you should be good to go!</p>
 </li>
 <li><p>Open a new command prompt in the root directory of the repository and execute:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">src</span>\<span class="n">muxer</span><span class="o">.</span><span class="n">py</span>
@@ -200,6 +220,7 @@
 <p>Finally, if you’re experiencing issues, you can turn on logging in FFmpeg by passing the <code class="docutils literal notranslate"><span class="pre">-verbose</span></code> flag to <code class="docutils literal notranslate"><span class="pre">muxer.py</span></code>. This will directly pipe the output of FFmpeg through to the console, which can be helpful when debugging.</p>
 </li>
 </ol>
+</div>
 </div>
 <div class="section" id="reproduce-latency-measurement-array">
 <h2>Reproduce latency measurement array<a class="headerlink" href="#reproduce-latency-measurement-array" title="Permalink to this heading"></a></h2>

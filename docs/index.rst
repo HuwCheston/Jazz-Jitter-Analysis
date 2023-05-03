@@ -28,7 +28,7 @@ Finally, to explore the models and data created here without having to install o
 Requirements
 ------------
 
-- Windows 10 (other operating systems may work but are not tested)
+- Windows 10 (other operating systems including Ubuntu may work but are not tested)
 - Python 3.10+
 - Git
 - FFmpeg (**only for reproducing combined audio-visual stimuli**)

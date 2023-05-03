@@ -6,6 +6,7 @@ This page contains instructions for reproducing the data structures used in the 
 </a>
 
 ## Reproduce models, simulations, and figures
+### Windows 10 installation
 0. Make sure you have Python 3.10 installed and accessible at the top of your `PATH`, before any other versions of Python. Running `python` on a command terminal should open a new Python 3.10 session, not any other version of Python.
 
 
@@ -72,22 +73,32 @@ git clone https://github.com/HuwCheston/Jazz-Jitter-Analysis
 
 Now that you've built the dataset, models, and simulations, see [Examples](./examples.html) for guidance on how to work with these files in your own Python sessions.
 
+### Linux installation
+
+**Forthcoming!**
+
 ## Reproduce combined audio-visual stimuli
+### These instructions should work on most operating systems
 The raw dataset contains separate audio and video files (both with and without latency/jitter) for each performer inside the `\data\raw\avmanip_output` folder. These can be combined to create muxed audio-video recordings, i.e. a single video file containing both audio and video tracks, sync'ed together, with any combination of live or delayed audio/video. The perceptual component of this study used the delayed audio and video from both the pianist and drummer.
 
 1. Follow steps 1–3 in the section **Reproduce models, simulations, and figures from original paper** above. You don't need to build the models or simulations, just get the data into the correct place within the overall filestructure.
 
 
-2. Download and install [FFmpeg](https://ffmpeg.org/). Any recent version should work: versions `6.0` and `5.1.2` have both been tested. You then need to ensure that FFmpeg can be accessed on your `PATH`. To check this, open a command prompt and type in
+2. Download and install [FFmpeg](https://ffmpeg.org/). Any recent version should work: versions `6.0` and `5.1.2` have both been tested. You then need to ensure that FFmpeg can be accessed via the command line. On Linux, this should happen automatically when you install FFmpeg via:
+   
+   ```
+   sudo apt install ffmpeg
+   ```
+
+   On Windows, the process can be a bit more complicated, and involves adding ffmpeg.exe (usually found in (usually `ffmpeg\bin`) manually to your `PATH` system environment variable. Instructions on how to do this are out-of-scope for this project; but the instructions [available here](https://stackoverflow.com/a/41895179) should suffice. Regardless of which OS you're using, if you can run:
     
    ```
    ffmpeg -version
    ```
 
-   If you don't see any errors, you're good to go! Otherwise, you may need to manually add the containing `ffmpeg.exe` (usually `ffmpeg\bin`) to your `PATH`.
+   in a CLI without any errors, you should be good to go!
 
-
-3. Open a new command prompt in the root directory of the repository and execute:
+4. Open a new command prompt in the root directory of the repository and execute:
     
    ```
    python src\muxer.py
