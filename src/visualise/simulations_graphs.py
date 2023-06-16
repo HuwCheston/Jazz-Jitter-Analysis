@@ -176,7 +176,8 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         super().__init__(**kwargs)
         self.key: dict = {'Original': 0, 'Democracy': 1, 'Anarchy': 2, 'Leadership': 3}
         self.df = self._format_df(df=df)
-        self.fig, self.ax = plt.subplots(nrows=1, ncols=2, sharex=True, figsize=(18.8, 5))
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=3, sharex=True, figsize=(18.8, 6))
+        self.hand, self.lab = None, None
 
     @staticmethod
     def _format_df(
@@ -195,6 +196,8 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         df = df[(df['parameter'] != 'Actual')]
         df = df[(df['original_noise'] == False)]
         df.loc[df['parameter'].str.contains('Leadership'), 'parameter'] = 'Leadership'
+        df = df[(df['parameter'] != 'Original')]
+        df['tempo_slope_simulated'] = df['tempo_slope_simulated'].abs()
         return df
 
     @vutils.plot_decorator
@@ -217,17 +220,25 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         Creates the stripplot and barplot for both variables, then carries out t-test and adds in asterisks
         """
         # Iterate through both variables which we wish to plot
-        for num, var in enumerate(['tempo_slope_simulated', 'asynchrony_simulated']):
+        for num, var in enumerate(['tempo_slope_simulated', 'ioi_variability_simulated', 'asynchrony_simulated', ]):
             # Add the scatter plot, showing each individual performance
             sns.stripplot(
-                data=self.df, ax=self.ax[num], x='parameter', y=var, dodge=True, s=5, marker='.', jitter=0.1,
-                color=vutils.BLACK,
+                data=self.df[self.df['latency'] != 0], ax=self.ax[num], x='parameter', y=var, dodge=True, s=8,
+                marker='.', jitter=0.1,
+                color=vutils.BLACK, label='Experiment'
+            )
+            sns.stripplot(
+                data=self.df[self.df['latency'] == 0], ax=self.ax[num], x='parameter', y=var, dodge=True, s=8,
+                marker='s', jitter=0,
+                color=vutils.RED, label='Control'
             )
             # Add the bar plot, showing the median values
             sns.barplot(
                 data=self.df, x='parameter', y=var, ax=self.ax[num], errorbar=None, facecolor='#6fcbdc',
                 estimator=np.mean, edgecolor=vutils.BLACK,
             )
+            self.hand, self.lab = self.ax[num].get_legend_handles_labels()
+            self.ax[num].get_legend().remove()
 
     def _format_ax(
             self
@@ -236,14 +247,16 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         Formats axes objects, setting ticks, labels etc.
         """
         # Apply formatting to tempo slope ax
-        self.ax[0].set_ylabel('Tempo slope (BPM/s)', fontsize=vutils.FONTSIZE + 3)
-        self.ax[0].set(xlabel='', ylim=(-0.75, 0.75))
-        self.ax[0].axhline(y=0, linestyle='-', color=vutils.BLACK, linewidth=2)
+        self.ax[0].set_ylabel('Absolute tempo slope (|BPM/s|)', fontsize=vutils.FONTSIZE + 3)
+        self.ax[0].set(xlabel='', ylim=(0, 0.75))
+        # Apply formatting to irregularity ax
+        self.ax[1].set(xlabel='', ylim=(1, 35), yticks=np.linspace(0, 35, 8))
+        self.ax[1].set_ylabel('Timing irregularity (SD, ms)', fontsize=vutils.FONTSIZE + 3)
         # Apply formatting to async ax
         t = [1, 10, 100, 1000, 10000]
-        self.ax[1].set_yscale('log')
-        self.ax[1].set(xlabel='', ylim=(1, 10000), yticks=t, yticklabels=t)
-        self.ax[1].set_ylabel('Asynchrony (RMS, ms)', fontsize=vutils.FONTSIZE + 3, labelpad=-2)
+        self.ax[2].set_yscale('log')
+        self.ax[2].set(xlabel='', ylim=(1, 10000), yticks=t, yticklabels=t)
+        self.ax[2].set_ylabel('Asynchrony (RMS, ms)', fontsize=vutils.FONTSIZE + 3, labelpad=-2)
         # Apply joint formatting to both axes
         for ax in self.ax:
             # Adjust width of each bar on the bar plot
@@ -263,10 +276,12 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         """
         Formats figure object, setting legend and padding etc.
         """
-        # Add a label to the x axis
-        self.fig.supxlabel('Coupling paradigm')
+        self.fig.legend([self.hand[2], self.hand[-1]], [self.lab[2], self.lab[-1]], loc='right', title='Condition',
+                        frameon=False)
+        # Add a label to the x-axis
+        self.fig.supxlabel('Coordination strategy')
         # Adjust subplots positioning a bit to fit in the legend we've just created
-        self.fig.subplots_adjust(bottom=0.35, top=0.95, left=0.07, right=0.99, wspace=0.27)
+        self.fig.subplots_adjust(bottom=0.3, top=0.9, left=0.07, right=0.875, wspace=0.35)
 
 
 class RegPlotSlopeComparisons(vutils.BasePlot):
@@ -853,7 +868,7 @@ class RegPlotSlopeAsynchrony(vutils.BasePlot):
         Extracts results data from each Simulation class instance and subsets to get original coupling simulations only.
         Results data is initialised when simulations are created, which makes this really fast.
         """
-        return df[(df['parameter'] == 'original') & (df['original_noise'] == self.original_noise) & (
+        return df[(df['parameter'] == 'Original') & (df['original_noise'] == self.original_noise) & (
                     df['tempo_slope_simulated'] <= 4)]
 
     @vutils.plot_decorator
@@ -996,20 +1011,19 @@ def generate_plots_for_simulations_with_coupling_parameters(
     """
     figures_output_dir = output_dir + '\\figures\\simulations_plots'
     df_avg = pd.DataFrame([sim.results_dic for sim in sims_params])
+    bp = BarPlotSimulationParameters(df_avg, output_dir=figures_output_dir)
+    bp.create_plot()
     rp = RegPlotSlopeAsynchrony(df=df_avg, output_dir=figures_output_dir)
     rp.create_plot()
     dp = DistPlotAverage(df=df_avg, output_dir=figures_output_dir)
     dp.create_plot()
-    bp = BarPlotSimulationParameters(df_avg, output_dir=figures_output_dir)
-    bp.create_plot()
 
 
 if __name__ == '__main__':
-    # TODO: this shouldn't be hardcoded
-    raw = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", "phase_correction_sims.p")
-    raw_av = autils.load_from_disc(r"C:\Python Projects\jazz-jitter-analysis\models", "phase_correction_sims_average.p")
+    # raw = autils.load_from_disc(r"..\..\models", "phase_correction_sims.p")
+    raw_av = autils.load_from_disc(r"..\..\models", "phase_correction_sims.p")
     # Default location to save plots
-    output = r"C:\Python Projects\jazz-jitter-analysis\reports"
+    output = r"..\..\reports"
     # Generate plots for our simulations using our coupling parameters
     generate_plots_for_simulations_with_coupling_parameters(raw_av, output)
     # Generate plots for our simulations from every performance

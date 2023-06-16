@@ -66,7 +66,7 @@ def gen_questionnaire_output(
     Clean questionnaire output: return as list of dataframes, one dataframe per trial (both participants)
     """
 
-    # Read the excel spreadsheet created by Qualtrics
+    # Read the Excel spreadsheet created by Qualtrics
     df = pd.read_excel(
         f'{input_dir}/questionnaire_anonymised.xlsx',
         engine="openpyxl",
@@ -114,7 +114,10 @@ def _format_perceptual_data(
     big = pd.concat([clean['definition'].map(eval).apply(pd.Series), clean], axis=1)
     # Convert required columns into integers
     for col in ['latency', 'jitter', 'hours_of_daily_music_listening', 'years_of_formal_training', 'age', 'answer_x']:
-        big[col] = big[col].astype(np.int64)
+        try:
+            big[col] = big[col].astype(np.int64)
+        except ValueError:
+            big[col] = big[col].astype(np.float64)
     # We stored jitter in the form 0/5/10, so we convert it back to 0.0/0.5/1.0 here.
     big['jitter'] = big['jitter'] / 10
     # These are the columns we want to keep from our data, we'll drop everything else
@@ -152,7 +155,7 @@ def _perceptual_data_to_dict(
                 answers.append(
                     g_[[col for col in fmt.columns if col not in ['trial', 'block', 'latency', 'jitter']]].to_dict()
                 )
-            # Finally, we append all of the results as a new dictionary
+            # Finally, we append all the results as a new dictionary
             res[idx_ - 1].append(
                 {'trial': idx_, 'block': idx[0], 'latency': idx[1], 'jitter': idx[2], 'perceptual_answers': answers}
             )
@@ -166,7 +169,7 @@ def gen_perceptual_study_output(
     Clean perceptual study output: return as dictionary, with experimental conditions as keys and answers as values
     """
 
-    # Load in our ratings dataframe, containing the individual responses to each stimuli
+    # Load in our ratings dataframe, containing the individual responses to each stimulus
     ratings_df = pd.read_csv(rf"{input_dir}\{file_pre}SuccessTrial{file_post}.csv")
     # Load in the participants dataframe, containing the demographic/meta data from each participant, e.g. age, country
     participants_df = pd.read_csv(rf"{input_dir}\{file_pre}Participant{file_post}.csv")
@@ -176,5 +179,5 @@ def gen_perceptual_study_output(
     clean = _clean_perceptual_data(merge)
     # Format the cleaned data, setting the correct datatypes etc.
     fmt = _format_perceptual_data(clean)
-    # Convert the perceptual data to the required format: list of list of dictionaries
+    # Convert the perceptual data to the required format: list of dictionaries
     return _perceptual_data_to_dict(fmt)

@@ -138,7 +138,8 @@ class PhaseCorrectionModel:
         return df, len(temp)
 
     def _extract_tempo_slope(
-            self
+            self,
+            subset: int = None
     ):
         """
         Extracts tempo slope, in the form of a float representing BPM change per second.
@@ -158,6 +159,8 @@ class PhaseCorrectionModel:
         conc = pd.DataFrame(pd.concat([df['bpm'] for df in resampled], axis=1).mean(axis=1), columns=['bpm'])
         # Get the elapsed time column as an integer
         conc['my_onset'] = conc.index.total_seconds()
+        if subset is not None:
+            conc = conc[conc['my_onset'] <= subset]
         # Create the regression model and extract the tempo slope coefficient
         return smf.ols('bpm~my_onset', data=conc.dropna()).fit()
 
@@ -210,12 +213,17 @@ class PhaseCorrectionModel:
         return np.mean(means)
 
     def _extract_asynchrony_third_person(
-            self, async_col: str = 'asynchrony_third_person'
+            self, async_col: str = 'asynchrony_third_person', subset: int = None
     ) -> float:
         """
         Extracts asynchrony experienced by an imagined third person joined to the Zoom call
         """
-        conc = np.concatenate([self.keys_nn[async_col].to_numpy(), self.drms_nn[async_col].to_numpy()])
+        keys_nn = self.keys_nn.copy()
+        drms_nn = self.drms_nn.copy()
+        if subset is not None:
+            keys_nn = keys_nn[keys_nn['my_onset'] <= subset]
+            drms_nn = drms_nn[drms_nn['my_onset'] <= subset]
+        conc = np.concatenate([keys_nn[async_col].to_numpy(), drms_nn[async_col].to_numpy()])
         return np.sqrt(np.nanmean(np.square(conc))) * 1000
 
     def _match_onsets(
@@ -654,6 +662,10 @@ class PhaseCorrectionModel:
             # for this particular condition. The 'answer' variable is the rating itself, the remaining variables
             # contain demographic/meta data for that participant, e.g. age, country, time taken to respond etc. etc.
             'perceptual_answers': c['perceptual_answers'],
+            # Objective metrics for perceptual study responses based on first 45 seconds of performances
+            'perceptual_tempo_slope': self._extract_tempo_slope(subset=53).params.loc['my_onset'],
+            'perceptual_ioi_std': self._get_rolling_standard_deviation_values(nn_df=nn[nn['my_onset'] <= 53])['my_prev_ioi_std'].median(),
+            'perceptual_pw_asym': self._extract_asynchrony_third_person(subset=53),
             # These variables provide quick summaries of the answers in perceptual_answers
             'perceptual_answer_mean': np.nanmean([int(ans['answer']) for ans in c['perceptual_answers']]),
             'perceptual_answer_median': np.nanmedian([int(ans['answer']) for ans in c['perceptual_answers']]),
@@ -695,7 +707,6 @@ def generate_phase_correction_models(
 
 if __name__ == '__main__':
     import logging
-    import os
 
     # Configure logger
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

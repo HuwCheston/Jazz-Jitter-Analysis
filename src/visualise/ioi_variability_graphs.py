@@ -268,7 +268,7 @@ class NumberLineIOIVariability(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.df = self._format_df()
-        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 5))
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 5.3))
 
     @vutils.plot_decorator
     def create_plot(self) -> tuple[plt.Figure, str]:
@@ -340,11 +340,11 @@ class NumberLineIOIVariability(vutils.BasePlot):
         # Set ticks and axis label
         self.g.set(xlim=(0, 40), ylim=(-1, 1), xticks=np.linspace(0, 40, 5), xlabel='', ylabel='')
         plt.yticks([], [])
-        self.g.figure.supxlabel('Timing irregularity (SD, ms)', y=0.01)
+        self.g.figure.suptitle('Timing irregularity (SD, ms)')
         # Add arrows and labels showing the direction of the x variable
-        for text_x, arr_x, lab in zip([0.6, 0.36], [0.9, 0.1], ['Irregular', 'Regular']):
+        for text_x, arr_x, lab in zip([0.75, 0.15], [0.9, 0.1], ['Irregular', 'Regular']):
             self.g.annotate(
-                f"${lab}$", (arr_x, 0.93), xytext=(text_x, 0.92), annotation_clip=False,
+                f"${lab}$", (arr_x, 0.93), xytext=(text_x, 0.91), annotation_clip=False,
                 textcoords='figure fraction', xycoords='figure fraction', fontsize=vutils.FONTSIZE + 3,
                 arrowprops=dict(arrowstyle='->', color=vutils.BLACK, lw=4)
             )
@@ -356,7 +356,7 @@ class NumberLineIOIVariability(vutils.BasePlot):
         # Remove the left and bottom axis
         sns.despine(left=True, bottom=False)
         # Adjust plot position slightly
-        plt.subplots_adjust(top=0.63, bottom=0.2, left=0.03, right=0.97)
+        plt.subplots_adjust(top=0.63, bottom=0.15, left=0.03, right=0.97)
         # Remove the legend
         plt.legend([], [], frameon=False)
 

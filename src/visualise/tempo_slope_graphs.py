@@ -149,7 +149,7 @@ class NumberLineTempoSlope(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.df = self._format_df(corpus_filepath=kwargs.get('corpus_filepath', None))
-        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 5.5))
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4 * 2, 5.3))
 
     @vutils.plot_decorator
     def create_plot(self) -> tuple[plt.Figure, str]:
@@ -220,10 +220,10 @@ class NumberLineTempoSlope(vutils.BasePlot):
         self.ax.tick_params(axis="x", direction="in", pad=-25, width=3, )
         plt.setp(self.ax.spines.values(), linewidth=2)
         self.g.set(xlim=(-0.15, 0.15), ylim=(-1, 1), xticks=np.linspace(-0.15, 0.15, 3), xlabel='', ylabel='')
-        self.g.figure.supxlabel('Tempo slope (BPM/s)', y=0.01)
-        for text_x, arr_x, lab in zip([0.55, 0.35], [0.9, 0.1], ['Accelerating', 'Decelerating']):
+        self.g.figure.suptitle('Tempo slope (BPM/s)')
+        for text_x, arr_x, lab in zip([0.75, 0.15], [0.9, 0.1], ['Accelerating', 'Decelerating']):
             self.g.annotate(
-                f"${lab}$", (arr_x, 0.93), xytext=(text_x, 0.92), annotation_clip=False,
+                f"${lab}$", (arr_x, 0.93), xytext=(text_x, 0.91), annotation_clip=False,
                 textcoords='figure fraction', xycoords='figure fraction', fontsize=vutils.FONTSIZE + 3,
                 arrowprops=dict(arrowstyle='->', color=vutils.BLACK, lw=4)
             )
@@ -234,7 +234,7 @@ class NumberLineTempoSlope(vutils.BasePlot):
         )
         sns.despine(left=True, bottom=False)
         # Adjust plot position slightly
-        plt.subplots_adjust(top=0.63, bottom=0.18, left=0.03, right=0.97)
+        plt.subplots_adjust(top=0.63, bottom=0.12, left=0.03, right=0.97)
         plt.yticks([], [])
         plt.legend([], [], frameon=False)
 
@@ -315,8 +315,6 @@ def generate_tempo_slope_plots(
     bp.create_plot()
     lp = LinePlotTempoSlopes(df=df, output_dir=figures_output_dir)
     lp.create_plot()
-    # TODO: this shouldn't be hardcoded
-    corpus_dir = r"C:\Python Projects\jazz-jitter-analysis\references\corpus.xlsx"
     nl = NumberLineTempoSlope(df=df, output_dir=figures_output_dir, corpus_filepath=corpus_dir)
     nl.create_plot()
 

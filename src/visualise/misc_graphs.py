@@ -221,7 +221,7 @@ class LinePlotAllConditions(vutils.BasePlot):
             s['timestamp'] = pd.to_timedelta([timedelta(seconds=val) for val in s['timestamp']]).seconds
             # Subset zoom array and return
             res.append((r['latency'], r['jitter'], s))
-        # Create a dataframe of all condiitons
+        # Create a dataframe of all conditions
         return pd.DataFrame(res, columns=['latency', 'jitter', 'data'])
 
     @vutils.plot_decorator
@@ -260,7 +260,7 @@ class LinePlotAllConditions(vutils.BasePlot):
                         color=vutils.JITTER_CMAP[num_],
                     )
                 self.ax[num, 0].set(
-                    title=f'{i}ms baseline', ylim=(-25, 300), xticks=[0, 30, 60, 90], yticks=[0, 100, 200, 300]
+                    title=f'{i} ms latency condition', ylim=(-25, 300), xticks=[0, 30, 60, 90], yticks=[0, 100, 200, 300]
                 )
                 # Plotting jitter
                 roll = g_['data'].values[0].rolling(window=8, min_periods=1)['latency']
@@ -268,7 +268,7 @@ class LinePlotAllConditions(vutils.BasePlot):
                     g_['data'].values[0]['timestamp'], roll.std(), lw=3, color=vutils.JITTER_CMAP[num_],
                 )
                 self.ax[num, 1].set(
-                    title=f'{i}ms baseline', ylim=(-5, 60), xticks=[0, 30, 60, 90], yticks=[0, 20, 40, 60]
+                    title=f'{i} ms latency condition', ylim=(-5, 60), xticks=[0, 30, 60, 90], yticks=[0, 20, 40, 60]
                 )
                 # Add y labels onto only the middle row of plots
                 if num == 2:
@@ -294,7 +294,7 @@ class LinePlotAllConditions(vutils.BasePlot):
         Format figure-level attributes
         """
         self.fig.supxlabel('Performance duration (s)', )
-        self.fig.legend(loc='center right', ncol=1, frameon=False, title='Jitter')
+        self.fig.legend(loc='center right', ncol=1, frameon=False, title='Jitter\ncondition')
         self.fig.subplots_adjust(top=0.95, bottom=0.09, left=0.07, right=0.9, wspace=0.15, hspace=0.4)
 
 
@@ -488,7 +488,7 @@ class BarPlotHigherOrderModelComparison(vutils.BasePlot):
             all_ = all_[[i for i in range(2, self.max_order + 1)]]
             # Concatenate the dataframe with the original variable
             conc = pd.concat([self.df[var], all_], axis=1).melt(var_name='order', value_name='value')
-            conc['order'] = conc['order'].replace(var, '1 (initial)')
+            conc['order'] = conc['order'].replace(var, '0 (initial)')
             dfs.append(conc)
         return dfs
 
@@ -513,12 +513,13 @@ class BarPlotHigherOrderModelComparison(vutils.BasePlot):
         for ax_, tit, ylab, ylim in zip(
                 self.ax.flatten(), self.titles, self.ylabels, self.ylims
         ):
+            ax_.set(xticklabels=['0 (initial)', '1', '2', '3'])
             ax_.set(title=tit, xlabel='', ylabel='', ylim=ylim)
             ax_.tick_params(width=3, which='major')
             plt.setp(ax_.spines.values(), linewidth=2)
 
     def _format_fig(self):
-        self.fig.supxlabel('Model order')
+        self.fig.supxlabel('Model order ($M$)')
         self.fig.supylabel('Value')
         self.fig.subplots_adjust(top=0.9, bottom=0.175, right=0.97, left=0.07, wspace=0.2, hspace=0.2)
 
@@ -830,6 +831,102 @@ class HeatmapNoteChoice(vutils.BasePlot):
         plt.setp(cb.ax.spines.values(), linewidth=2)
 
 
+class CountPlotListenerDemographics(vutils.BasePlot):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.df = (
+            pd.DataFrame(self._format_df())
+              .drop_duplicates()
+              .sort_values(by='id')
+              .reset_index(drop=True)
+        )
+        self._bin_data()
+        self.fig, self.ax = plt.subplots(nrows=2, ncols=3, sharex=False, sharey=True, figsize=(18.8, 10))
+        self.pal = sns.color_palette('Set2', n_colors=6)
+        self.labs = ['Years', 'Gender', 'Region', 'Years', 'Hours', 'Response']
+        self.tits = [
+            'What is your age?',
+            'How do you identify yourself?',
+            'What country are you from?',
+            'How many years of formal training on\na musical instrument (including voice)\nhave you had during your '
+            'lifetime?',
+            'On average, how many hours\ndo you listen to music daily?',
+            'Do you make money\nfrom playing music?'
+        ]
+        self.vars = ['age', 'gender', 'country', 'years', 'hours', 'money']
+
+    def _format_df(self):
+        for idx, row in self.df.iterrows():
+            for i in row['perceptual_answers']:
+                yield {
+                    'id': i['participant_id'],
+                    'age': i['age'],
+                    'gender': i['gender'],
+                    'country': i['country'],
+                    'years_of_formal_training': i['years_of_formal_training'],
+                    'hours_of_daily_music_listening': i['hours_of_daily_music_listening'],
+                    'money_from_playing_music': i['money_from_playing_music']
+                }
+
+    def _bin_data(self):
+        # Bin age
+        age_bins = [-np.inf, 24, 40, 55, 70, np.inf]
+        age_labs = ['<25', '25–40', '41–55', '56–70', '>70']
+        self.df['age'] = pd.Categorical(pd.cut(self.df['age'], bins=age_bins, labels=age_labs), categories=age_labs)
+        # Bin country
+        col = 'country'
+        conditions = [
+            np.isin(self.df[col], ['GB', 'IE']),
+            np.isin(self.df[col], ['US', 'CA']),
+            np.isin(self.df[col], ['RO', 'BG', 'CZ', 'HU', 'NO']),
+            np.isin(self.df[col], ['CN', 'MY', 'RU', 'NP']),
+        ]
+        choices = ["UK/Ireland", 'N. America', 'Europe', 'Asia']
+        self.df['country'] = pd.Categorical(np.select(conditions, choices, default=np.nan), choices)
+        # Bin money
+        self.df['money'] = pd.Categorical(self.df['money_from_playing_music'].str.title(),
+                                          ['Never', 'Sometimes', 'Frequently'])
+        # Bin gender
+        self.df['gender'] = self.df['gender'].str.title()
+        self.df['gender'] = self.df['gender'].str.replace('_', '-')
+        # Bin hours/years
+        for col in ['hours_of_daily_music_listening', 'years_of_formal_training']:
+            conditions = [
+                self.df[col] < 1,
+                (self.df[col] <= 3) & (self.df[col] >= 1),
+                (self.df[col] <= 6) & (self.df[col] >= 4),
+                (self.df[col] <= 9) & (self.df[col] >= 7),
+                self.df[col] >= 10
+            ]
+            choices = ["0", '1–3', '4–6', '7–9', '>9']
+            self.df[col.split('_')[0]] = pd.Categorical(np.select(conditions, choices, default=np.nan), choices)
+
+    @vutils.plot_decorator
+    def create_plot(self):
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\countplot_listener_demographics'
+        return self.fig, fname
+
+    def _create_plot(self):
+        for var, ax, col in zip(self.vars, self.ax.flatten(), self.pal):
+            res = self.df.sort_values(by=var)
+            sns.countplot(data=res, x=var, ax=ax, lw=2, edgecolor=vutils.BLACK, width=0.5, color=col)
+
+    def _format_ax(self):
+        for ax, tit in zip(self.ax.flatten(), self.tits):
+            ax.set(ylim=(0, len(self.df)), xlabel='', ylabel='', title=tit)
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=0, ha='center')
+            ax.tick_params(width=3, )
+            plt.setp(ax.spines.values(), linewidth=2)
+
+    def _format_fig(self):
+        self.fig.supylabel('Count')
+        self.fig.supxlabel('Response')
+        self.fig.subplots_adjust(bottom=0.078, top=0.95, left=0.07, right=0.975, wspace=0.035, hspace=0.45)
+
+
 def generate_misc_plots(
     mds: list, output_dir: str,
 ) -> None:
@@ -842,6 +939,10 @@ def generate_misc_plots(
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\misc_plots'
+    lp_all = LinePlotAllConditions(df=df, output_dir=figures_output_dir)
+    lp_all.create_plot()
+    cp = CountPlotListenerDemographics(df=df, output_dir=figures_output_dir)
+    cp.create_plot()
     hm = HeatmapNoteChoice(df=df, output_dir=figures_output_dir)
     hm.create_plot()
     bp = BarPlotQuestionnaireCorrelation(df=df, output_dir=figures_output_dir)
@@ -856,8 +957,6 @@ def generate_misc_plots(
     stacked_bp.create_plot()
     lp_orig = LinePlotZoomCall(df=df, output_dir=figures_output_dir)
     lp_orig.create_plot()
-    lp_all = LinePlotAllConditions(df=df, output_dir=figures_output_dir)
-    lp_all.create_plot()
 
 
 if __name__ == '__main__':

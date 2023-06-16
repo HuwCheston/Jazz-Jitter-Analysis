@@ -31,14 +31,17 @@ class PairPlotAllVariables(vutils.BasePlot):
         super().__init__(**kwargs)
         self.labels: list[str] = kwargs.get(
             'labels', ['Tempo slope\n(BPM/s)', 'Asynchrony\n(RMS, ms)',
-                       'Timing\nirregularity\n(SD, ms)', 'Self-reported\nsuccess']
+                       'Timing\nirregularity\n(SD, ms)', 'Performer-\nreported\nsuccess', 'Listener-\nreported\nsuccess']
         )
         self._jitter_success: bool = kwargs.get('jitter_success', True)
         self._abs_slope: bool = kwargs.get('abs_slope', True)
+        self._avg_sessions: bool = kwargs.get('average_sessions', True)
         self.error_bar: str = kwargs.get('error_bar', 'sd')
         self.n_boot: int = kwargs.get('n_boot', vutils.N_BOOT)
         self.percentiles: tuple[float] = kwargs.get('percentiles', (2.5, 97.5))
-        self.vars: list[str] = kwargs.get('vars', ['tempo_slope', 'pw_asym', 'ioi_std', 'success'])
+        self.vars: list[str] = kwargs.get('vars', [
+            'tempo_slope', 'pw_asym', 'ioi_std', 'success', 'perceptual_answer_mean'
+        ])
         self.df: pd.DataFrame = self._format_df()
         self.counter: int = 0
 
@@ -55,12 +58,16 @@ class PairPlotAllVariables(vutils.BasePlot):
         if self._jitter_success:
             # Add gaussian noise to success variable
             df['success'] = [val + np.random.normal(0, 0.01) for val in df['success'].to_list()]
+            df['perceptual_answer_mean'] = [val + np.random.normal(0, 0.01) for val in df['perceptual_answer_mean'].to_list()]
         if self._abs_slope:
             # Get absolute tempo slope
             df['tempo_slope'] = df['tempo_slope'].abs()
         pd.options.mode.chained_assignment = 'warn'
         # Group by trial, latency, and jitter, get the mean, then reset the index and return
-        return df.groupby(['trial', 'latency', 'jitter']).mean().reset_index()
+        if self._avg_sessions:
+            return df.groupby(['trial', 'latency', 'jitter']).mean().reset_index()
+        else:
+            return df
 
     @vutils.plot_decorator
     def create_plot(
@@ -88,7 +95,7 @@ class PairPlotAllVariables(vutils.BasePlot):
         # Get the required label from our list
         s = self.labels[self.counter]
         # Add the label to the upper centre of the diagonal plot
-        y = 0.85 if self.counter != 2 else 0.8
+        y = 0.85 if self.counter < 2 else 0.8
         ax.annotate(
             s, xy=(0.97, y), transform=ax.transAxes, xycoords='axes fraction', va='center', ha='right', fontsize=30
         )
@@ -124,7 +131,7 @@ class PairPlotAllVariables(vutils.BasePlot):
         act_predict = regress(grp)
         # Create bootstrapped regression predictions
         res = [regress(grp.sample(frac=1, replace=True, random_state=n)) for n in range(0, self.n_boot)]
-        # Create empty variable to hold concatenated dataframe so we don't get warnings
+        # Create empty variable to hold concatenated dataframe, so we don't get warnings
         conc = None
         # Convert bootstrapped predictions to dataframe and get standard deviation for each x value
         if self.error_bar == 'ci':
@@ -222,18 +229,18 @@ class PairPlotAllVariables(vutils.BasePlot):
         # If we're using absolute slope, we need to define a different axis limit
         slope_lim = (0, 0.5) if self._abs_slope else (-0.5, 0.5)
         # Iterate through all rows and columns and set required axis limits and step values
-        for i, lim, step in zip(range(0, 4), [slope_lim, (0, 400), (0, 100), (1, 9)], [3, 5, 5, 3]):
+        for i, lim, step in zip(range(0, len(self.vars)), [slope_lim, (0, 400), (0, 100), (1, 9), (1, 9)], [3, 5, 5, 3, 3]):
             ticks = np.linspace(lim[0], lim[1], step)
             self.g.axes[i, i].set(ylim=lim, xlim=lim, yticks=ticks, xticks=ticks)
-        # If using absolute tempo slope, adjust axis limit slightly so we don't cut off some markers
+        # If using absolute tempo slope, adjust axis limit slightly, so we don't cut off some markers
         if self._abs_slope:
             self.g.axes[0, 0].set(xlim=(-0.01, 0.5))
         # Iterate through just the first column and last row and add the correct axis ticks back in
-        for i in range(0, 4):
+        for i in range(0, 5):
             self.g.axes[i, 0].tick_params(width=3, length=7, axis='y')
-            self.g.axes[3, i].tick_params(width=3, length=7, axis='x')
+            self.g.axes[4, i].tick_params(width=3, length=7, axis='x')
         # The axis in the bottom left corner is the only one which requires ticks on both axes
-        self.g.axes[3, 0].tick_params(width=3, length=7, axis='both')
+        self.g.axes[4, 0].tick_params(width=3, length=7, axis='both')
 
     def _format_fig(
             self
@@ -474,15 +481,16 @@ class BarPlotRegressionCoefficients(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Get parameters for table from kwargs
-        self.categories: list[str] = kwargs.get('categories', ['tempo_slope', 'pw_asym', 'ioi_std', 'success'])
+        self.categories: list[str] = kwargs.get('categories', ['tempo_slope', 'pw_asym', 'ioi_std', 'success', 'perceptual_answer_mean'])
         self.labels: list[str] = kwargs.get('labels', [
-            'Tempo slope (BPM/s)', 'Asynchrony (RMS, ms)', 'Timing irregularity (SD, ms)', 'Self-reported success'
+            'Tempo slope (BPM/s)', 'Asynchrony (RMS, ms)', 'Timing irregularity (SD, ms)', 'Performer-reported Success', 'Listener-reported Success'
         ])
-        self.averaged_vars: list[str] = kwargs.get('averaged_vars', ['tempo_slope', 'pw_asym'])
+        self.averaged_vars: list[str] = kwargs.get('averaged_vars', ['tempo_slope', 'pw_asym', 'perceptual_answer_mean'])
         self.predictor_ticks: list[str] = kwargs.get('predictor_ticks', [
             'Reference\n(0ms, 0.0x, Drums)', 'Latency (ms)', 'Jitter', 'Instrument'
         ])
         self.levels: list[str] = kwargs.get('levels', ['Intercept', '23', '45', '90', '180', '0.5', '1.0', 'Keys'])
+        self.yticks = kwargs.get('yticks', [(-0.6, 0.6, 7), (-50, 200, 6), (-10, 40, 6), (-5, 10, 4), (-5, 10, 4)])
         self.alpha: float = kwargs.get('alpha', 0.05)
         # Format dataframe to get regression results
         self.df = self._format_df()
@@ -492,7 +500,13 @@ class BarPlotRegressionCoefficients(vutils.BasePlot):
         self.vlines_margin: float = kwargs.get('vlines_margin', 0.25)
         self.add_pvals: bool = kwargs.get('add_pvals', False)
         # Create plotting objects in matplotlib
-        self.fig, self.ax = plt.subplots(nrows=4, ncols=1, sharex=True, sharey=False, figsize=(18.8, 18.8))
+        self.fig, self.ax = plt.subplots(
+            nrows=len(self.categories),
+            ncols=1,
+            sharex=True,
+            sharey=False,
+            figsize=(18.8, 4.7 * len(self.categories))
+        )
         self.legend_handles_labels = None   # Used to hold our legend object for later
 
     def _extract_regression_parameters(
@@ -619,7 +633,7 @@ class BarPlotRegressionCoefficients(vutils.BasePlot):
         """
         Adds in an X to an axes to show that certain variables were not included as predictors
         """
-        # Get all of our X positions, sort the, and extract the final 5 (equivalent to our keys variable, all duos)
+        # Get all of our X positions, sort them, and extract the final 5 (equivalent to our keys variable, all duos)
         xs = sorted([p.get_x() for p in ax.patches])[-5:]
         # Add in the text
         ax.text((xs[2] + xs[3]) / 2, y=0, s='X', fontsize=self.x_fontsize, ha='center', va='center_baseline')
@@ -682,12 +696,21 @@ class BarPlotRegressionCoefficients(vutils.BasePlot):
         """
         Applies required axis formatting
         """
+        ylims = [(-0.7, 0.7), (-50, 250), (-20, 50), (-9, 12), (-9, 12)]
         # Iterate through each axis and label, with a counter
-        for count, ax, lab in zip(range(self.df['var'].nunique()), self.ax.flatten(), self.labels):
+        for count, ax, lab, yt, yl in zip(
+                range(self.df['var'].nunique()), self.ax.flatten(), self.labels, self.yticks, ylims
+        ):
             # Add in a horizontal line at y = 0
             ax.axhline(y=0, color=vutils.BLACK, lw=2)
             # Set our axis labels
-            ax.set(xlabel='', ylabel=lab, xticklabels=['Intercept', '23', '45', '90', '180', '0.5x', '1.0x', 'Keys'])
+            ax.set(
+                xlabel='',
+                ylabel=lab,
+                xticklabels=['Intercept', '23', '45', '90', '180', '0.5x', '1.0x', 'Keys'],
+                yticks=np.linspace(*yt),
+                ylim=yl
+            )
             # Add in our predictor ticks to the top of the first subplot
             ticks = self.predictor_ticks if count == 0 else ['' for _ in range(len(self.predictor_ticks))]
             self._add_predictor_ticks(ax=ax, ticks=ticks)
@@ -717,7 +740,7 @@ class BarPlotRegressionCoefficients(vutils.BasePlot):
         self.fig.supylabel(r'Coefficient (B)')
         self.fig.supxlabel('Categorical levels')
         # Adjust the subplot positioning slightly
-        self.fig.subplots_adjust(top=0.92, bottom=0.05, left=0.1, right=0.9)
+        self.fig.subplots_adjust(top=0.935, bottom=0.05, left=0.1, right=0.9)
 
 
 class BarPlotModelComparison(vutils.BasePlot):
@@ -923,6 +946,8 @@ def generate_all_metrics_plots(
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\all_metrics_plots'
 
+    bp = BarPlotRegressionCoefficients(df=df, output_dir=figures_output_dir)
+    bp.create_plot()
     bp = BarPlotModelComparison(df=df, output_dir=figures_output_dir)
     bp.create_plot()
     pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir, error_bar='ci')
@@ -931,8 +956,6 @@ def generate_all_metrics_plots(
     rt.create_tables()
     pp_ = PointPlotRepeatComparisons(df=df, output_dir=figures_output_dir)
     pp_.create_plot()
-    bp = BarPlotRegressionCoefficients(df=df, output_dir=figures_output_dir)
-    bp.create_plot()
 
 
 if __name__ == '__main__':
