@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>src.visualise.phase_correction_graphs &mdash; Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances 0.1 documentation</title>
+  <title>src.visualise.phase_correction_graphs &mdash; Code for: Coordination Strategies in Networked Jazz Performances 0.1 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -31,7 +31,7 @@
           
           
           <a href="../index.html" class="icon icon-home">
-            Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances
+            Code for: Coordination Strategies in Networked Jazz Performances
           </a>
               <div class="version">
                 0.1
@@ -79,7 +79,7 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../index.html">Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances</a>
+          <a href="../index.html">Code for: Coordination Strategies in Networked Jazz Performances</a>
       </nav>
 
       <div class="wy-nav-content">
@@ -139,14 +139,20 @@
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BarPlotMixedEffectsRegressionCoefficients</span></code>(...)</p></td>
 <td><p>Creates a barplot showing regression coefficients and confidence intervals for mixed effects models</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BarPlotPhaseCorrectionModelComparison</span></code>(**kwargs)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BarPlotPerformerListenerSuccess</span></code>(**kwargs)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BarPlotPhaseCorrectionModelComparison</span></code>(**kwargs)</p></td>
 <td><p>Creates barplots showing the difference in R2 between models.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BoxPlot</span></code>(**kwargs)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BoxPlot</span></code>(**kwargs)</p></td>
 <td><p>Creates a figure showing correction to partner coefficients obtained for each performer in a duo, stratified by a given variable (defaults to jitter scale).</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BoxPlotR2WindowSize</span></code>(**kwargs)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BoxPlotR2WindowSize</span></code>(**kwargs)</p></td>
 <td><p>Creates a boxplot of average R2 values per rolling window size</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">HistPlotModelTerms</span></code>(**kwargs)</p></td>
+<td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">HistPlotR2</span></code>(**kwargs)</p></td>
 <td><p>Creates histograms of model parameters stratified by trial and instrument, x-axis variable defaults to R-squared</p></td>
@@ -166,10 +172,13 @@
 <tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RegPlotGrid</span></code>(**kwargs)</p></td>
 <td><p>Creates a grid of scatter and regression plots, showing relationship between primary variables (tempo slope, ioi variability, asynchrony, self-reported success) and coupling balance.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">SingleConditionAnimation</span></code>(**kwargs)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RegPlotGridStrAsyn</span></code>(**kwargs)</p></td>
+<td><p>Creates a grid of scatter and regression plots, showing relationship between primary variables (tempo slope, ioi variability, asynchrony, self-reported success) and coupling balance.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">SingleConditionAnimation</span></code>(**kwargs)</p></td>
 <td><p>Creates an animation of actual and predicted tempo slope that should(!) be synchronised to the AV_Manip videos.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">SingleConditionPlot</span></code>(**kwargs)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">SingleConditionPlot</span></code>(**kwargs)</p></td>
 <td><p>Generate a nice plot of a single performance, showing actual and predicted tempo slope, relative phase adjustments, phase correction coefficients to partner and self for both performers</p></td>
 </tr>
 </tbody>

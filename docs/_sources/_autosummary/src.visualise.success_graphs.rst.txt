@@ -1,4 +1,4 @@
-src.visualise.success\_graphs
+﻿src.visualise.success\_graphs
 =============================
 
 .. automodule:: src.visualise.success_graphs
@@ -23,9 +23,12 @@ src.visualise.success\_graphs
 
    .. autosummary::
    
+      BarPlotListenerEvaluations
       BarPlotTestRetestReliability
       HeatmapQuestionnaire
+      NumberLineListenerSuccess
       NumberLineSuccess
+      PairGridListenerRatings
       ScatterPlotQuestionnaire
    
    

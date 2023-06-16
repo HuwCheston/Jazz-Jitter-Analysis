@@ -92,7 +92,8 @@ target/
 .mypy_cache/
 
 # Outputs
-/reports/figures
+_deprecated/
+reports/figures/
 *.mid
 *.wav
 *.avi

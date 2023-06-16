@@ -62,7 +62,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Code for: Leader-Follower Relationships Optimize Coordination in Networked Jazz Performances'
+project = u'Code for: Coordination Strategies in Networked Jazz Performances'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

@@ -1,4 +1,4 @@
-src.visualise.phase\_correction\_graphs
+﻿src.visualise.phase\_correction\_graphs
 =======================================
 
 .. automodule:: src.visualise.phase_correction_graphs
@@ -29,15 +29,18 @@ src.visualise.phase\_correction\_graphs
       BarPlotCouplingStrengthAsymmetry
       BarPlotCouplingStrengthAsymmetryComparison
       BarPlotMixedEffectsRegressionCoefficients
+      BarPlotPerformerListenerSuccess
       BarPlotPhaseCorrectionModelComparison
       BoxPlot
       BoxPlotR2WindowSize
+      HistPlotModelTerms
       HistPlotR2
       PairGrid
       PointPlotCouplingStrengthAsymmetry
       PointPlotSelfPartnerCouplingByInstrument
       RegPlot
       RegPlotGrid
+      RegPlotGridStrAsyn
       SingleConditionAnimation
       SingleConditionPlot
    

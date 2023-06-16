@@ -1,4 +1,4 @@
-src.visualise.misc\_graphs
+﻿src.visualise.misc\_graphs
 ==========================
 
 .. automodule:: src.visualise.misc_graphs
@@ -28,6 +28,7 @@ src.visualise.misc\_graphs
       BarPlotHigherOrderModelComparison
       BarPlotInterpolatedIOIs
       BarPlotQuestionnaireCorrelation
+      CountPlotListenerDemographics
       HeatmapNoteChoice
       LinePlotAllConditions
       LinePlotZoomCall
