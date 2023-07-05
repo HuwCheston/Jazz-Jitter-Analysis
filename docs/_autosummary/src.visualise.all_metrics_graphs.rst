@@ -1,4 +1,4 @@
-src.visualise.all\_metrics\_graphs
+﻿src.visualise.all\_metrics\_graphs
 ==================================
 
 .. automodule:: src.visualise.all_metrics_graphs
@@ -27,6 +27,7 @@ src.visualise.all\_metrics\_graphs
       BarPlotRegressionCoefficients
       PairPlotAllVariables
       PointPlotRepeatComparisons
+      RegPlotTestRetestReliability
       RegressionTableAllMetrics
    
    

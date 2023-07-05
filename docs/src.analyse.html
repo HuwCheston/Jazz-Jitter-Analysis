@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>src.analyse package &mdash; Code for: Coordination Strategies in Networked Jazz Performances 0.1 documentation</title>
+  <title>src.analyse package &mdash; Code for: Trade-offs in Coordination Strategies for Networked Jazz Performances 0.1 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -29,7 +29,7 @@
           
           
           <a href="index.html" class="icon icon-home">
-            Code for: Coordination Strategies in Networked Jazz Performances
+            Code for: Trade-offs in Coordination Strategies for Networked Jazz Performances
           </a>
               <div class="version">
                 0.1
@@ -58,7 +58,7 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="index.html">Code for: Coordination Strategies in Networked Jazz Performances</a>
+          <a href="index.html">Code for: Trade-offs in Coordination Strategies for Networked Jazz Performances</a>
       </nav>
 
       <div class="wy-nav-content">
@@ -397,6 +397,12 @@ for every second.</p>
 <dt class="sig sig-object py" id="src.analyse.phase_correction_models.PhaseCorrectionModel._remove_duplicate_matches">
 <em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_remove_duplicate_matches</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nn_np</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#src.analyse.phase_correction_models.PhaseCorrectionModel._remove_duplicate_matches" title="Permalink to this definition"></a></dt>
 <dd><p>Filters onsets for duplicate matches, then keeps whichever match is closest to median asynchrony time.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.analyse.phase_correction_models.PhaseCorrectionModel._return_granger_causality">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">_return_granger_causality</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxlag</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#src.analyse.phase_correction_models.PhaseCorrectionModel._return_granger_causality" title="Permalink to this definition"></a></dt>
+<dd><p>Calculates Granger causality between time series</p>
 </dd></dl>
 
 </dd></dl>

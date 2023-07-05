@@ -32,6 +32,8 @@
       HeatmapNoteChoice
       LinePlotAllConditions
       LinePlotZoomCall
+      RegPlotCouplingHalves
+      RegPlotCouplingSessions
    
    
 
