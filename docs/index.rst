@@ -3,14 +3,14 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Code for: Coordination Strategies in Networked Jazz Performances
+Code for: Trade-offs in Coordination Strategies for Networked Jazz Performances
 ============================================================================================
 
 .. image:: https://user-images.githubusercontent.com/97224401/231712093-133cafa0-dffe-4a23-945d-5249c4385bab.gif
    :alt: StreamPlayer
    :align: center
 
-This repository is associated with the paper `Coordination Strategies in Networked Jazz Performances` and includes scripts for reproducing the analysis, data, and figures contained in this paper. The corresponding dataset, comprising audio and video recordings of 130 individual jazz duo performances, biometric data, and subjective evaluations and comments from both the musicians and listeners recruited in a separate perceptual study, is `freely accessible on Zenodo <https://doi.org/10.5281/zenodo.7773824>`_.
+This repository is associated with the paper `Trade-offs in Coordination Strategies for Networked Jazz Performances` and includes scripts for reproducing the analysis, data, and figures contained in this paper. The corresponding dataset, comprising audio and video recordings of 130 individual jazz duo performances, biometric data, and subjective evaluations and comments from both the musicians and listeners recruited in a separate perceptual study, is `freely accessible on Zenodo <https://doi.org/10.5281/zenodo.7773824>`_.
 
 Quick start
 -----------

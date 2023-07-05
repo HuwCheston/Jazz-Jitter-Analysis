@@ -30,7 +30,7 @@ class PairPlotAllVariables(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.labels: list[str] = kwargs.get(
-            'labels', ['Tempo slope\n(BPM/s)', 'Asynchrony\n(RMS, ms)',
+            'labels', ['|Tempo slope|\n(|BPM/s|)', 'Asynchrony\n(RMS, ms)',
                        'Timing\nirregularity\n(SD, ms)', 'Performer-\nreported\nsuccess', 'Listener-\nreported\nsuccess']
         )
         self._jitter_success: bool = kwargs.get('jitter_success', True)
@@ -364,14 +364,15 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.metrics = ['tempo_slope', 'ioi_std', 'pw_asym', 'success']
+        self.metrics = ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean']
         self.titles = [
-            'Tempo slope (BPM/s)',
-            'Timing irregularity (SD, ms)',
-            'Asynchrony (RMS, ms)',
-            'Self-reported success',
+            'Tempo slope',
+            'Timing irregularity',
+            'Asynchrony',
+            'Performer success',
+            'Listener success'
         ]
-        self.xlims = [0.2, 9, 70, 2]
+        self.xlims = [0.2, 9, 70, 2, 2]
         self.fig, self.ax = plt.subplots(
             nrows=1, ncols=len(self.metrics), sharex=False, sharey=True, figsize=(18.8, 5.52)
         )
@@ -751,11 +752,11 @@ class BarPlotModelComparison(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Dataframe formatting attributes
-        self.categories: list[str] = kwargs.get('categories', ['tempo_slope', 'ioi_std', 'pw_asym', 'success'])
+        self.categories: list[str] = kwargs.get('categories', ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean', ])
         self.labels: list[str] = kwargs.get('labels', [
-            'Tempo slope (BPM/s)', 'Timing irregularity (SD, ms)', 'Asynchrony (RMS, ms)', 'Self-reported success'
+            'Tempo slope (BPM/s)', 'Timing irregularity (SD, ms)',  'Asynchrony (RMS, ms)', 'Performer-reported success', 'Listener-reported success',
         ])
-        self.averaged_vars: list[str] = kwargs.get('averaged_vars', ['tempo_slope', 'pw_asym'])
+        self.averaged_vars: list[str] = kwargs.get('averaged_vars', ['tempo_slope', 'pw_asym', 'perceptual_answer_mean'])
         self.full_mds = [
             'C(latency)+C(jitter)+C(instrument)',
             'C(latency)+C(jitter)',
@@ -774,9 +775,10 @@ class BarPlotModelComparison(vutils.BasePlot):
         self.df = self._format_df()
         # Create subplots
         self.fig, self.ax = plt.subplots(
-            nrows=2, ncols=2, sharex='col', sharey='all', figsize=(18.8, 9.4),
+            nrows=3, ncols=2, sharex=False, sharey='all', figsize=(18.8, 14.1),
             gridspec_kw=dict(width_ratios=[3, 7])
         )
+        self.ax.flatten()[-1].axis('off')
         # Visualisation attributes
         self.ci: str = kwargs.get('ci', 'se')  # Type of error bar to plot
 
@@ -842,7 +844,7 @@ class BarPlotModelComparison(vutils.BasePlot):
         """
         Creates the barplots for each performance success metric
         """
-        palette = sns.color_palette('Set2', n_colors=4)
+        palette = sns.color_palette('Set2', n_colors=5)
         palette[1], palette[2] = palette[2], palette[1]
         # Iterate through each axis and performance success variable
         for ax, (idx, grp), col in zip(self.ax.flatten(), self.df.groupby('var'), palette):
@@ -885,40 +887,32 @@ class BarPlotModelComparison(vutils.BasePlot):
             # Set title and axis labels
             ax.set(title=lab, ylabel='', xlabel='', ylim=[-0.2, 1.15], )
             # Set x axis ticks and tick parameters
-            self._set_axis_ticks(ax)
             ax.tick_params(width=3, which='major')
             plt.setp(ax.spines.values(), linewidth=2)
             # Add horizontal line at y = 0
             ax.axhline(y=0, color=vutils.BLACK, lw=2)
-
-    @staticmethod
-    def _set_axis_ticks(
-            ax
-    ) -> None:
-        """
-        Sets ticks for x axis
-        """
-        # Get our ticks
-        ticks = [t.get_text() for t in ax.get_xticklabels()]
-        if 'C(instrument)' in ticks:
-            new_ticks = [
-                'Full model\n(~$L$ + $J$ + $I$)',
-                'Testbed only\n(~$L$ + $J$)',
-                'Instrument only\n(~$I$)',
-                'Latency + instrument\n(~$L$ + $I$)',
-                'Jitter + instrument\n(~$J$ + $I$)',
-                'Latency only\n(~$L$)',
-                'Jitter only\n(~$J$)',
-            ]
-        elif 'C(latency)' in ticks:
-            new_ticks = [
-                'Full model\n(~$L$ + $J$)',
-                'Latency only\n(~$L$)',
-                'Jitter only\n(~$J$)',
-            ]
-        else:
-            new_ticks = ticks
-        ax.set_xticks(ax.get_xticks(), labels=new_ticks, rotation=45, ha='right', rotation_mode='anchor')
+            # Hack alert
+            if lab == 'Performer-reported success':
+                t = [
+                    'Full model\n(~$L$ + $J$ + $I$)',
+                    'Testbed only\n(~$L$ + $J$)',
+                    'Instrument only\n(~$I$)',
+                    'Latency + instrument\n(~$L$ + $I$)',
+                    'Jitter + instrument\n(~$J$ + $I$)',
+                    'Latency only\n(~$L$)',
+                    'Jitter only\n(~$J$)',
+                ]
+                ax.set_xticks(ax.get_xticks(), labels=t, rotation=45, ha='right', rotation_mode='anchor')
+                ax.tick_params(axis='x', which='major', pad=20)
+            elif lab == 'Listener-reported success':
+                t = [
+                    'Full model\n(~$L$ + $J$)',
+                    'Latency only\n(~$L$)',
+                    'Jitter only\n(~$J$)',
+                ]
+                ax.set_xticks(ax.get_xticks(), labels=t, rotation=45, ha='right', rotation_mode='anchor')
+            else:
+                ax.set(xticklabels=[])
 
     def _format_fig(
             self
@@ -930,7 +924,194 @@ class BarPlotModelComparison(vutils.BasePlot):
         self.fig.supxlabel('Model predictor variables')
         self.fig.supylabel(r'Adjusted $R^{2}$', y=0.6)
         # Adjust plot positioning slightly
-        self.fig.subplots_adjust(bottom=0.3, top=0.95, left=0.08, right=0.95, hspace=0.2, wspace=0.1)
+        self.fig.subplots_adjust(bottom=0.12, top=0.95, left=0.08, right=0.95, hspace=0.3, wspace=0.1)
+
+
+class RegPlotTestRetestReliability(vutils.BasePlot):
+    def __init__(self, df: pd.DataFrame, **kwargs):
+        super().__init__(**kwargs)
+        self.df = self._format_df(df)
+        self.fig = plt.figure(figsize=(18.8, 5))
+        self.vars = ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean']
+        self.main_ax, self.top_marginal_ax, self.right_marginal_ax = self._init_gridspec_subplots()
+        self.handles, self.labels = None, None
+        self.lims = [(-0.6, 0.35), (0, 80), (0, 250), (0, 10), (0, 10)]
+        self.ticks = [(-0.5, 0.0), (0, 50), (0, 100, 200), (1, 5, 9), (1, 5, 9)]
+        self.titles = [
+            'Tempo slope',
+            'Timing irregularity',
+            'Asynchrony',
+            'Performer success',
+            'Listener success',
+        ]
+
+    def _init_gridspec_subplots(
+            self, widths: tuple[int] = (5, 0.5, 5, 0.5, 5, 0.5, 5, 0.5, 5, 0.5), heights: tuple[int] = (0.5, 5)
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Initialise grid of subplots. Returns two numpy arrays corresponding to main and marginal axes respectively.
+        """
+        # Initialise subplot grid with desired width and height ratios
+        grid = self.fig.add_gridspec(nrows=2, ncols=10, width_ratios=widths, height_ratios=heights, wspace=0.3,
+                                     hspace=0.1)
+        # Create a list of index values for each subplot type
+        top_margins = [0, 2, 4, 6, 8, ]
+        right_margins = [11, 13, 15, 17, 19]
+        mains = [10, 12, 14, 16, 18]
+        # Create empty lists to hold subplots
+        top_marginal_ax = []
+        right_marginal_ax = []
+        main_ax = []
+        # Iterate through all the subplots we want to create
+        for i in range(len(heights) * len(widths)):
+            # Create the subplot object
+            ax = self.fig.add_subplot(grid[i // len(widths), i % len(widths)])
+            # Append the subplot to the desired list
+            if i in top_margins:
+                top_marginal_ax.append(ax)
+            elif i in right_margins:
+                right_marginal_ax.append(ax)
+            elif i in mains:
+                main_ax.append(ax)
+            # If we don't want to keep the axis, turn it off so it is hidden from the plot
+            else:
+                ax.axis('off')
+        # Return the figure, main subplots (as numpy array), and marginal subplots (as numpy array)
+        return np.array(main_ax), np.array(top_marginal_ax), np.array(right_marginal_ax)
+
+    @staticmethod
+    def _format_df(df):
+        piv = df.pivot(['trial', 'latency', 'jitter', 'instrument'], 'block',
+                       ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean']).reset_index(
+            drop=False)
+        piv.columns = pd.Index([str(e[0]) + str(e[1]) for e in piv.columns.tolist()])
+        # piv['tempo_slope1'] = piv['tempo_slope1'].abs()
+        # piv['tempo_slope2'] = piv['tempo_slope2'].abs()
+        np.random.seed(2)
+        piv['success1'] += np.random.normal(0, 0.2, len(piv))
+        piv['success2'] += np.random.normal(0, 0.2, len(piv))
+        return piv
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class; creates plot and returns to vutils.plot_decorator for saving.
+        """
+        self._create_plot()
+        self._format_main_ax()
+        self._format_marginal_ax()
+        self._format_fig()
+        self._move_marginal_ax()
+        fname = f'{self.output_dir}\\regplot_test_retest_reliability'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ):
+        """
+        Creates scatter plots for both simulated and actual tempo slope values
+        """
+        # Create the grid, but don't map any plots onto it just yet
+        for main_ax, var, top_margin, right_margin in zip(
+                self.main_ax.flatten(), self.vars, self.top_marginal_ax, self.right_marginal_ax
+        ):
+            sns.scatterplot(
+                data=self.df, x=var + '1', y=var + '2', hue='trial', palette=vutils.DUO_CMAP,
+                style='trial', markers=vutils.DUO_MARKERS, s=100, edgecolor=vutils.BLACK, ax=main_ax
+            )
+            sns.regplot(
+                data=self.df, x=var + '1', y=var + '2', ax=main_ax, scatter=False,
+                n_boot=vutils.N_BOOT, line_kws=dict(color=vutils.BLACK, lw=3)
+            )
+            self._add_correlation_results(ax=main_ax, var=var, position=var == 'success')
+            for margin, kwargs, in zip([top_margin, right_margin],
+                                       [dict(x=var + '1'), dict(y=var + '2')]):
+                sns.kdeplot(
+                    data=self.df, hue='trial', palette=vutils.DUO_CMAP, legend=False, lw=2,
+                    multiple='stack', fill=True, common_grid=True, cut=0, ax=margin, **kwargs
+                )
+
+    def _add_correlation_results(
+            self, ax, var, position=False
+    ) -> None:
+        """
+        Adds the results of a linear correlation onto the plot
+        """
+        # Calculate the correlation, get r and p values
+        r, p = stats.pearsonr(self.df[var + '1'], self.df[var + '2'])
+        # Format correlation results into a string
+        s = f'$r$ = {round(r, 2)}{vutils.get_significance_asterisks(p)}'
+        # Add the annotation onto the plot
+        pos = (0.325, 0.95) if not position else (0.675, 0.055)
+        ax.annotate(
+            s, pos, xycoords='axes fraction', fontsize=vutils.FONTSIZE, ha='center', va='center',
+            bbox=dict(facecolor='white', alpha=vutils.ALPHA, edgecolor=vutils.BLACK),
+        )
+
+    def _move_marginal_ax(self):
+        for ax in self.right_marginal_ax.flatten():
+            pos1 = ax.get_position()  # get the original position
+            pos2 = [pos1.x0 - 0.012, pos1.y0 - 0.001, pos1.width, pos1.height]
+            ax.set_position(pos2)
+
+    def _format_marginal_ax(self):
+        for top_margin, right_margin, lim, tit, tick in zip(
+                self.top_marginal_ax.flatten(), self.right_marginal_ax.flatten(), self.lims, self.titles, self.ticks
+        ):
+            top_margin.set(xlim=lim, ylabel='', xlabel='', xticklabels=[], yticks=[], xticks=tick)
+            top_margin.set_title(tit, fontsize=vutils.FONTSIZE + 5, y=1.1)
+            top_margin.spines['left'].set_visible(False)
+            right_margin.set(ylim=lim, xlabel='', ylabel='', yticklabels=[], xticks=[], yticks=tick)
+            right_margin.spines['bottom'].set_visible(False)
+            for ax in [top_margin, right_margin]:
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.tick_params(width=3, which='major')
+                plt.setp(ax.spines.values(), linewidth=2)
+
+    def _format_main_ax(self):
+        for ax, lim, tick in zip(self.main_ax.flatten(), self.lims, self.ticks):
+            # Get the axes limit from minimum and maximum values across both simulated and original data
+            ax.set(xlim=lim, ylim=lim, xticks=tick, yticks=tick, xlabel='', ylabel='')
+            # Set the top and right spines of the joint plot to visible
+            ax.spines['top'].set_visible(True)
+            ax.spines['right'].set_visible(True)
+            # Add the diagonal line to the joint ax
+            ax.axline(
+                xy1=(0, 0), xy2=(1, 1), linewidth=3, transform=ax.transAxes,
+                color=vutils.BLACK, alpha=vutils.ALPHA, ls='--'
+            )
+            ax.tick_params(width=3, which='major')
+            plt.setp(ax.spines.values(), linewidth=2)
+            # Store our handles and labels
+            self.handles, self.labels = ax.get_legend_handles_labels()
+            # Remove the legend
+            ax.get_legend().remove()
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Formats figure object, setting legend and padding etc.
+        """
+        # Add the legend back in
+        self.labels = [int(float(lab)) for lab in self.labels]
+        lgnd = plt.legend(
+            self.handles, self.labels, title='Duo', frameon=False, ncol=1, loc='right', markerscale=1.5,
+            fontsize=vutils.FONTSIZE + 3, edgecolor=vutils.BLACK, bbox_to_anchor=(7.05, 0.65),
+        )
+        self.fig.supxlabel('Experiment session 1')
+        self.fig.supylabel('Experiment session 2')
+        # Set the legend font size
+        plt.setp(lgnd.get_title(), fontsize=vutils.FONTSIZE + 3)
+        # Set the legend marker size and edge color
+        for handle in lgnd.legendHandles:
+            handle.set_edgecolor(vutils.BLACK)
+            handle.set_sizes([100])
+        # Adjust subplots positioning a bit to fit in the legend we've just created
+        self.fig.subplots_adjust(left=0.075, right=0.945, bottom=0.135, top=0.9)
 
 
 def generate_all_metrics_plots(
@@ -946,16 +1127,19 @@ def generate_all_metrics_plots(
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\all_metrics_plots'
 
+    pp_ = PointPlotRepeatComparisons(df=df, output_dir=figures_output_dir)
+    pp_.create_plot()
+    rp = RegPlotTestRetestReliability(df=df, output_dir=figures_output_dir,)
+    rp.create_plot()
+    pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir, error_bar='ci')
+    pp.create_plot()
     bp = BarPlotRegressionCoefficients(df=df, output_dir=figures_output_dir)
     bp.create_plot()
     bp = BarPlotModelComparison(df=df, output_dir=figures_output_dir)
     bp.create_plot()
-    pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir, error_bar='ci')
-    pp.create_plot()
     rt = RegressionTableAllMetrics(df, output_dir=figures_output_dir)
     rt.create_tables()
-    pp_ = PointPlotRepeatComparisons(df=df, output_dir=figures_output_dir)
-    pp_.create_plot()
+
 
 
 if __name__ == '__main__':

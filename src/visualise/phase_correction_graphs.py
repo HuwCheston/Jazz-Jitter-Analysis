@@ -61,6 +61,7 @@ class PairGrid(vutils.BasePlot):
         if self.average:
             self.df = self.df.groupby(['trial', 'latency', 'jitter', 'instrument']).mean().reset_index(drop=False)
         self.df['abbrev'] = self.df['latency'].astype('str') + 'ms/' + round(self.df['jitter'], 1).astype('str') + 'x'
+        self.df['instrument'] = self.df['instrument'].replace({'Keys': 'Piano'})
         return self.df.sort_values(by=['latency', 'jitter'])
 
     def _create_facetgrid(self):
@@ -69,7 +70,7 @@ class PairGrid(vutils.BasePlot):
         """
         return sns.catplot(
             data=self.df, x=self.xvar, y='abbrev', row='block', col='trial', hue='instrument', sharex=True, sharey=True,
-            hue_order=['Keys', 'Drums'], palette=vutils.INSTR_CMAP, kind='strip', height=5.5, marker='o', aspect=0.62,
+            hue_order=['Piano', 'Drums'], palette=vutils.INSTR_CMAP, kind='strip', height=5.5, marker='o', aspect=0.62,
             s=125, jitter=False, dodge=False
         )
 
@@ -89,7 +90,7 @@ class PairGrid(vutils.BasePlot):
                 ax.yaxis.grid(lw=2, alpha=vutils.ALPHA)
                 # Add the span, shaded according to tempo slope
                 d = self.df[
-                    (self.df['trial'] == num + 1) & (self.df['instrument'] == 'Keys')
+                    (self.df['trial'] == num + 1) & (self.df['instrument'] == 'Piano')
                 ].sort_values(['latency', 'jitter'])[self.cvar]
                 for n in range(0, 13):
                     coef = vutils.SLOPES_CMAP(self.norm(d.iloc[n]))
@@ -113,7 +114,7 @@ class PairGrid(vutils.BasePlot):
                     ax.yaxis.grid(True)
                     # Add the span, shaded according to tempo slope
                     d = self.df[
-                        (self.df['trial'] == num + 1) & (self.df['block'] == x + 1) & (self.df['instrument'] == 'Keys')
+                        (self.df['trial'] == num + 1) & (self.df['block'] == x + 1) & (self.df['instrument'] == 'Piano')
                     ].sort_values(['latency', 'jitter'])[self.cvar]
                     for n in range(0, 13):
                         coef = vutils.SLOPES_CMAP(self.norm(d.iloc[n]))
@@ -556,9 +557,10 @@ class BarPlot(vutils.BasePlot):
             )
         else:
             kwargs = dict(errorbar=None)
+        self.df['instrument'] = self.df['instrument'].replace({'Keys': 'Piano'})
         ax = sns.barplot(
             data=self.df, x='trial', y=self.yvar, hue='instrument', ax=self.ax, palette=vutils.INSTR_CMAP,
-            hue_order=['Keys', 'Drums'], estimator=self.estimator, edgecolor=vutils.BLACK, lw=2, width=0.8,
+            hue_order=['Piano', 'Drums'], estimator=self.estimator, edgecolor=vutils.BLACK, lw=2, width=0.8,
             **kwargs
         )
         return ax
@@ -1061,6 +1063,7 @@ class ArrowPlotPhaseCorrection(vutils.BasePlot):
         Creates the individual subplots
         """
         self.df['trial'] = pd.Categorical(self.df['trial'], [1, 3, 4, 5, 2])
+        self.df['instrument'] = self.df['instrument'].replace({'Keys': 'Piano'})
         # Iterate through each ax and duo
         for a, (idx, duo) in zip(self.ax.flatten(), self.df.groupby('trial')):
             # Sort values for each duo
@@ -1087,7 +1090,7 @@ class ArrowPlotPhaseCorrection(vutils.BasePlot):
             # Iterate through all colours, x values (x2), y values, and text
             for col, col2, col3, x1, x2, y, text, vals in zip(
                     vutils.INSTR_CMAP, vutils.INSTR_CMAP[::-1], [vutils.WHITE, vutils.BLACK],
-                    [0, 1], [1, 0], [0.6, 0.35, ], ['Keys', 'Drums'], [drms, keys],
+                    [0, 1], [1, 0], [0.6, 0.35, ], ['Piano', 'Drums'], [drms, keys],
             ):
                 # Create the arrow
                 a.annotate(
@@ -2580,6 +2583,7 @@ class HistPlotModelTerms(vutils.BasePlot):
         return self.fig, fname
 
     def _create_plot(self):
+        self.df['instrument'] = self.df['instrument'].replace({'Keys': 'Piano'})
         for ax, var in zip(self.ax.flatten(), self.vars):
             sns.histplot(
                 data=self.df, x=var, ax=ax, hue='instrument', kde=True, palette=vutils.INSTR_CMAP, line_kws=dict(lw=2),
@@ -2674,16 +2678,24 @@ def generate_phase_correction_plots(
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\phase_correction_plots'
-    # Create regression table
-    # vutils.output_regression_table(
-    #     mds=autils.create_model_list(df=df, md=f'correction_partner~C(latency)+C(jitter)+C(instrument)',
-    #                                  avg_groupers=['latency', 'jitter', 'instrument']),
-    #     output_dir=figures_output_dir, verbose_footer=False
-    # )
+    pg_a = PairGrid(
+        df=df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(0, 1.25),
+        xlabel='Average coupling to partner', average=True
+    )
+    bp = BarPlot(
+        df=df.copy(deep=True), output_dir=figures_output_dir, yvar='granger_f', ylim=(0, 140), ylabel='Granger index'
+    )
+    bp.create_plot()
+    bar = BarPlot(df=df.copy(deep=True), output_dir=figures_output_dir)
+    bar.create_plot()
+    bar = BarPlot(df=df.copy(deep=True), output_dir=figures_output_dir, yvar='correction_self', ylabel='Self coupling', ylim=(-1, 1))
+    bar.create_plot()
+    ap = ArrowPlotPhaseCorrection(df=df.copy(deep=True), output_dir=figures_output_dir)
+    ap.create_plot()
+    hp = HistPlotModelTerms(df=df.copy(deep=True), output_dir=figures_output_dir)
+    hp.create_plot()
     bp = BarPlotPerformerListenerSuccess(df=df, output_dir=figures_output_dir)
     bp.create_plot()
-    hp = HistPlotModelTerms(df=df, output_dir=figures_output_dir)
-    hp.create_plot()
     rp = RegPlotGridStrAsyn(df=df, output_dir=figures_output_dir, errorbar='ci', abs_slope=True)
     rp.create_plot()
     bp = BarPlotMixedEffectsRegressionCoefficients(df=df, output_dir=figures_output_dir)
@@ -2694,16 +2706,10 @@ def generate_phase_correction_plots(
     pp.create_plot()
     # bp = BarPlotPhaseCorrectionModelComparison(df=df, output_dir=figures_output_dir, n_boot=500)
     # bp.create_plot()
-    ap = ArrowPlotPhaseCorrection(df=df, output_dir=figures_output_dir)
-    ap.create_plot()
     # Create box plot
     bp = BoxPlot(df=df, output_dir=figures_output_dir, yvar='correction_partner', ylim=(-0.2, 1.5))
     bp.create_plot()
     # Create pair grids
-    pg_a = PairGrid(
-        df=df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(0, 1.25),
-        xlabel='Average coupling to partner', average=True
-    )
     pg_a.create_plot()
     pg = PairGrid(
         df=df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(0, 1.5),
@@ -2715,10 +2721,6 @@ def generate_phase_correction_plots(
     rp.create_plot()
     rp = RegPlotGrid(df=df, output_dir=figures_output_dir, errorbar='ci', abs_slope=True)
     rp.create_plot()
-    bar = BarPlot(df=df, output_dir=figures_output_dir)
-    bar.create_plot()
-    bar = BarPlot(df=df, output_dir=figures_output_dir, yvar='correction_self', ylabel='Self coupling', ylim=(-1, 1))
-    bar.create_plot()
     bp = BarPlotCouplingStrengthAsymmetry(df=df, output_dir=figures_output_dir)
     bp.create_plot()
     bp = BarPlotCouplingStrengthAsymmetryComparison(df=df, output_dir=figures_output_dir)

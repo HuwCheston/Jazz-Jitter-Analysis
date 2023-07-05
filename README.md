@@ -1,7 +1,7 @@
-# Code from: Coordination Strategies in Networked Jazz Performances
+# Code from: Trade-offs in Coordination Strategies for Networked Jazz Performances
 ![output](https://user-images.githubusercontent.com/97224401/231712093-133cafa0-dffe-4a23-945d-5249c4385bab.gif)
 
-This repository is associated with the paper `Coordination Strategies in Networked Jazz Performances` and includes scripts for reproducing the analysis, models, computer simulations, audio-visual stimuli, and figures contained in this paper. The corresponding dataset, comprising audio and video recordings of 130 individual jazz duo performances, biometric data, and subjective evaluations and comments from both the musicians and listeners recruited in a separate perceptual study, is [freely accessible on Zenodo](https://doi.org/10.5281/zenodo.7773824).
+This repository is associated with the paper `Trade-offs in Coordination Strategies for Networked Jazz Performances` and includes scripts for reproducing the analysis, models, computer simulations, audio-visual stimuli, and figures contained in this paper. The corresponding dataset, comprising audio and video recordings of 130 individual jazz duo performances, biometric data, and subjective evaluations and comments from both the musicians and listeners recruited in a separate perceptual study, is [freely accessible on Zenodo](https://doi.org/10.5281/zenodo.7773824).
 
 ## Quick start
 
@@ -61,7 +61,7 @@ If you reference any aspect of this work, please cite it in the format below:
 ```
 @unpublished{jazz-jitter-analysis,
   author = "Cheston, H. and Cross, I. and Harrison, P.",
-  title  = "Coordination Strategies in Networked Jazz Performances",
+  title  = "Trade-offs in Coordination Strategies for Networked Jazz Performances",
   note   = "In preparation",
   year   = "2023"
 }

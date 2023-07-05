@@ -8,6 +8,7 @@ import os
 import dill as pickle
 import warnings
 import statsmodels.formula.api as smf
+from statsmodels.tsa.stattools import grangercausalitytests
 from sklearn.covariance import EllipticEnvelope
 from pingouin import partial_corr
 from datetime import timedelta
@@ -591,6 +592,23 @@ class PhaseCorrectionModel:
         # Return the list of models
         return higher_order_mds
 
+    @staticmethod
+    def _return_granger_causality(
+            nn: pd.DataFrame, maxlag: int = 1
+    ) -> dict:
+        """Calculates Granger causality between time series"""
+        # Get the columns in the correct order and drop na values
+        test = nn[['my_prev_ioi_diff', 'asynchrony']].dropna()
+        # Carry out the test
+        grang = grangercausalitytests(
+            test, maxlag=maxlag, addconst=True, verbose=False,
+        )
+        # Extract F and P values and return
+        f = grang[1][0]['ssr_ftest'][0]
+        p = grang[1][0]['ssr_ftest'][1]
+        return {'granger_f': f, 'granger_p': p}
+
+
     def _create_summary_dictionary(
             self, c: dict, md, nn: pd.DataFrame, rn: int, higher_order_md: list
     ):
@@ -649,6 +667,8 @@ class PhaseCorrectionModel:
             'aic': md.aic,
             'bic': md.bic,
             'log-likelihood': md.llf,
+            # Granger causality variables
+            **self._return_granger_causality(nn),
             # Higher order model comparison variables
             'higher_order_rsquared': [md_.rsquared for md_ in higher_order_md],
             'higher_order_rsquared_adj': [md_.rsquared_adj for md_ in higher_order_md],

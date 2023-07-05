@@ -57,7 +57,7 @@ class BarPlotInterpolatedIOIs(vutils.BasePlot):
     def _format_ax(self):
         # Add invisible data to add another legend for instrument
         n1 = [self.ax.bar(0, 0, color=cmap) for i, cmap in zip(range(2), vutils.INSTR_CMAP)]
-        l1 = plt.legend(n1, ['Keys', 'Drums'], title='Instrument', bbox_to_anchor=(1, 0.8), ncol=1, frameon=False,)
+        l1 = plt.legend(n1, ['Piano', 'Drums'], title='Instrument', bbox_to_anchor=(1, 0.8), ncol=1, frameon=False,)
         self.ax.add_artist(l1)
         # Add invisible data to add another legend for interpolation
         n2 = [self.ax.bar(0, 0, color='gray', hatch=h, alpha=vutils.ALPHA) for i, h in zip(range(2), ['', '//'])]
@@ -101,7 +101,7 @@ class BarPlotInterpolatedIOIs(vutils.BasePlot):
 
 class LinePlotZoomCall(vutils.BasePlot):
     """
-    Creates a lineplot and histogram showing latency over time for initial zoom call
+    Creates a lineplot and histogram showing latency over time for initial Zoom call
     """
     def __init__(self, df, **kwargs):
         super().__init__(**kwargs)
@@ -260,7 +260,7 @@ class LinePlotAllConditions(vutils.BasePlot):
                         color=vutils.JITTER_CMAP[num_],
                     )
                 self.ax[num, 0].set(
-                    title=f'{i} ms latency condition', ylim=(-25, 300), xticks=[0, 30, 60, 90], yticks=[0, 100, 200, 300]
+                    title=f'{i} ms latency', ylim=(-25, 300), xticks=[0, 30, 60, 90], yticks=[0, 100, 200, 300]
                 )
                 # Plotting jitter
                 roll = g_['data'].values[0].rolling(window=8, min_periods=1)['latency']
@@ -268,13 +268,13 @@ class LinePlotAllConditions(vutils.BasePlot):
                     g_['data'].values[0]['timestamp'], roll.std(), lw=3, color=vutils.JITTER_CMAP[num_],
                 )
                 self.ax[num, 1].set(
-                    title=f'{i} ms latency condition', ylim=(-5, 60), xticks=[0, 30, 60, 90], yticks=[0, 20, 40, 60]
+                    title=f'{i} ms latency', ylim=(-5, 60), xticks=[0, 30, 60, 90], yticks=[0, 20, 40, 60]
                 )
                 # Add y labels onto only the middle row of plots
                 if num == 2:
-                    self.ax[num, 0].set_ylabel('Latency (ms)', labelpad=10, fontsize=vutils.FONTSIZE + 3)
+                    self.ax[num, 0].set_ylabel('Delay time (ms)', labelpad=10, fontsize=vutils.FONTSIZE + 3)
                     self.ax[num, 1].set_ylabel(
-                        'Latency variability (SD, ms)', labelpad=10, fontsize=vutils.FONTSIZE + 3
+                        'Delay variability (SD, ms)', labelpad=10, fontsize=vutils.FONTSIZE + 3
                     )
 
     def _format_ax(
@@ -293,8 +293,8 @@ class LinePlotAllConditions(vutils.BasePlot):
         """
         Format figure-level attributes
         """
-        self.fig.supxlabel('Performance duration (s)', )
-        self.fig.legend(loc='center right', ncol=1, frameon=False, title='Jitter\ncondition')
+        self.fig.supxlabel('Time (s)', )
+        self.fig.legend(loc='center right', ncol=1, frameon=False, title='Jitter')
         self.fig.subplots_adjust(top=0.95, bottom=0.09, left=0.07, right=0.9, wspace=0.15, hspace=0.4)
 
 
@@ -320,6 +320,7 @@ class BarPlotCouplingExperimentalSessions(vutils.BasePlot):
         """
         Coerces data into correct format for plotting
         """
+        self.df['instrument'] = self.df['instrument'].replace({'Keys': 'Piano'})
         return (
             self.df.pivot_table(self.yvar, ['trial', 'latency', 'jitter', 'instrument', ], 'block')
                 .reset_index(drop=False)
@@ -348,7 +349,7 @@ class BarPlotCouplingExperimentalSessions(vutils.BasePlot):
         for ax_, block in zip(self.ax.flatten(), ['block_1', 'block_2']):
             sns.barplot(
                 data=self.df, x='trial', y=block, hue='instrument', ax=ax_, palette=vutils.INSTR_CMAP,
-                hue_order=['Keys', 'Drums'], estimator=self.estimator, edgecolor=vutils.BLACK, lw=2, width=0.8,
+                hue_order=['Piano', 'Drums'], estimator=self.estimator, edgecolor=vutils.BLACK, lw=2, width=0.8,
                 errorbar=('ci', 95), errcolor=vutils.BLACK, errwidth=2, n_boot=vutils.N_BOOT, seed=1, capsize=0.1,
             )
 
@@ -420,10 +421,11 @@ class BarPlotCouplingPieceParts(vutils.BasePlot):
         """
         Creates plot in matplotlib
         """
+        self.df['instrument'] = self.df['instrument'].replace({'Keys': 'Piano'})
         for ax_, block in zip(self.ax.flatten(), ['coupling_1st', 'coupling_2nd']):
             sns.barplot(
                 data=self.df, x='trial', y=block, hue='instrument', ax=ax_, palette=vutils.INSTR_CMAP,
-                hue_order=['Keys', 'Drums'], estimator=self.estimator, edgecolor=vutils.BLACK, lw=2, width=0.8,
+                hue_order=['Piano', 'Drums'], estimator=self.estimator, edgecolor=vutils.BLACK, lw=2, width=0.8,
                 errorbar=('ci', 95), errcolor=vutils.BLACK, errwidth=2, n_boot=vutils.N_BOOT, seed=1, capsize=0.1,
             )
 
@@ -927,6 +929,236 @@ class CountPlotListenerDemographics(vutils.BasePlot):
         self.fig.subplots_adjust(bottom=0.078, top=0.95, left=0.07, right=0.975, wspace=0.035, hspace=0.45)
 
 
+class RegPlotCouplingSessions(vutils.BasePlot):
+    """
+    Creates a barplot showing differences in coupling between experimental sessions. For supplementary material!
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Dataframe, axis objects
+        self.block_df = self._format_block_df()
+        self.g = sns.JointGrid(
+            data=self.block_df, x='block_1', y='block_2', xlim=(-0.01, 1.3), ylim=(-0.01, 1.3),
+            hue='instrument', palette=vutils.INSTR_CMAP, height=8,
+        )
+
+    def _format_block_df(
+            self
+    ) -> pd.DataFrame:
+        """
+        Coerces data into correct format for plotting
+        """
+        self.df['instrument'] = self.df['instrument'].replace({'Keys': 'Piano'})
+        return (
+            self.df.pivot(['trial', 'latency', 'jitter', 'instrument', ], 'block', 'correction_partner')
+            .reset_index(drop=False)
+            .rename(columns={1: 'block_1', 2: 'block_2'})
+        )
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Axes, str]:
+        """
+        Called from outside the class to generate and save the image.
+        """
+        self._create_joint_plot()
+        self.g.plot_marginals(
+            sns.kdeplot, legend=False, lw=2, multiple='stack', fill=True, common_grid=True, cut=0,
+            hue_order=['Piano', 'Drums']
+        )
+        self._format_main_ax()
+        self._format_marginal_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\regplot_coupling_experimental_sessions'
+        return self.g.fig, fname
+
+    def _create_joint_plot(
+            self
+    ) -> None:
+        """
+        Creates plot in matplotlib
+        """
+        sns.scatterplot(
+            data=self.block_df, x='block_1', y='block_2', hue='instrument', palette=vutils.INSTR_CMAP,
+            edgecolor=vutils.BLACK, ax=self.g.ax_joint, hue_order=['Piano', 'Drums'], s=100
+        )
+        sns.regplot(
+            data=self.block_df, x='block_1', y='block_2', ax=self.g.ax_joint, scatter=False,
+            n_boot=vutils.N_BOOT, line_kws=dict(color=vutils.BLACK, lw=3)
+        )
+
+    def _add_correlation_results(
+            self,
+    ) -> None:
+        """
+        Adds the results of a linear correlation onto the plot
+        """
+        # Calculate the correlation, get r and p values
+        r, p = stats.pearsonr(self.block_df['block_1'], self.block_df['block_2'])
+        # Format correlation results into a string
+        s = f'$r$ = {round(r, 2)}{vutils.get_significance_asterisks(p)}'
+        # Add the annotation onto the plot
+        self.g.ax_joint.annotate(
+            s, (0.8, 0.1), xycoords='axes fraction', fontsize=vutils.FONTSIZE + 3,
+            bbox=dict(facecolor='none', edgecolor=vutils.BLACK, pad=10.0), ha='center', va='center'
+        )
+
+    def _format_main_ax(
+            self
+    ) -> None:
+        """
+        Formats axis-level objects
+        """
+        # Set the top and right spines of the joint plot to visible
+        self.g.ax_joint.spines['top'].set_visible(True)
+        self.g.ax_joint.spines['right'].set_visible(True)
+        # Add correlation results
+        self._add_correlation_results()
+        # Set axis aesthetics
+        self.g.ax_joint.tick_params(width=3, )
+        self.g.ax_joint.set(
+            ylabel='', xlabel='', xlim=(-0.01, 1.3), ylim=(-0.01, 1.3),
+            xticks=[0, 0.25, 0.5, 0.75, 1, 1.25], yticks=[0, 0.25, 0.5, 0.75, 1, 1.25]
+        )
+        plt.setp(self.g.ax_joint.spines.values(), linewidth=2)
+        self.g.ax_joint.axline(
+            xy1=(-0.01, -0.01), xy2=(1.65, 1.65), linewidth=3, transform=self.g.ax_joint.transAxes,
+            color=vutils.BLACK, alpha=vutils.ALPHA, ls='--'
+        )
+
+    def _format_marginal_ax(self):
+        for ax in [self.g.ax_marg_x, self.g.ax_marg_y]:
+            ax.tick_params(width=3, which='major')
+            plt.setp(ax.spines.values(), linewidth=2)
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Formats figure-level attributes
+        """
+        self.g.fig.supxlabel('Coupling (first session)')
+        self.g.fig.supylabel('Coupling (second session)')
+        # Store legend handles and labels, then remove
+        sns.move_legend(self.g.ax_joint, loc='upper left', fontsize=vutils.FONTSIZE + 3,
+                        facecolor='none', edgecolor=vutils.BLACK, title=None)
+        # Adjust the figure a bit and return for saving in decorator
+        self.g.fig.set_figwidth(9.4)
+        self.g.fig.set_figheight(8)
+        self.g.fig.subplots_adjust(bottom=0.1, top=0.95, left=0.125, right=0.975)
+
+
+class RegPlotCouplingHalves(vutils.BasePlot):
+    """
+    Creates a barplot showing differences in coupling between experimental sessions. For supplementary material!
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Dataframe, axis objects
+        self.g = sns.JointGrid(
+            data=self.df, x='coupling_1st', y='coupling_2nd', xlim=(-0.3, 2.5), ylim=(-0.3, 2.5),
+            hue='instrument', palette=vutils.INSTR_CMAP, height=8,
+        )
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Axes, str]:
+        """
+        Called from outside the class to generate and save the image.
+        """
+        self._create_joint_plot()
+        self.g.plot_marginals(
+            sns.kdeplot, legend=False, lw=2, multiple='stack', fill=True, common_grid=True, cut=0,
+            hue_order=['Keys', 'Drums']
+        )
+        self._format_main_ax()
+        self._format_marginal_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\regplot_coupling_piece_halves'
+        return self.g.fig, fname
+
+    def _create_joint_plot(
+            self
+    ) -> None:
+        """
+        Creates plot in matplotlib
+        """
+        self.df['instrument'] = self.df['instrument'].replace({'Keys': 'Piano'})
+        sns.scatterplot(
+            data=self.df, x='coupling_1st', y='coupling_2nd', hue='instrument', palette=vutils.INSTR_CMAP,
+            edgecolor=vutils.BLACK, ax=self.g.ax_joint, hue_order=['Piano', 'Drums'], s=100
+        )
+        sns.regplot(
+            data=self.df, x='coupling_1st', y='coupling_2nd', ax=self.g.ax_joint, scatter=False,
+            n_boot=vutils.N_BOOT, line_kws=dict(color=vutils.BLACK, lw=3)
+        )
+
+    def _add_correlation_results(
+            self,
+    ) -> None:
+        """
+        Adds the results of a linear correlation onto the plot
+        """
+        self.df['instrument'] = self.df['instrument'].replace({'Keys': 'Piano'})
+        # Calculate the correlation, get r and p values
+        r, p = stats.pearsonr(self.df['coupling_1st'], self.df['coupling_2nd'])
+        # Format correlation results into a string
+        s = f'$r$ = {round(r, 2)}{vutils.get_significance_asterisks(p)}'
+        # Add the annotation onto the plot
+        self.g.ax_joint.annotate(
+            s, (0.8, 0.1), xycoords='axes fraction', fontsize=vutils.FONTSIZE + 3,
+            bbox=dict(facecolor='none', edgecolor=vutils.BLACK, pad=10.0), ha='center', va='center'
+        )
+
+    def _format_main_ax(
+            self
+    ) -> None:
+        """
+        Formats axis-level objects
+        """
+        # Set the top and right spines of the joint plot to visible
+        self.g.ax_joint.spines['top'].set_visible(True)
+        self.g.ax_joint.spines['right'].set_visible(True)
+        # Add correlation results
+        self._add_correlation_results()
+        # Set axis aesthetics
+        self.g.ax_joint.tick_params(width=3, )
+        self.g.ax_joint.set(
+            ylabel='', xlabel='', xlim=(-0.3, 1.75), ylim=(-0.3, 1.75),
+            xticks=np.linspace(0, 1.5, 4), yticks=np.linspace(0, 1.5, 4)
+        )
+        plt.setp(self.g.ax_joint.spines.values(), linewidth=2)
+        self.g.ax_joint.axline(
+            xy1=(-0.01, -0.01), xy2=(1.65, 1.65), linewidth=3, transform=self.g.ax_joint.transAxes,
+            color=vutils.BLACK, alpha=vutils.ALPHA, ls='--'
+        )
+
+    def _format_marginal_ax(self):
+        for ax in [self.g.ax_marg_x, self.g.ax_marg_y]:
+            ax.tick_params(width=3, which='major')
+            plt.setp(ax.spines.values(), linewidth=2)
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Formats figure-level attributes
+        """
+        self.g.fig.supxlabel('Coupling, first half (0 – 44 secs)')
+        self.g.fig.supylabel('Coupling, second half (45 – 90 secs)')
+        # Store legend handles and labels, then remove
+        sns.move_legend(self.g.ax_joint, loc='upper left', fontsize=vutils.FONTSIZE + 3,
+                        facecolor='none', edgecolor=vutils.BLACK, title=None)
+        # Adjust the figure a bit and return for saving in decorator
+        self.g.fig.set_figwidth(9.4)
+        self.g.fig.set_figheight(8)
+        self.g.fig.subplots_adjust(bottom=0.1, top=0.95, left=0.125, right=0.975)
+
+
 def generate_misc_plots(
     mds: list, output_dir: str,
 ) -> None:
@@ -939,6 +1171,16 @@ def generate_misc_plots(
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\misc_plots'
+    bp = RegPlotCouplingSessions(df=df.copy(deep=True), output_dir=figures_output_dir)
+    bp.create_plot()
+    bp = RegPlotCouplingHalves(df=df.copy(deep=True), output_dir=figures_output_dir)
+    bp.create_plot()
+    stacked_bp = BarPlotInterpolatedIOIs(df=df.copy(deep=True), output_dir=figures_output_dir)
+    stacked_bp.create_plot()
+    bp = BarPlotCouplingExperimentalSessions(df=df.copy(deep=True), output_dir=figures_output_dir)
+    bp.create_plot()
+    bp = BarPlotCouplingPieceParts(df=df.copy(deep=True), output_dir=figures_output_dir)
+    bp.create_plot()
     lp_all = LinePlotAllConditions(df=df, output_dir=figures_output_dir)
     lp_all.create_plot()
     cp = CountPlotListenerDemographics(df=df, output_dir=figures_output_dir)
@@ -949,12 +1191,6 @@ def generate_misc_plots(
     bp.create_plot()
     bp = BarPlotHigherOrderModelComparison(df=df, output_dir=figures_output_dir)
     bp.create_plot()
-    bp = BarPlotCouplingExperimentalSessions(df=df, output_dir=figures_output_dir)
-    bp.create_plot()
-    bp = BarPlotCouplingPieceParts(df=df, output_dir=figures_output_dir)
-    bp.create_plot()
-    stacked_bp = BarPlotInterpolatedIOIs(df=df, output_dir=figures_output_dir)
-    stacked_bp.create_plot()
     lp_orig = LinePlotZoomCall(df=df, output_dir=figures_output_dir)
     lp_orig.create_plot()
 
