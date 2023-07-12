@@ -366,17 +366,19 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
         super().__init__(**kwargs)
         self.metrics = ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean']
         self.titles = [
-            'Tempo slope',
-            'Timing irregularity',
-            'Asynchrony',
-            'Performer success',
-            'Listener success'
+            'Tempo slope (BPM/s)',
+            'Asynchrony (RMS, ms)',
+            'Timing irregularity (SD, ms)',
+            'Performer-reported Success',
+            'Listener-reported Success'
         ]
         self.xlims = [0.2, 9, 70, 2, 2]
         self.fig, self.ax = plt.subplots(
-            nrows=1, ncols=len(self.metrics), sharex=False, sharey=True, figsize=(18.8, 5.52)
+            nrows=2, ncols=3, sharex=False, sharey=True, figsize=(18.8, 9.4)
         )
+        self.ax.flatten()[-1].axis('off')
         self.boot_df = self._generate_bootstraps()
+        self.handles, self.labels = None, None
 
     def _generate_bootstraps(
             self
@@ -396,7 +398,7 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
                 # Get the actual mean difference between arrays
                 mea = a2.mean() - a1.mean()
                 # Get the lower and upper bands of our confidence intervals and append everything
-                low, high = vutils.bootstrap_mean_difference(a1, a2)
+                low, high = vutils.bootstrap_mean_difference(a1, a2, n_boot=vutils.N_BOOT)
                 # We append index as a string so that it is automatically treated as a category in seaborn
                 res.append((str(idx), met, low, high, mea,))
         # Return everything as a dataframe
@@ -429,7 +431,7 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
             # Create our scatter plots
             sns.scatterplot(
                 data=v, y='duo', x='mean', ax=ax, s=125, zorder=100, edgecolor=vutils.BLACK, lw=2,
-                palette=vutils.DUO_CMAP, markers=vutils.DUO_MARKERS, hue='duo', legend=False, style='duo'
+                palette=vutils.DUO_CMAP, markers=vutils.DUO_MARKERS, hue='duo', legend=True, style='duo'
             )
             # Iterate through each row
             for idx, row in v.groupby('duo'):
@@ -453,6 +455,8 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
         for ax, lim, tit in zip(
                 self.ax.flatten(), self.xlims, self.titles,
         ):
+            self.handles, self.labels = ax.get_legend_handles_labels()
+            ax.get_legend().remove()
             # Set axis properties
             ax.set(xlabel='', ylabel='', xlim=(-lim, lim))
             ax.set_title(tit, y=1.01)
@@ -468,11 +472,20 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
         """
         Formats figure-level objects
         """
+        lgnd = plt.legend(
+            self.handles, self.labels, title='Duo', frameon=False, ncol=1, loc='right', markerscale=1.5,
+            fontsize=vutils.FONTSIZE + 3, edgecolor=vutils.BLACK, bbox_to_anchor=(0.65, 0.55),
+        )
+        for handle in lgnd.legendHandles:
+            handle.set_edgecolor(vutils.BLACK)
+            handle.set_sizes([100])
         # Add in the axis labels
+        self.fig.suptitle('Objective evaluations', fontsize=vutils.FONTSIZE + 7)
+        self.fig.text(0.4, 0.475, 'Subjective evaluations', fontsize=vutils.FONTSIZE + 7)
         self.fig.supxlabel('Difference in mean across both sessions')
         self.fig.supylabel('Duos', x=0.01)
         # Adjust the subplot positioning slightly
-        self.fig.subplots_adjust(left=0.05, right=0.95, bottom=0.15, top=0.9, wspace=0.1)
+        self.fig.subplots_adjust(left=0.05, right=0.95, bottom=0.1, top=0.88, wspace=0.1, hspace=0.5)
 
 
 class BarPlotRegressionCoefficients(vutils.BasePlot):
@@ -931,7 +944,7 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
     def __init__(self, df: pd.DataFrame, **kwargs):
         super().__init__(**kwargs)
         self.df = self._format_df(df)
-        self.fig = plt.figure(figsize=(18.8, 5))
+        self.fig = plt.figure(figsize=(18.8, 12))
         self.vars = ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean']
         self.main_ax, self.top_marginal_ax, self.right_marginal_ax = self._init_gridspec_subplots()
         self.handles, self.labels = None, None
@@ -946,18 +959,21 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
         ]
 
     def _init_gridspec_subplots(
-            self, widths: tuple[int] = (5, 0.5, 5, 0.5, 5, 0.5, 5, 0.5, 5, 0.5), heights: tuple[int] = (0.5, 5)
+            self, widths: tuple[int] = (5, 0.5, 5, 0.5, 5, 0.5), heights: tuple[int] = (0.5, 5, 0.5, 5)
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Initialise grid of subplots. Returns two numpy arrays corresponding to main and marginal axes respectively.
         """
         # Initialise subplot grid with desired width and height ratios
-        grid = self.fig.add_gridspec(nrows=2, ncols=10, width_ratios=widths, height_ratios=heights, wspace=0.3,
-                                     hspace=0.1)
+        grid = self.fig.add_gridspec(
+            nrows=4, ncols=6,
+            width_ratios=widths, height_ratios=heights,
+            wspace=0.3, hspace=0.5
+        )
         # Create a list of index values for each subplot type
-        top_margins = [0, 2, 4, 6, 8, ]
-        right_margins = [11, 13, 15, 17, 19]
-        mains = [10, 12, 14, 16, 18]
+        top_margins = [0, 2, 4, 12, 14]
+        right_margins = [7, 9, 11, 19, 21]
+        mains = [6, 8, 10, 18, 20]
         # Create empty lists to hold subplots
         top_marginal_ax = []
         right_marginal_ax = []
@@ -1004,6 +1020,7 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
         self._format_marginal_ax()
         self._format_fig()
         self._move_marginal_ax()
+        self._move_marginal_ax_y()
         fname = f'{self.output_dir}\\regplot_test_retest_reliability'
         return self.fig, fname
 
@@ -1044,7 +1061,7 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
         # Format correlation results into a string
         s = f'$r$ = {round(r, 2)}{vutils.get_significance_asterisks(p)}'
         # Add the annotation onto the plot
-        pos = (0.325, 0.95) if not position else (0.675, 0.055)
+        pos = (0.21, 0.9) if not position else (0.79, 0.1)
         ax.annotate(
             s, pos, xycoords='axes fraction', fontsize=vutils.FONTSIZE, ha='center', va='center',
             bbox=dict(facecolor='white', alpha=vutils.ALPHA, edgecolor=vutils.BLACK),
@@ -1053,7 +1070,13 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
     def _move_marginal_ax(self):
         for ax in self.right_marginal_ax.flatten():
             pos1 = ax.get_position()  # get the original position
-            pos2 = [pos1.x0 - 0.012, pos1.y0 - 0.001, pos1.width, pos1.height]
+            pos2 = [pos1.x0 - 0.02, pos1.y0 - 0.001, pos1.width, pos1.height]
+            ax.set_position(pos2)
+
+    def _move_marginal_ax_y(self):
+        for ax in self.top_marginal_ax.flatten():
+            pos1 = ax.get_position()  # get the original position
+            pos2 = [pos1.x0, pos1.y0 - 0.06, pos1.width, pos1.height]
             ax.set_position(pos2)
 
     def _format_marginal_ax(self):
@@ -1100,8 +1123,10 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
         self.labels = [int(float(lab)) for lab in self.labels]
         lgnd = plt.legend(
             self.handles, self.labels, title='Duo', frameon=False, ncol=1, loc='right', markerscale=1.5,
-            fontsize=vutils.FONTSIZE + 3, edgecolor=vutils.BLACK, bbox_to_anchor=(7.05, 0.65),
+            fontsize=vutils.FONTSIZE + 3, edgecolor=vutils.BLACK, bbox_to_anchor=(-5, 0.5),
         )
+        self.fig.suptitle('Objective evaluations', fontsize=vutils.FONTSIZE + 7)
+        self.fig.text(0.4, 0.475, 'Subjective evaluations', fontsize=vutils.FONTSIZE + 7)
         self.fig.supxlabel('Experiment session 1')
         self.fig.supylabel('Experiment session 2')
         # Set the legend font size
@@ -1111,7 +1136,7 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
             handle.set_edgecolor(vutils.BLACK)
             handle.set_sizes([100])
         # Adjust subplots positioning a bit to fit in the legend we've just created
-        self.fig.subplots_adjust(left=0.075, right=0.945, bottom=0.135, top=0.9)
+        self.fig.subplots_adjust(left=0.075, right=0.985, bottom=0.075, top=0.95)
 
 
 def generate_all_metrics_plots(
@@ -1139,7 +1164,6 @@ def generate_all_metrics_plots(
     bp.create_plot()
     rt = RegressionTableAllMetrics(df, output_dir=figures_output_dir)
     rt.create_tables()
-
 
 
 if __name__ == '__main__':

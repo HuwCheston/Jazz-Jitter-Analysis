@@ -6,10 +6,10 @@ import pandas as pd
 import numpy as np
 import scipy.stats as stats
 import statsmodels.api as sm
+from itertools import product
 
 import src.visualise.visualise_utils as vutils
 import src.analyse.analysis_utils as autils
-
 from src.analyse.simulations import Simulation
 
 # Define the objects we can import from this file into others
@@ -1003,6 +1003,148 @@ def generate_plots_for_individual_performance_simulations(
     ap.create_plot()
 
 
+class DistPlotAll(vutils.BasePlot):
+    """
+    Plots mean tempo slope and asynchrony of simulations with letters showing the coupling parameters used
+    """
+
+    def __init__(self, df: pd.DataFrame, **kwargs):
+        super().__init__(**kwargs)
+        self.df = df
+        # Define the conditions we wish to plot data for -- defaults to all 90 ms conditions
+        self.conditions = kwargs.get('conditions', [(0, 0), *list(product([23, 45, 90, 180], [0, 0.5, 1]))])
+        # Initialise subplots -- always two rows, and as many columns as we have conditions to plot
+        self.fig, self.top_ax, self.bottom_ax = self._init_gridspec()
+
+    @staticmethod
+    def _init_gridspec():
+        fig, ax = plt.subplots(
+            nrows=10, ncols=3, figsize=(18.8, 24), sharex=False, sharey=False,
+            gridspec_kw={'height_ratios': [0.5, 1.5, 0.5, 1.5, 0.5, 1.5, 0.5, 1.5, 0.5, 1.5]}
+        )
+        removers = [1, 2, 4, 5]
+        axis = []
+        for n, a in enumerate(ax.flatten()):
+            if n in removers:
+                a.axis('off')
+            else:
+                axis.append(a)
+        axis = np.array(axis)
+        top_ax = [0, 2, 3, 4, 8, 9, 10, 14, 15, 16, 20, 21, 22]
+        mask = np.ones(axis.shape, dtype=bool)
+        mask[top_ax] = False
+        return fig, axis[top_ax], axis[mask]
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the class to generate and save the plot in decorator
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}\\distplot_simulation_params_all'
+        return self.fig, fname
+
+    def _create_plot(
+            self
+    ) -> None:
+        """
+        Create each plot individually
+        """
+        for top_ax, lower_ax, (lat, jit) in zip(self.top_ax, self.bottom_ax, self.conditions):
+            condition = self.df[(self.df['latency'] == lat) & (self.df['jitter'] == jit)]
+            for i, g in condition[condition['trial'] != 0].groupby('trial'):
+                i = int(i)
+                lower_ax.scatter(
+                    g['tempo_slope_simulated'], g['asynchrony_simulated'], marker=vutils.DUO_MARKERS[i - 1],
+                    s=150, edgecolor=vutils.BLACK, facecolor=vutils.DUO_CMAP[i - 1], zorder=1,
+                    label=f'Duo {i}' if lat == 0 else None
+                )
+            for i, g in condition[condition['trial'] == 0].groupby('parameter'):
+                if i == 'anarchy':
+                    top_ax.scatter(
+                        g['tempo_slope_simulated'], g['asynchrony_simulated'], marker='$A$',
+                        s=150, color=vutils.BLACK, zorder=10, label=i.title() if lat == 0 else None
+                    )
+                else:
+                    lower_ax.scatter(
+                        g['tempo_slope_simulated'], g['asynchrony_simulated'], marker=f'${i[0].upper()}$',
+                        s=150, color=vutils.BLACK, label=i.title() if lat == 0 else None, zorder=10
+                    )
+                if lat == 0:
+                    if i == 'leadership':
+                        y_pad = 20
+                        x_pad = 0.1
+                    elif i == 'anarchy':
+                        y_pad = 75
+                        x_pad = 0
+                    else:
+                        y_pad = 20
+                        x_pad = -0.6
+                    lower_ax.annotate(
+                        i.title(), xy=(g['tempo_slope_simulated'], g['asynchrony_simulated']),
+                        xytext=(g['tempo_slope_simulated'] + x_pad, g['asynchrony_simulated'] + y_pad),
+                        arrowprops=dict(arrowstyle="-", color='black', lw=2, alpha=vutils.ALPHA), ha='left', va='bottom'
+                    )
+
+    def _format_ax(
+            self
+    ) -> None:
+        """
+        Format axis-level attributes
+        """
+        # Iterate through each column of plots and latency/jitter combination
+        for top_ax, lower_ax, (lat, jit) in zip(self.top_ax, self.bottom_ax, self.conditions):
+            # Break the axis with our utility function
+            vutils.break_axis(top_ax, lower_ax)
+            # Set parameters for both rows of plots
+            top_ax.set(
+                xlim=(-1, 1), xticks=[], yticks=[1750, 2500, 3250], ylim=(1500, 3500)
+            )
+            lower_ax.set(
+                ylim=(0, 250), xlim=(-0.75, 0.75), xticks=np.linspace(-0.5, 0.5, 3), yticks=np.linspace(0, 200, 5)
+            )
+            if lat == 180:
+                lower_ax.set_xlabel(f'Jitter: {jit}x', fontsize=vutils.FONTSIZE + 5)
+            # Apply the same formatting to all plots
+            for ax in [top_ax, lower_ax]:
+                if jit == 0:
+                    lower_ax.set_ylabel(f'        Latency: {lat} ms', fontsize=vutils.FONTSIZE + 5)
+                else:
+                    ax.set(yticklabels=[])
+                if lat != 180:
+                    lower_ax.set(xticklabels=[])
+                # Add in a vertical line at 0 tempo slope
+                ax.axvline(x=0, linewidth=3, color=vutils.BLACK, alpha=0.1, ls='--')
+                # Adjust tick and axis width slightly
+                ax.tick_params(width=3, axis='both', pad=7.5, which='major')
+                plt.setp(ax.spines.values(), linewidth=2)
+
+    def _format_fig(
+            self
+    ) -> None:
+        """
+        Set figure-level attributes
+        """
+        # Add in axis labels
+        self.fig.supxlabel('Tempo slope (BPM/s)', fontsize=vutils.FONTSIZE + 8)
+        self.fig.supylabel('Asynchrony (RMS, ms)', x=0.01, fontsize=vutils.FONTSIZE + 8)
+        # Add in legend
+        hand, lab = self.top_ax[0].get_legend_handles_labels()
+        for h in self.bottom_ax[0].get_legend_handles_labels()[0]:
+            hand.append(h)
+        for l in self.bottom_ax[0].get_legend_handles_labels()[1]:
+            lab.append(l)
+        order = [1, 2, 3, 4, 5, 0, 6, 7]
+        self.fig.legend(np.array(hand)[order], np.array(lab)[order], loc='center right', frameon=False,
+                        title='Simulation')
+        # Adjust plot spacing a bit -- hspace adjusts broken axis
+        self.fig.subplots_adjust(bottom=0.06, top=0.975, left=0.1, right=0.865, wspace=0.1, hspace=0.2)
+
+
 def generate_plots_for_simulations_with_coupling_parameters(
     sims_params: list[Simulation], output_dir: str
 ) -> None:
@@ -1011,6 +1153,8 @@ def generate_plots_for_simulations_with_coupling_parameters(
     """
     figures_output_dir = output_dir + '\\figures\\simulations_plots'
     df_avg = pd.DataFrame([sim.results_dic for sim in sims_params])
+    dp = DistPlotAll(df=df_avg, output_dir=figures_output_dir)
+    dp.create_plot()
     bp = BarPlotSimulationParameters(df_avg, output_dir=figures_output_dir)
     bp.create_plot()
     rp = RegPlotSlopeAsynchrony(df=df_avg, output_dir=figures_output_dir)

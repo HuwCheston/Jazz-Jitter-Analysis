@@ -248,24 +248,24 @@ class LinePlotAllConditions(vutils.BasePlot):
             # Iterate through jitter scales
             for num_, (i_, g_) in enumerate(g.groupby('jitter')):
                 # Plotting latency
+                dat = g_['data'].values[0]
+                dat = dat[dat['timestamp'] <= 90]
                 # We don't want to add labels for all our plots
                 if num == 1:
                     self.ax[num, 0].plot(
-                        g_['data'].values[0]['timestamp'], g_['data'].values[0]['latency'], lw=3, label=f'{i_}x',
-                        color=vutils.JITTER_CMAP[num_],
+                        dat['timestamp'], dat['latency'], lw=3, label=f'{i_}x', color=vutils.JITTER_CMAP[num_],
                     )
                 else:
                     self.ax[num, 0].plot(
-                        g_['data'].values[0]['timestamp'], g_['data'].values[0]['latency'], lw=3,
-                        color=vutils.JITTER_CMAP[num_],
+                        dat['timestamp'], dat['latency'], lw=3, color=vutils.JITTER_CMAP[num_],
                     )
                 self.ax[num, 0].set(
                     title=f'{i} ms latency', ylim=(-25, 300), xticks=[0, 30, 60, 90], yticks=[0, 100, 200, 300]
                 )
                 # Plotting jitter
-                roll = g_['data'].values[0].rolling(window=8, min_periods=1)['latency']
                 self.ax[num, 1].plot(
-                    g_['data'].values[0]['timestamp'], roll.std(), lw=3, color=vutils.JITTER_CMAP[num_],
+                    dat['timestamp'], dat.rolling(window=8, min_periods=1)['latency'].std(),
+                    lw=3, color=vutils.JITTER_CMAP[num_],
                 )
                 self.ax[num, 1].set(
                     title=f'{i} ms latency', ylim=(-5, 60), xticks=[0, 30, 60, 90], yticks=[0, 20, 40, 60]
@@ -1171,6 +1171,8 @@ def generate_misc_plots(
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\misc_plots'
+    lp_all = LinePlotAllConditions(df=df, output_dir=figures_output_dir)
+    lp_all.create_plot()
     bp = RegPlotCouplingSessions(df=df.copy(deep=True), output_dir=figures_output_dir)
     bp.create_plot()
     bp = RegPlotCouplingHalves(df=df.copy(deep=True), output_dir=figures_output_dir)
@@ -1181,8 +1183,6 @@ def generate_misc_plots(
     bp.create_plot()
     bp = BarPlotCouplingPieceParts(df=df.copy(deep=True), output_dir=figures_output_dir)
     bp.create_plot()
-    lp_all = LinePlotAllConditions(df=df, output_dir=figures_output_dir)
-    lp_all.create_plot()
     cp = CountPlotListenerDemographics(df=df, output_dir=figures_output_dir)
     cp.create_plot()
     hm = HeatmapNoteChoice(df=df, output_dir=figures_output_dir)
