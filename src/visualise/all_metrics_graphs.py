@@ -1139,6 +1139,87 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
         self.fig.subplots_adjust(left=0.075, right=0.985, bottom=0.075, top=0.95)
 
 
+class PointPlotDuoStats(vutils.BasePlot):
+    """
+    Creates a pointplot showing bootstrapped mean for each level of latency and jitter predictor variables
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.boot_df = pd.DataFrame(self._format_df())
+        self.fig, self.ax = plt.subplots(nrows=1, ncols=5, sharex=False, sharey=True, figsize=(18.8, 5))
+
+    def _format_df(self):
+        df_ = self.df.groupby(['trial', 'latency', 'jitter', 'instrument'], as_index=False).mean(numeric_only=True)
+        for var in ['latency', 'jitter']:
+            for idx, grp in df_.groupby(var):
+                for col in ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean']:
+                    print(var, col)
+                    vals = grp[col]
+                    true_mean = vals.mean()
+                    boots = [vals.sample(frac=1, replace=True, random_state=i).mean() for i in range(vutils.N_BOOT)]
+                    yield {
+                        'grp': str(idx),
+                        'var': col,
+                        'dv': var,
+                        'mean': true_mean,
+                        'low': np.quantile(boots, 0.025),
+                        'high': np.quantile(boots, 0.975)
+                    }
+
+    @vutils.plot_decorator
+    def create_plot(
+            self
+    ) -> tuple[plt.Figure, str]:
+        """
+        Called from outside the plot to generate the figure, format, and save in decorator
+        """
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        # Save the plot
+        fname = f'{self.output_dir}\\pointplot_duo_stats'
+        return self.fig, fname
+
+    def _create_plot(self):
+        for a, (i, v) in zip(self.ax.flatten(), self.boot_df.groupby('var', sort=False)):
+            for (i_, v_) in v.groupby('dv', sort=False):
+                a.scatter(
+                    v_['mean'], v_['grp'], zorder=5, s=100, lw=1, edgecolor=vutils.BLACK,
+                    color=vutils.DUO_CMAP[0] if i_ == 'latency' else vutils.DUO_CMAP[1],
+                    marker=vutils.DUO_MARKERS[0] if i_ == 'latency' else vutils.DUO_MARKERS[1],
+                )
+
+            l = v['mean'] - v['low']
+            h = v['high'] - v['mean']
+            a.errorbar(
+                x=v['mean'], y=v['grp'], xerr=[l, h], ls='none', lw=2,
+                color=vutils.BLACK, zorder=1, capsize=5, markeredgewidth=2
+            )
+            a.axhline(
+                y=4.5, xmin=0, xmax=1, ls='dashed', lw=2,
+                color=vutils.BLACK, alpha=vutils.ALPHA
+            )
+
+    def _format_ax(self):
+        titles = [
+            'Tempo slope (BPM/s)',
+            'Timing irregularity (SD, ms)',
+            'Asynchrony (RMS, ms)',
+            'Performer-reported Success',
+            'Listener-reported Success'
+        ]
+        self.ax[0].text(x=-0.25, y=6, s='Jitter', rotation=90, ha='center', va='center')
+        self.ax[0].text(x=-0.25, y=2, s='Latency (ms)', rotation=90, ha='center', va='center')
+        for tit, a in zip(titles, self.ax.flatten()):
+            a.set(xlabel=tit)
+            plt.setp(a.spines.values(), linewidth=2)
+            a.tick_params(axis='both', width=3)
+
+    def _format_fig(self):
+        self.fig.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.15, wspace=0.12)
+
+
 def generate_all_metrics_plots(
     mds: list[PhaseCorrectionModel], output_dir: str,
 ) -> None:
@@ -1151,7 +1232,8 @@ def generate_all_metrics_plots(
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\all_metrics_plots'
-
+    ppds = PointPlotDuoStats(df=df, output_dir=figures_output_dir)
+    ppds.create_plot()
     pp_ = PointPlotRepeatComparisons(df=df, output_dir=figures_output_dir)
     pp_.create_plot()
     rp = RegPlotTestRetestReliability(df=df, output_dir=figures_output_dir,)
