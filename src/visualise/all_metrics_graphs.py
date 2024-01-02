@@ -1,18 +1,20 @@
 """Code for generating plots that combine all performance success metrics"""
 
-import pandas as pd
-import numpy as np
-import scipy.stats as stats
-import statsmodels.api as sm
-import matplotlib.pyplot as plt
-import seaborn as sns
+import random
 import warnings
-from stargazer.stargazer import Stargazer
-import statsmodels.formula.api as smf
 
-from src.analyse.phase_correction_models import PhaseCorrectionModel
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import scipy.stats as stats
+import seaborn as sns
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from stargazer.stargazer import Stargazer
+
 import src.analyse.analysis_utils as autils
 import src.visualise.visualise_utils as vutils
+from src.analyse.phase_correction_models import PhaseCorrectionModel
 
 __all__ = [
     'generate_all_metrics_plots'
@@ -1151,17 +1153,28 @@ class PointPlotDuoStats(vutils.BasePlot):
 
     def _format_df(self):
         df_ = self.df.groupby(['trial', 'latency', 'jitter', 'instrument'], as_index=False).mean(numeric_only=True)
-        for var in ['latency', 'jitter']:
-            for idx, grp in df_.groupby(var):
-                for col in ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean']:
-                    print(var, col)
-                    vals = grp[col]
-                    true_mean = vals.mean()
-                    boots = [vals.sample(frac=1, replace=True, random_state=i).mean() for i in range(vutils.N_BOOT)]
+        df_ = df_[df_['latency'] != 0]
+        # Iterate over each independent variable
+        for iv in ['latency', 'jitter']:
+            # Iterate over each level of the iv
+            for lvl, grp in df_.groupby(iv, sort=False):
+                # Iterate over each dependent variable
+                for dv in ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean']:
+                    print(iv, dv, lvl)
+                    # Get the actual mean
+                    true_mean = grp[dv].mean()
+                    # Get the bootstrap data
+                    boots = []
+                    for i in range(1000):
+                        random.seed(i)
+                        trials = random.choices(grp['trial'].unique(), k=5)
+                        values = pd.concat([grp[grp['trial'] == t] for t in trials], axis=0)[dv]
+                        boots.append(values.mean())
+                    # Return the results
                     yield {
-                        'grp': str(idx),
-                        'var': col,
-                        'dv': var,
+                        'level': str(lvl),
+                        'iv': iv,
+                        'dv': dv,
                         'mean': true_mean,
                         'low': np.quantile(boots, 0.025),
                         'high': np.quantile(boots, 0.975)
@@ -1182,10 +1195,10 @@ class PointPlotDuoStats(vutils.BasePlot):
         return self.fig, fname
 
     def _create_plot(self):
-        for a, (i, v) in zip(self.ax.flatten(), self.boot_df.groupby('var', sort=False)):
-            for (i_, v_) in v.groupby('dv', sort=False):
+        for a, (i, v) in zip(self.ax.flatten(), self.boot_df.groupby('dv', sort=False)):
+            for (i_, v_) in v.groupby('iv', sort=False):
                 a.scatter(
-                    v_['mean'], v_['grp'], zorder=5, s=100, lw=1, edgecolor=vutils.BLACK,
+                    v_['mean'], v_['level'], zorder=5, s=100, lw=1, edgecolor=vutils.BLACK,
                     color=vutils.DUO_CMAP[0] if i_ == 'latency' else vutils.DUO_CMAP[1],
                     marker=vutils.DUO_MARKERS[0] if i_ == 'latency' else vutils.DUO_MARKERS[1],
                 )
@@ -1193,11 +1206,11 @@ class PointPlotDuoStats(vutils.BasePlot):
             l = v['mean'] - v['low']
             h = v['high'] - v['mean']
             a.errorbar(
-                x=v['mean'], y=v['grp'], xerr=[l, h], ls='none', lw=2,
+                x=v['mean'], y=v['level'], xerr=[l, h], ls='none', lw=2,
                 color=vutils.BLACK, zorder=1, capsize=5, markeredgewidth=2
             )
             a.axhline(
-                y=4.5, xmin=0, xmax=1, ls='dashed', lw=2,
+                y=3.5, xmin=0, xmax=1, ls='dashed', lw=2,
                 color=vutils.BLACK, alpha=vutils.ALPHA
             )
 
@@ -1209,8 +1222,9 @@ class PointPlotDuoStats(vutils.BasePlot):
             'Performer-reported Success',
             'Listener-reported Success'
         ]
-        self.ax[0].text(x=-0.25, y=6, s='Jitter', rotation=90, ha='center', va='center')
-        self.ax[0].text(x=-0.25, y=2, s='Latency (ms)', rotation=90, ha='center', va='center')
+        self.ax[0].set(xlim=(-0.25, 0.25))
+        self.ax[0].text(x=-0.35, y=5, s='Jitter', rotation=90, ha='center', va='center')
+        self.ax[0].text(x=-0.35, y=1, s='Latency (ms)', rotation=90, ha='center', va='center')
         for tit, a in zip(titles, self.ax.flatten()):
             a.set(xlabel=tit)
             plt.setp(a.spines.values(), linewidth=2)
