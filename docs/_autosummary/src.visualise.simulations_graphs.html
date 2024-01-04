@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>src.visualise.simulations_graphs &mdash; Code for: Trade-offs in Coordination Strategies for Networked Jazz Performances 0.1 documentation</title>
+  <title>src.visualise.simulations_graphs &mdash; Code for: Trade-offs in Coordination Strategies for Duet Jazz Performances Subject to Network Delay and Jitter 0.1 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -31,7 +31,7 @@
           
           
           <a href="../index.html" class="icon icon-home">
-            Code for: Trade-offs in Coordination Strategies for Networked Jazz Performances
+            Code for: Trade-offs in Coordination Strategies for Duet Jazz Performances Subject to Network Delay and Jitter
           </a>
               <div class="version">
                 0.1
@@ -79,7 +79,7 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../index.html">Code for: Trade-offs in Coordination Strategies for Networked Jazz Performances</a>
+          <a href="../index.html">Code for: Trade-offs in Coordination Strategies for Duet Jazz Performances Subject to Network Delay and Jitter</a>
       </nav>
 
       <div class="wy-nav-content">
@@ -130,19 +130,22 @@
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BarPlotSimulationParameters</span></code>(df, **kwargs)</p></td>
 <td><p>Creates a plot showing the simulation results per parameter, designed to look similar to fig 2.(d) in Jacoby et al. (2021).</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">DistPlotAverage</span></code>(df, **kwargs)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">DistPlotAll</span></code>(df, **kwargs)</p></td>
 <td><p>Plots mean tempo slope and asynchrony of simulations with letters showing the coupling parameters used</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">DistPlotParams</span></code>(df, **kwargs)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">DistPlotAverage</span></code>(df, **kwargs)</p></td>
+<td><p>Plots mean tempo slope and asynchrony of simulations with letters showing the coupling parameters used</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">DistPlotParams</span></code>(df, **kwargs)</p></td>
 <td><p>Creates seperate kernel density plots for each duo showing distribution of asynchrony and tempo slope values for each parameter.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">LinePlotAllParameters</span></code>(simulations, **kwargs)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">LinePlotAllParameters</span></code>(simulations, **kwargs)</p></td>
 <td><p>For a single performance, creates two line plots showing tempo and asynchrony change for all simulated parameters (anarchy, democracy etc.)</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RegPlotSlopeAsynchrony</span></code>(df, **kwargs)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RegPlotSlopeAsynchrony</span></code>(df, **kwargs)</p></td>
 <td><p>Creates a regression jointplot, designed to show similarity in tempo slope and asynchrony between simulated and original performances.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RegPlotSlopeComparisons</span></code>(df, **kwargs)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RegPlotSlopeComparisons</span></code>(df, **kwargs)</p></td>
 <td><p>Creates a regression jointplot, designed to show similarity in tempo slope between actual and simulated performances (with original coupling patterns).</p></td>
 </tr>
 </tbody>
@@ -172,7 +175,7 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright Huw Cheston 2023.</p>
+    <p>&#169; Copyright Huw Cheston 2024.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

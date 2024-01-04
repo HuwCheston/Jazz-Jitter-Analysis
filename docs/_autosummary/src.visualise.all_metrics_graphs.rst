@@ -26,6 +26,7 @@
       BarPlotModelComparison
       BarPlotRegressionCoefficients
       PairPlotAllVariables
+      PointPlotDuoStats
       PointPlotRepeatComparisons
       RegPlotTestRetestReliability
       RegressionTableAllMetrics

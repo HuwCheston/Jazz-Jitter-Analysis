@@ -1171,6 +1171,8 @@ def generate_misc_plots(
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '\\figures\\misc_plots'
+    cp = CountPlotListenerDemographics(df=df, output_dir=figures_output_dir)
+    cp.create_plot()
     lp_all = LinePlotAllConditions(df=df, output_dir=figures_output_dir)
     lp_all.create_plot()
     bp = RegPlotCouplingSessions(df=df.copy(deep=True), output_dir=figures_output_dir)
@@ -1183,8 +1185,6 @@ def generate_misc_plots(
     bp.create_plot()
     bp = BarPlotCouplingPieceParts(df=df.copy(deep=True), output_dir=figures_output_dir)
     bp.create_plot()
-    cp = CountPlotListenerDemographics(df=df, output_dir=figures_output_dir)
-    cp.create_plot()
     hm = HeatmapNoteChoice(df=df, output_dir=figures_output_dir)
     hm.create_plot()
     bp = BarPlotQuestionnaireCorrelation(df=df, output_dir=figures_output_dir)

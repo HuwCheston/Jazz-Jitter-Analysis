@@ -62,7 +62,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Code for: Trade-offs in Coordination Strategies for Networked Jazz Performances'
+project = u'Code for: Trade-offs in Coordination Strategies for Duet Jazz Performances Subject to Network Delay and Jitter'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -177,7 +177,7 @@ html_static_path = ['_static']
 
 # If true, "(C) Copyright ..." is shown in the HTML footer. Default is True.
 # html_show_copyright = True
-copyright = "Huw Cheston 2023"
+copyright = "Huw Cheston 2024"
 
 # If true, an OpenSearch description file will be output, and all pages will
 # contain a <link> tag referring to it.  The value of this option must be the

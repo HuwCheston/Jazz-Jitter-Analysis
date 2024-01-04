@@ -1153,7 +1153,7 @@ class PointPlotDuoStats(vutils.BasePlot):
 
     def _format_df(self):
         df_ = self.df.groupby(['trial', 'latency', 'jitter', 'instrument'], as_index=False).mean(numeric_only=True)
-        df_ = df_[df_['latency'] != 0]
+        # df_ = df_[df_['latency'] != 0]
         # Iterate over each independent variable
         for iv in ['latency', 'jitter']:
             # Iterate over each level of the iv
@@ -1165,7 +1165,7 @@ class PointPlotDuoStats(vutils.BasePlot):
                     true_mean = grp[dv].mean()
                     # Get the bootstrap data
                     boots = []
-                    for i in range(1000):
+                    for i in range(vutils.N_BOOT):
                         random.seed(i)
                         trials = random.choices(grp['trial'].unique(), k=5)
                         values = pd.concat([grp[grp['trial'] == t] for t in trials], axis=0)[dv]
@@ -1210,7 +1210,7 @@ class PointPlotDuoStats(vutils.BasePlot):
                 color=vutils.BLACK, zorder=1, capsize=5, markeredgewidth=2
             )
             a.axhline(
-                y=3.5, xmin=0, xmax=1, ls='dashed', lw=2,
+                y=4.5, xmin=0, xmax=1, ls='dashed', lw=2,
                 color=vutils.BLACK, alpha=vutils.ALPHA
             )
 
@@ -1223,8 +1223,8 @@ class PointPlotDuoStats(vutils.BasePlot):
             'Listener-reported Success'
         ]
         self.ax[0].set(xlim=(-0.25, 0.25))
-        self.ax[0].text(x=-0.35, y=5, s='Jitter', rotation=90, ha='center', va='center')
-        self.ax[0].text(x=-0.35, y=1, s='Latency (ms)', rotation=90, ha='center', va='center')
+        self.ax[0].text(x=-0.35, y=6, s='Jitter', rotation=90, ha='center', va='center')
+        self.ax[0].text(x=-0.35, y=2, s='Latency (ms)', rotation=90, ha='center', va='center')
         for tit, a in zip(titles, self.ax.flatten()):
             a.set(xlabel=tit)
             plt.setp(a.spines.values(), linewidth=2)

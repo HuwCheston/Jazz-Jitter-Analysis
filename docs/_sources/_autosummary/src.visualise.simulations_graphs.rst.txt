@@ -1,4 +1,4 @@
-src.visualise.simulations\_graphs
+﻿src.visualise.simulations\_graphs
 =================================
 
 .. automodule:: src.visualise.simulations_graphs
@@ -26,6 +26,7 @@ src.visualise.simulations\_graphs
    
       ArrowPlotParams
       BarPlotSimulationParameters
+      DistPlotAll
       DistPlotAverage
       DistPlotParams
       LinePlotAllParameters
