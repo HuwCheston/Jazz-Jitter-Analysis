@@ -157,4 +157,22 @@ Run the notebook online here: <a target="_blank" href="https://colab.research.go
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
 
+## Building these docs
+To build these doc files yourself (*probably not necessary for many people, but important to document regardless*):
 
+1. Make sure you have the source repository cloned and a `venv` created (i.e., you may need to run `run.cmd` first or set this up yourself)
+
+
+2. Install `sphinx` and the theme `sphinx_rtd_theme` (note that these are not installed when running `pip install -r requirements.txt` or `run.cmd`!)
+```
+pip install sphinx sphinx_rtd_theme
+```
+
+
+3. From the root directory, run the following (this will spit out loads of errors, but they can be ignored safely):
+```
+cd docs
+sphinx-build . .\_build
+```
+
+You can now access the HTML files in `.\docs\_build`. In order to get this set up and running on GitHub pages, I've found it necessary to then copy the contents of `docs\_build` to `docs`, overwriting any files currently in that directory.

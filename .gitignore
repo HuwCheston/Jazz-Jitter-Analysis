@@ -111,6 +111,10 @@ reports/figures/
 *.sib
 *.mp3
 
+# These are created by Sphinx
+*.doctree
+*.pickle
+
 # We ignore the Makefiles and .bat files to keep things clean
 *Makefile
 *.bat
