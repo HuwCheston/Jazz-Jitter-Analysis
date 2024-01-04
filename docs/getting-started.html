@@ -19,7 +19,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Examples" href="examples.html" />
-    <link rel="prev" title="Code for: Trade-offs in Coordination Strategies for Networked Jazz Performances" href="index.html" /> 
+    <link rel="prev" title="Code for: Trade-offs in Coordination Strategies for Duet Jazz Performances Subject to Network Delay and Jitter" href="index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -56,6 +56,7 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#reproduce-latency-measurement-array">Reproduce latency measurement array</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#building-these-docs">Building these docs</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
@@ -230,13 +231,32 @@
 <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a></p>
 </div>
+<div class="section" id="building-these-docs">
+<h2>Building these docs<a class="headerlink" href="#building-these-docs" title="Permalink to this heading"></a></h2>
+<p>To build these doc files yourself (<em>probably not necessary for many people, but important to document regardless</em>):</p>
+<ol class="arabic simple">
+<li><p>Make sure you have the source repository cloned and a <code class="docutils literal notranslate"><span class="pre">venv</span></code> created (i.e., you may need to run <code class="docutils literal notranslate"><span class="pre">run.cmd</span></code> first or set this up yourself)</p></li>
+<li><p>Install <code class="docutils literal notranslate"><span class="pre">sphinx</span></code> and the theme <code class="docutils literal notranslate"><span class="pre">sphinx_rtd_theme</span></code> (note that these are not installed when running <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-r</span> <span class="pre">requirements.txt</span></code> or <code class="docutils literal notranslate"><span class="pre">run.cmd</span></code>!)</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">sphinx</span> <span class="n">sphinx_rtd_theme</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li><p>From the root directory, run the following (this will spit out loads of errors, but they can be ignored safely):</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="n">docs</span>
+<span class="n">sphinx</span><span class="o">-</span><span class="n">build</span> <span class="o">.</span> <span class="o">.</span>\<span class="n">_build</span>
+</pre></div>
+</div>
+<p>You can now access the HTML files in <code class="docutils literal notranslate"><span class="pre">.\docs\_build</span></code>. In order to get this set up and running on GitHub pages, I’ve found it necessary to then copy the contents of <code class="docutils literal notranslate"><span class="pre">docs\_build</span></code> to <code class="docutils literal notranslate"><span class="pre">docs</span></code>, overwriting any files currently in that directory.</p>
+</div>
 </div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="index.html" class="btn btn-neutral float-left" title="Code for: Trade-offs in Coordination Strategies for Networked Jazz Performances" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="index.html" class="btn btn-neutral float-left" title="Code for: Trade-offs in Coordination Strategies for Duet Jazz Performances Subject to Network Delay and Jitter" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
