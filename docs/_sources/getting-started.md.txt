@@ -163,9 +163,9 @@ To build these doc files yourself (*probably not necessary for many people, but 
 1. Make sure you have the source repository cloned and a `venv` created (i.e., you may need to run `run.cmd` first or set this up yourself)
 
 
-2. Install `sphinx` and the theme `sphinx_rtd_theme` (note that these are not installed when running `pip install -r requirements.txt` or `run.cmd`!)
+2. Install `sphinx`, `myst_parser`, and the theme `sphinx_rtd_theme` (note that these are not installed when running `pip install -r requirements.txt` or `run.cmd`!)
 ```
-pip install sphinx sphinx_rtd_theme
+pip install sphinx sphinx_rtd_theme myst_parser
 ```
 
 
