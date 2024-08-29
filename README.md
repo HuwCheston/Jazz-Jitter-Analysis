@@ -2,13 +2,11 @@
 
 ![A video of performers in the experiment for this project](https://user-images.githubusercontent.com/97224401/231712093-133cafa0-dffe-4a23-945d-5249c4385bab.gif "Performer GIF")
 
-**Published paper**: [![DOI (Paper)](http://img.shields.io/badge/Coming_Soon!-red)](https://doi.org/10.31234/osf.io/z8c7w)
+**Paper**: [![DOI (Preprint)](http://img.shields.io/badge/DOI-10.1525/mp.2024.42.1.48-blue)](https://doi.org/10.1525/mp.2024.42.1.48)
 
 **Dataset**: [![DOI (Dataset)](https://zenodo.org/badge/DOI/10.5281/zenodo.7773824.svg)](https://doi.org/10.5281/zenodo.7773824)
 
-**Preprint**: [![DOI (Preprint)](http://img.shields.io/badge/DOI-10.31234/osf.io/z8c7w-blue)](https://doi.org/10.31234/osf.io/z8c7w)
-
-This repository is associated with the paper `Trade-offs in Coordination Strategies for Duet Jazz Performances Subject to Network Delay and Jitter` and includes scripts for reproducing the analysis, models, computer simulations, audio-visual stimuli, and figures contained in this paper. The corresponding dataset, comprising audio and video recordings of 130 individual jazz duo performances, biometric data, and subjective evaluations and comments from both the musicians and listeners recruited in a separate perceptual study, is [freely accessible on Zenodo](https://doi.org/10.5281/zenodo.7773824). The preprint is [available on PsyArXiv](https://doi.org/10.31234/osf.io/z8c7w).
+This repository is associated with the paper `Trade-offs in Coordination Strategies for Duet Jazz Performances Subject to Network Delay and Jitter`, published in *Music Perception* and includes scripts for reproducing the analysis, models, computer simulations, audio-visual stimuli, and figures contained in this paper. The corresponding dataset, comprising audio and video recordings of 130 individual jazz duo performances, biometric data, and subjective evaluations and comments from both the musicians and listeners recruited in a separate perceptual study, is [freely accessible on Zenodo](https://doi.org/10.5281/zenodo.7773824).
 
 ## Quick start
 
@@ -60,16 +58,21 @@ As this repository relates to a research paper, I don't envisage making many fut
 
 ## Citation
 
-If you reference any aspect of this work, please cite the preprint in the format below:
+If you reference any aspect of this work, please cite the paper in the format below:
 
 ```
-@misc{jazz-jitter-analysis,
- author       = {Cheston, H. and Cross, I. and Harrison, P.},
- title        = {Trade-offs in Coordination Strategies for Duet Jazz Performances Subject to Network Delay and Jitter},
- url          = {https://osf.io/preprints/psyarxiv/z8c7w},
- DOI          = {10.31234/osf.io/z8c7w},
- publisher    = {PsyArXiv},
- year         = {2023},
- month        = {July}
+@article{10.1525/mp.2024.42.1.48,
+    author = {Cheston, Huw and Cross, Ian and Harrison, Peter M. C.},
+    title = "{Trade-offs in Coordination Strategies for Duet Jazz Performances Subject to Network Delay and Jitter}",
+    journal = {Music Perception},
+    volume = {42},
+    number = {1},
+    pages = {48-72},
+    year = {2024},
+    month = {09},
+    issn = {0730-7829},
+    doi = {10.1525/mp.2024.42.1.48},
+    url = {https://doi.org/10.1525/mp.2024.42.1.48},
+    eprint = {https://online.ucpress.edu/mp/article-pdf/42/1/48/833292/mp.2024.42.1.48.pdf},
 }
 ```
