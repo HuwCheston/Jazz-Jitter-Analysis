@@ -2717,7 +2717,7 @@ class RegPlotGrangerCoupling(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}/barplot_performer_listener_success_models'
+        fname = f'{self.output_dir}/regplot_granger_phasecorrection'
         return self.fig, fname
 
 
