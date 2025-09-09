@@ -4,7 +4,6 @@
 import click
 import logging
 from pathlib import Path
-from dotenv import find_dotenv, load_dotenv
 
 # Import our helper objects
 import src.visualise.visualise_utils as vutils
@@ -22,9 +21,9 @@ from src.visualise.simulations_graphs import *
 
 
 @click.command()
-@click.option('-i', 'input_filepath', type=click.Path(exists=True), default='models')
-@click.option('-o', 'output_filepath', type=click.Path(exists=True), default=r'reports\figures')
-@click.option('-r', 'references_filepath', type=click.Path(exists=True), default=r'references')
+@click.option('-i', 'input_filepath', type=click.Path(exists=True), default='../../models')
+@click.option('-o', 'output_filepath', type=click.Path(exists=True), default='../../reports/figures')
+@click.option('-r', 'references_filepath', type=click.Path(exists=True), default='../../references')
 def main(input_filepath, output_filepath, references_filepath):
     """
     Runs data processing scripts to turn raw data from (../raw) into
@@ -82,9 +81,5 @@ if __name__ == '__main__':
 
     # not used in this stub but often useful for finding various files
     project_dir = Path(__file__).resolve().parents[2]
-
-    # find .env automagically by walking up directories until it's found, then
-    # load up the .env entries as environment variables
-    load_dotenv(find_dotenv())
 
     main()

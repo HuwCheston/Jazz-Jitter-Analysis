@@ -37,7 +37,7 @@ def load_data(
     """
     Loads all pickled data from the processed data folder
     """
-    return [pickle.load(open(f'{input_filepath}\\{f}', "rb")) for f in os.listdir(input_filepath) if f.endswith('.p')]
+    return [pickle.load(open(f'{input_filepath}/{f}', "rb")) for f in os.listdir(input_filepath) if f.endswith('.p')]
 
 
 def generate_df(
@@ -343,7 +343,7 @@ def load_from_disc(
     Try and load models from disc
     """
     try:
-        mds = pickle.load(open(f"{output_dir}\\{filename}", "rb"))
+        mds = pickle.load(open(f"{output_dir}/{filename}", "rb"))
     # If we haven't generated the models in the first place, return None
     except FileNotFoundError:
         return None

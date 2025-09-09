@@ -2734,7 +2734,7 @@ def generate_phase_correction_plots(
     df = pd.DataFrame(df)
     figures_output_dir = output_dir + '/figures/phase_correction_plots'
 
-    rp_ = RegPlotGrangerCoupling(df)
+    rp_ = RegPlotGrangerCoupling(df.copy(deep=True), output_dir=figures_output_dir)
     rp_.create_plot()
     pg_a = PairGrid(
         df=df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(0, 1.25),
