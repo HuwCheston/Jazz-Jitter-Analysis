@@ -2703,10 +2703,10 @@ class RegPlotGrangerCoupling(vutils.BasePlot):
         self.ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, 1.05], xlabel="Granger index (scaled between 0-1)",
                     ylabel="Coupling coefficient (scaled between 0-1)")
         sns.move_legend(self.ax, title="Instrument", loc="upper left")
-        self.ax.grid(lw=2, alpha=vutils.ALPHA, which="both")
+        # self.ax.grid(lw=2, alpha=vutils.ALPHA, which="both")
         self.ax.tick_params(width=3, )
-        self.ax.text(0.875, 0.01, f"$r$(128) = {self.corr:.3f}", fontsize=vutils.FONTSIZE, ha='center', va='bottom',
-                     bbox=dict(edgecolor=vutils.BLACK, linewidth=1, facecolor="white"))
+        self.ax.text(0.875, 0.01, f"$r$(128) = {self.corr:.2f}", fontsize=vutils.FONTSIZE, ha='center', va='bottom',
+                     bbox=dict(facecolor='white', alpha=vutils.ALPHA, edgecolor=vutils.BLACK))
         plt.setp(self.ax.spines.values(), linewidth=2)
 
     def _format_fig(self):

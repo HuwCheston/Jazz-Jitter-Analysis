@@ -82,7 +82,7 @@ class PairPlotAllVariables(vutils.BasePlot):
         self.g = self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\pairplot_all_variables'
+        fname = f'{self.output_dir}/pairplot_all_variables'
         return self.g.figure, fname
 
     # noinspection PyUnusedLocal
@@ -176,10 +176,10 @@ class PairPlotAllVariables(vutils.BasePlot):
         ast = vutils.get_significance_asterisks(p)
         # Create the format string, with additional escape characters for nicer kerning between asterisks
         if ast != '':
-            s = "${{{}}}".format(round(r, 2)) + ''.join([r"^{{{}}}\,\!".format(a) for a in ast]) + "$"
+            s = "${{{}}}".format(f"{r:.2f}") + ''.join([r"^{{{}}}\,\!".format(a) for a in ast]) + "$"
         # If our correlation is not significant, we won't return any asterisks, so need to catch this
         else:
-            s = "${{{}}}$".format(round(r, 2))
+            s = "${{{}}}$".format(f"{r:.2f}")
         # Add the format string to the middle of the axis, with fontsize scaled to match the absolute r value
         scaling = abs(r)
         if scaling < 0.3:
@@ -1245,15 +1245,15 @@ def generate_all_metrics_plots(
         df.append(pcm.keys_dic)
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
-    figures_output_dir = output_dir + '\\figures\\all_metrics_plots'
+    figures_output_dir = output_dir + '/figures/all_metrics_plots'
+    pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir, error_bar='ci')
+    pp.create_plot()
     ppds = PointPlotDuoStats(df=df, output_dir=figures_output_dir)
     ppds.create_plot()
     pp_ = PointPlotRepeatComparisons(df=df, output_dir=figures_output_dir)
     pp_.create_plot()
     rp = RegPlotTestRetestReliability(df=df, output_dir=figures_output_dir,)
     rp.create_plot()
-    pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir, error_bar='ci')
-    pp.create_plot()
     bp = BarPlotRegressionCoefficients(df=df, output_dir=figures_output_dir)
     bp.create_plot()
     bp = BarPlotModelComparison(df=df, output_dir=figures_output_dir)
@@ -1273,9 +1273,9 @@ if __name__ == '__main__':
     # Default location for phase correction models
     logger.info(f"Making graphs from data in {os.path.abspath(r'../../models')}")
     raw = autils.load_from_disc(
-        r'..\..\models', filename='phase_correction_mds.p'
+        '../../models', filename='phase_correction_mds.p'
     )
     # Default location to save plots
-    output = r"..\..\reports"
+    output = r"../.../reports"
     # Generate phase correction plots from models
     generate_all_metrics_plots(mds=raw, output_dir=output)
