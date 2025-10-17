@@ -27,6 +27,7 @@ seaborn = ">=0.12"
 stargazer = "0.0.5"
 statsmodels = "*"
 dill = "~0.3.6"
+dotenv = "*"
 
 [poetry.group.dev.dependencies]
 coverage = "*"
