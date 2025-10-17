@@ -231,7 +231,7 @@ class PairPlotAllVariables(vutils.BasePlot):
         # If we're using absolute slope, we need to define a different axis limit
         slope_lim = (0, 0.5) if self._abs_slope else (-0.5, 0.5)
         # Iterate through all rows and columns and set required axis limits and step values
-        for i, lim, step in zip(range(0, len(self.vars)), [slope_lim, (0, 400), (0, 100), (1, 9), (1, 9)], [3, 5, 5, 3, 3]):
+        for i, lim, step in zip(range(0, len(self.vars)), [slope_lim, (0, 200), (0, 100), (1, 9), (1, 9)], [3, 5, 5, 3, 3]):
             ticks = np.linspace(lim[0], lim[1], step)
             self.g.axes[i, i].set(ylim=lim, xlim=lim, yticks=ticks, xticks=ticks)
         # If using absolute tempo slope, adjust axis limit slightly, so we don't cut off some markers
