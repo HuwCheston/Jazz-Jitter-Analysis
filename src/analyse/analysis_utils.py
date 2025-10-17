@@ -281,19 +281,19 @@ def extract_interpolated_beats(
     return total, num_interpolated
 
 
-def extract_pairwise_asynchrony(
-    keys_nn: pd.DataFrame, drms_nn: pd.DataFrame
-) -> float:
-    """
-    Extracts pairwise asynchrony from two matched dataframes.
-
-    Rasch (2015) defines pairwise asynchrony as as the root-mean-square of the standard deviations of the onset time
-    differences for all pairs of voice parts. We can calculate this for each condition, using the nearest-neighbour
-    model for both the keyboard and drummer.
-    """
-
-    std = lambda i: (i.asynchrony * 1000).std()
-    return np.sqrt(np.mean(np.square([std(keys_nn), std(drms_nn)])))
+# def extract_pairwise_asynchrony(
+#     keys_nn: pd.DataFrame, drms_nn: pd.DataFrame
+# ) -> float:
+#     """
+#     Extracts pairwise asynchrony from two matched dataframes.
+#
+#     Rasch (2015) defines pairwise asynchrony as as the root-mean-square of the standard deviations of the onset time
+#     differences for all pairs of voice parts. We can calculate this for each condition, using the nearest-neighbour
+#     model for both the keyboard and drummer.
+#     """
+#
+#     std = lambda i: (i.asynchrony * 1000).std()
+#     return np.sqrt(np.mean(np.square([std(keys_nn), std(drms_nn)])))
 
 
 def extract_npvi(

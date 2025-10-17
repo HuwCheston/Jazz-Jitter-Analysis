@@ -181,7 +181,8 @@ class PhaseCorrectionModel:
         -	Take the square root of this mean.
         """
         # Square all the asynchrony values, take the mean, then the square root, then convert to milliseconds
-        return np.sqrt(np.nanmean(np.square(nn[asynchrony_col].to_numpy()))) * 1000
+        return np.nanstd(nn[asynchrony_col].to_numpy()) * 1000
+        # return np.sqrt(np.nanmean(np.square(nn[asynchrony_col].to_numpy()))) * 1000
 
     def _extract_pairwise_asynchrony_with_standard_deviations(
             self, async_col: str = 'asynchrony'
@@ -207,9 +208,11 @@ class PhaseCorrectionModel:
             # Merge the dataframes together on their shared columns
             con = le.rename(columns={'my_onset': 'o'}).merge(r.rename(columns={'their_onset': 'o'}), how='left', on='o')
             # Append the pairwise asynchrony value
-            means.append(
-                np.sqrt(np.nanmean(np.square(con[[f'{async_col}_x', f'{async_col}_y']].std(axis=1)))) * 1000
-            )
+
+            means.append(np.mean([con[f'{async_col}_x'].std(), con[f'{async_col}_y'].std()]) * 1000)
+            # means.append(
+            #     np.sqrt(np.nanmean(np.square(con[[f'{async_col}_x', f'{async_col}_y']].std(axis=1)))) * 1000
+            # )
         # Calculate the mean of both values
         return np.mean(means)
 
@@ -224,8 +227,10 @@ class PhaseCorrectionModel:
         if subset is not None:
             keys_nn = keys_nn[keys_nn['my_onset'] <= subset]
             drms_nn = drms_nn[drms_nn['my_onset'] <= subset]
-        conc = np.concatenate([keys_nn[async_col].to_numpy(), drms_nn[async_col].to_numpy()])
-        return np.sqrt(np.nanmean(np.square(conc))) * 1000
+        # conc = np.concatenate([keys_nn[async_col].to_numpy(), drms_nn[async_col].to_numpy()])
+        # return np.sqrt(np.nanmean(np.square(conc))) * 1000
+        # return np.nanstd(conc) * 1000
+        return np.mean([np.nanstd(keys_nn[async_col]) * 1000, np.nanstd(drms_nn[async_col]) * 1000])
 
     def _match_onsets(
             self, live_arr: np.ndarray, delayed_arr: np.ndarray, zoom_arr: np.ndarray

@@ -305,9 +305,10 @@ class Simulation:
             Function used to calculate the pairwise asynchrony for a single simulation, in milliseconds
             """
             # Concatenate the two asynchrony columns together
-            conc = np.concatenate((keys[async_col].to_numpy(), drms[async_col].to_numpy()))
+            # conc = np.concatenate((keys[async_col].to_numpy(), drms[async_col].to_numpy()))
             # Square the values, take the mean, then the square root, then convert to miliseconds and return
-            return np.sqrt(np.nanmean(np.square(conc))) * 1000
+            return np.mean([keys[async_col].std(), drms[async_col].std()]) * 1000
+            # return np.sqrt(np.nanmean(np.square(conc))) * 1000
 
         # Calculate the mean pairwise async across all performances
         return func([pw_async(k_, d_) for k_, d_ in zip(self.keys_simulations, self.drms_simulations)], **kwargs)
