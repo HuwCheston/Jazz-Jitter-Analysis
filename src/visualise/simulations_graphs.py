@@ -101,7 +101,7 @@ class LinePlotAllParameters(vutils.BasePlot):
             self._plot_original_performance()
         self._format_ax()
         self._format_fig()
-        fname = f"{self.output_dir}\\lineplot_all_parameters_{self.params['trial']}_" \
+        fname = f"{self.output_dir}/lineplot_all_parameters_{self.params['trial']}_" \
                 f"{self.params['block']}_{self.params['latency']}_{self.params['jitter']}"
         return self.fig, fname
 
@@ -210,7 +210,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_simulation_by_parameter'
+        fname = f'{self.output_dir}/barplot_simulation_by_parameter'
         return self.fig, fname
 
     def _create_plot(
@@ -322,7 +322,7 @@ class RegPlotSlopeComparisons(vutils.BasePlot):
         self._add_correlation_results()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\regplot_simulation_slope_comparison_original_noise_{self.original_noise}'
+        fname = f'{self.output_dir}/regplot_simulation_slope_comparison_original_noise_{self.original_noise}'
         return self.g.fig, fname
 
     def _create_plot(
@@ -513,7 +513,7 @@ class ArrowPlotParams(vutils.BasePlot):
         """
         self._create_plot()
         self._format_fig()
-        fname = f'{self.output_dir}\\arrowplot_simulation_params'
+        fname = f'{self.output_dir}/arrowplot_simulation_params'
         return self.fig, fname
 
     def _create_plot(
@@ -604,7 +604,7 @@ class DistPlotParams(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\distplot_simulation_params'
+        fname = f'{self.output_dir}/distplot_simulation_params'
         return self.fig, fname
 
     def _create_plot(
@@ -702,7 +702,7 @@ class DistPlotAverage(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\distplot_simulation_params_average'
+        fname = f'{self.output_dir}/distplot_simulation_params_average'
         return self.fig, fname
 
     def _create_plot(
@@ -882,7 +882,7 @@ class RegPlotSlopeAsynchrony(vutils.BasePlot):
         self._format_main_ax()
         self._format_marginal_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\regplot_simulation_slope_comparison_original_noise_{self.original_noise}'
+        fname = f'{self.output_dir}/regplot_simulation_slope_comparison_original_noise_{self.original_noise}'
         return self.fig, fname
 
     def _create_plot(
@@ -991,7 +991,7 @@ def generate_plots_for_individual_performance_simulations(
     """
     Deprecated(?)
     """
-    figures_output_dir = output_dir + '\\figures\\simulations_plots'
+    figures_output_dir = output_dir + '/figures/simulations_plots'
     df = pd.DataFrame([sim.results_dic for sim in sims])
     dp = DistPlotParams(df, output_dir=figures_output_dir)
     dp.create_plot()
@@ -1045,7 +1045,7 @@ class DistPlotAll(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\distplot_simulation_params_all'
+        fname = f'{self.output_dir}/distplot_simulation_params_all'
         return self.fig, fname
 
     def _create_plot(
@@ -1151,7 +1151,7 @@ def generate_plots_for_simulations_with_coupling_parameters(
     """
     Generates all plots in this file, with required arguments and inputs
     """
-    figures_output_dir = output_dir + '\\figures\\simulations_plots'
+    figures_output_dir = output_dir + '/figures/simulations_plots'
     df_avg = pd.DataFrame([sim.results_dic for sim in sims_params])
     dp = DistPlotAll(df=df_avg, output_dir=figures_output_dir)
     dp.create_plot()

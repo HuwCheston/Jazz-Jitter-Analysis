@@ -76,7 +76,7 @@ class LinePlotTempoSlopes(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\lineplot_tempo_slopes'
+        fname = f'{self.output_dir}/lineplot_tempo_slopes'
         return self.fig, fname
 
     def _create_plot(
@@ -159,7 +159,7 @@ class NumberLineTempoSlope(vutils.BasePlot):
         self.g = self._create_plot()
         self._add_annotations()
         self._format_plot()
-        fname = f'{self.output_dir}\\numberline_tempo_slope'
+        fname = f'{self.output_dir}/numberline_tempo_slope'
         return self.g.figure, fname
 
     def _format_df(self, corpus_filepath) -> pd.DataFrame:
@@ -256,7 +256,7 @@ class BarPlotTempoSlope(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_tempo_slope'
+        fname = f'{self.output_dir}/barplot_tempo_slope'
         return self.fig, fname
 
     def _create_plot(self):
@@ -310,7 +310,7 @@ def generate_tempo_slope_plots(
         df.append(pcm.keys_dic)
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
-    figures_output_dir = output_dir + '\\figures\\tempo_slopes_plots'
+    figures_output_dir = output_dir + '/figures/tempo_slopes_plots'
     bp = BarPlotTempoSlope(df=df, output_dir=figures_output_dir)
     bp.create_plot()
     lp = LinePlotTempoSlopes(df=df, output_dir=figures_output_dir)

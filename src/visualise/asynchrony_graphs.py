@@ -33,7 +33,7 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
         self.g = self._create_plot()
         self._add_annotations()
         self._format_plot()
-        fname = f'{self.output_dir}\\numberline_pairwise_asynchrony'
+        fname = f'{self.output_dir}/numberline_pairwise_asynchrony'
         return self.g.figure, fname
 
     def _format_df(self, corpus_filepath) -> pd.DataFrame:
@@ -132,7 +132,7 @@ def generate_asynchrony_plots(
         df.append(pcm.keys_dic)
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
-    figures_output_dir = output_dir + '\\figures\\asynchrony_plots'
+    figures_output_dir = output_dir + '/figures/asynchrony_plots'
 
     nl = NumberLinePairwiseAsynchrony(
         df=df, output_dir=figures_output_dir, corpus_filepath=corpus_dir

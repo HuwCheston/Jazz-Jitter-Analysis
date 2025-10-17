@@ -267,7 +267,7 @@ class RegressionTableAllMetrics:
     def create_tables(self):
         for k, v in self.model_list.items():
             tab = self._output_regression_table(v)
-            with open(f"{self.output_dir}\\regress_{k}.html", "w") as f:
+            with open(f"{self.output_dir}/regress_{k}.html", "w") as f:
                 f.write(tab.render_html())
 
     @staticmethod
@@ -417,7 +417,7 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\pointplot_repeat_comparisons'
+        fname = f'{self.output_dir}/pointplot_repeat_comparisons'
         return self.fig, fname
 
     def _create_plot(
@@ -479,8 +479,8 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
             fontsize=vutils.FONTSIZE + 3, edgecolor=vutils.BLACK, bbox_to_anchor=(0.65, 0.55),
         )
         for handle in lgnd.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
-            handle.set_sizes([100])
+            handle.set_color(vutils.BLACK)
+            # handle.set_sizes([100])
         # Add in the axis labels
         self.fig.suptitle('Objective evaluations', fontsize=vutils.FONTSIZE + 7)
         self.fig.text(0.4, 0.475, 'Subjective evaluations', fontsize=vutils.FONTSIZE + 7)
@@ -617,7 +617,7 @@ class BarPlotRegressionCoefficients(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\barplot_regression_coefs'
+        fname = f'{self.output_dir}/barplot_regression_coefs'
         return self.fig, fname
 
     def _add_errorbars(
@@ -850,7 +850,7 @@ class BarPlotModelComparison(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\barplot_model_comparison'
+        fname = f'{self.output_dir}/barplot_model_comparison'
         return self.fig, fname
 
     def _create_plot(
@@ -1023,7 +1023,7 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
         self._format_fig()
         self._move_marginal_ax()
         self._move_marginal_ax_y()
-        fname = f'{self.output_dir}\\regplot_test_retest_reliability'
+        fname = f'{self.output_dir}/regplot_test_retest_reliability'
         return self.fig, fname
 
     def _create_plot(
@@ -1135,7 +1135,7 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
         plt.setp(lgnd.get_title(), fontsize=vutils.FONTSIZE + 3)
         # Set the legend marker size and edge color
         for handle in lgnd.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
+            handle.set_color(vutils.BLACK)
             handle.set_sizes([100])
         # Adjust subplots positioning a bit to fit in the legend we've just created
         self.fig.subplots_adjust(left=0.075, right=0.985, bottom=0.075, top=0.95)
@@ -1191,7 +1191,7 @@ class PointPlotDuoStats(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\pointplot_duo_stats'
+        fname = f'{self.output_dir}/pointplot_duo_stats'
         return self.fig, fname
 
     def _create_plot(self):
@@ -1248,8 +1248,8 @@ def generate_all_metrics_plots(
     figures_output_dir = output_dir + '/figures/all_metrics_plots'
     pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir, error_bar='ci')
     pp.create_plot()
-    ppds = PointPlotDuoStats(df=df, output_dir=figures_output_dir)
-    ppds.create_plot()
+    # ppds = PointPlotDuoStats(df=df, output_dir=figures_output_dir)
+    # ppds.create_plot()
     pp_ = PointPlotRepeatComparisons(df=df, output_dir=figures_output_dir)
     pp_.create_plot()
     rp = RegPlotTestRetestReliability(df=df, output_dir=figures_output_dir,)
