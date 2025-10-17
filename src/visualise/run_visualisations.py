@@ -39,7 +39,8 @@ def main(input_filepath, output_filepath, references_filepath):
     logger.info(f'... loaded {len(mds)} models!')
     logger.info(f'loading simulations...')
     sims_params = vutils.load_from_disc(input_filepath, filename='phase_correction_sims.p')
-    logger.info(f'... loaded {len(sims_params)} simulations!')
+    if sims_params is not None:
+        logger.info(f'... loaded {len(sims_params)} simulations!')
 
     # GENERATE PERFORMANCE SUCCESS PLOTS #
     # ALL METRICS TOGETHER #
@@ -71,7 +72,8 @@ def main(input_filepath, output_filepath, references_filepath):
     # GENERATE SIMULATION PLOTS #
     logger.info(f'generating plots for simulations...')
     # generate_plots_for_individual_performance_simulations(sims_indiv, output_filepath)
-    generate_plots_for_simulations_with_coupling_parameters(sims_params, output_filepath)
+    if sims_params is not None:
+        generate_plots_for_simulations_with_coupling_parameters(sims_params, output_filepath)
     logger.info(f'... done!')
 
 
