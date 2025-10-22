@@ -358,11 +358,11 @@ class AVMuxer:
 
 @click.command()
 @click.option(
-    '-i', 'input_dir', default=os.path.abspath(r'.\\data\\raw\\avmanip_output'), type=str,
+    '-i', 'input_dir', default=os.path.abspath(r'./data/raw/avmanip_output'), type=str,
     help=r'The path to your \avmanip_output directory, containing the raw input files',
 )
 @click.option(
-    '-o', 'output_dir', default=os.path.abspath(r'.\\data\\raw\\muxed_performances'), type=str,
+    '-o', 'output_dir', default=os.path.abspath(r'./data/raw/muxed_performances'), type=str,
     help=r'The path to save the output files. A new folder will be created in this location',
 )
 @click.option(
