@@ -553,7 +553,7 @@ class BarPlot(vutils.BasePlot):
             )
         if self.errorbar:
             kwargs = dict(
-                errorbar=('ci', 95), errcolor=vutils.BLACK, errwidth=2, n_boot=vutils.N_BOOT, seed=1, capsize=0.1,
+                errorbar=('ci', 95), err_kws={'color': vutils.BLACK, 'linewidth':2}, n_boot=vutils.N_BOOT, seed=1, capsize=0.1,
             )
         else:
             kwargs = dict(errorbar=None)
@@ -706,7 +706,7 @@ class RegPlotGrid(vutils.BasePlot):
         self.xlabs: list[str] = kwargs.get(
             'xlab', [
                 'Absolute tempo slope (BPM/s)', 'Timing irregularity (SD, ms)',
-                'Asynchrony (RMS, ms)', 'Self-reported success'
+                'Asynchrony (SD, ms)', 'Self-reported success'
             ]
         )
         # Format the dataframe
@@ -1011,8 +1011,8 @@ class RegPlotGrid(vutils.BasePlot):
         if self.abs_slope:
             leg.set_bbox_to_anchor((0.5, 0.45))
         for handle in leg.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
-            handle.set_sizes([200])
+            handle.set_color(vutils.BLACK)
+            handle.set_markersize([200])
         plt.setp(leg.get_title(), fontsize=20)
         # Adjust subplot positioning a bit: this will affect marginal positions, so we'll change these later
         self.fig.subplots_adjust(left=0.07, right=1.01, bottom=0.07, top=1.01, hspace=0.2, wspace=0.2)
@@ -1592,7 +1592,7 @@ class BarPlotPhaseCorrectionModelComparison(vutils.BasePlot):
         self.titles: list[str] = kwargs.get('titles', [
             'Tempo slope (BPM/s)',
             'Timing irregularity (SD, ms)',
-            'Asynchrony (RMS, ms)',
+            'Asynchrony (SD, ms)',
             'Self-reported success'
         ])
 
@@ -1728,7 +1728,7 @@ class BarPlotMixedEffectsRegressionCoefficients(vutils.BasePlot):
         self.group_vars: list[str] = ['trial', 'block', 'latency', 'jitter']
         self.categories: list[str] = kwargs.get('categories', ['tempo_slope', 'pw_asym', 'ioi_std', ])
         self.labels: list[str] = kwargs.get('labels', [
-            'Absolute tempo slope (|BPM/s|)', 'Asynchrony (RMS, ms)', 'Timing irregularity (SD, ms)', 'Self-reported success'
+            'Absolute tempo slope (|BPM/s|)', 'Asynchrony (SD, ms)', 'Timing irregularity (SD, ms)', 'Self-reported success'
         ])
         self.averaged_vars: list[str] = kwargs.get('averaged_vars', ['tempo_slope', 'pw_asym'])
         self.predictor_ticks: list[str] = kwargs.get('predictor_ticks', [
@@ -2026,8 +2026,8 @@ class PointPlotSelfPartnerCouplingByInstrument(vutils.BasePlot):
             markerscale=1.6, fontsize=vutils.FONTSIZE
         )
         for handle in leg.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
-            handle.set_sizes([200])
+            handle.set_color(vutils.BLACK)
+            handle.set_markersize([200])
         plt.setp(leg.get_title(), fontsize=20)
         # Add in the axis labels
         self.fig.supxlabel('Difference in means')
@@ -2559,8 +2559,8 @@ class RegPlotGridStrAsyn(vutils.BasePlot):
         if self.abs_slope:
             leg.set_bbox_to_anchor((0.95, 0.5))
         for handle in leg.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
-            handle.set_sizes([200])
+            handle.set_color(vutils.BLACK)
+            handle.set_markersize([200])
         plt.setp(leg.get_title(), fontsize=20)
         # Adjust subplot positioning a bit: this will affect marginal positions, so we'll change these later
         self.fig.subplots_adjust(left=0.07, right=0.94, bottom=0.09, top=1.01, hspace=0.3, wspace=0.3)

@@ -69,15 +69,15 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
         Creates the facetgrid object
         """
         # Create the strip plot data for results coming from this study
-        sns.stripplot(
+        return sns.stripplot(
             data=self.df[self.df['this_study'] == True], x='pw_asym', y='placeholder', jitter=False, dodge=False, s=15,
             ax=self.ax, orient='h', marker='o', edgecolor=vutils.BLACK, linewidth=2
         )
         # Create the strip plot data for results not coming from this study
-        return sns.stripplot(
-            data=self.df[self.df['this_study'] == False], x='pw_asym', y='placeholder', jitter=False, dodge=False, s=12,
-            ax=self.ax, orient='h', marker='s', edgecolor=vutils.BLACK, linewidth=2
-        )
+        # return sns.stripplot(
+        #     data=self.df[self.df['this_study'] == False], x='pw_asym', y='placeholder', jitter=False, dodge=False, s=12,
+        #     ax=self.ax, orient='h', marker='s', edgecolor=vutils.BLACK, linewidth=2
+        # )
 
     def _add_annotations(self):
         """
@@ -86,12 +86,13 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
         for k, v in self.df.iterrows():
             x = v['pw_asym']
             if v['this_study']:
-                x -= 0.25
-                self.g.annotate(text=v['style'], xy=(v['pw_asym'], 0), xytext=(x, -1.45), rotation=315)
-            else:
+                # x -= 0.5
+                # self.g.annotate(text=v['style'] + '\n' + v['source'], xy=(v['pw_asym'], 0), xytext=(x, 0.15),
+                #                 rotation=45)
                 x -= 0.5
-                self.g.annotate(text=v['style'] + '\n' + v['source'], xy=(v['pw_asym'], 0), xytext=(x, 0.15),
-                                rotation=45)
+                self.g.annotate(text=v['style'], xy=(v['pw_asym'], 0), xytext=(x, 0.15), rotation=45)
+            else:
+                continue
 
     def _format_plot(self):
         """
@@ -105,7 +106,7 @@ class NumberLinePairwiseAsynchrony(vutils.BasePlot):
         # Set ticks and axis label
         self.g.set(xlim=(15, 45), ylim=(-1, 1), xticks=np.linspace(15, 45, 7), xlabel='', ylabel='')
         plt.yticks([], [])
-        self.g.figure.suptitle('Asynchrony (RMS, ms)')
+        self.g.figure.suptitle('Asynchrony (SD, ms)')
         # Add arrows and labels showing the direction of the x variable
         for text_x, arr_x, lab in zip([0.75, 0.15], [0.9, 0.1], ['Looser', 'Tighter']):
             self.g.annotate(

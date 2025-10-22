@@ -269,8 +269,9 @@ class BarPlotTempoSlope(vutils.BasePlot):
                 s=6, marker='.', jitter=0.1, ax=self.ax[num],
             )
             _ = sns.barplot(
-                data=self.df, x=var, y='tempo_slope', hue='trial', ax=self.ax[num], errorbar='se', errcolor='#3953a3',
-                palette=vutils.DUO_CMAP, errwidth=5, estimator=np.mean, edgecolor=vutils.BLACK, lw=2
+                data=self.df, x=var, y='tempo_slope', hue='trial', ax=self.ax[num], errorbar='se',
+                palette=vutils.DUO_CMAP, estimator=np.mean, edgecolor=vutils.BLACK, lw=2,
+                err_kws={"linewidth": 5, 'color': '#3953a3'}
             )
 
     def _format_ax(self):
