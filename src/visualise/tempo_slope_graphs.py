@@ -76,7 +76,7 @@ class LinePlotTempoSlopes(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\lineplot_tempo_slopes'
+        fname = f'{self.output_dir}/lineplot_tempo_slopes'
         return self.fig, fname
 
     def _create_plot(
@@ -159,7 +159,7 @@ class NumberLineTempoSlope(vutils.BasePlot):
         self.g = self._create_plot()
         self._add_annotations()
         self._format_plot()
-        fname = f'{self.output_dir}\\numberline_tempo_slope'
+        fname = f'{self.output_dir}/numberline_tempo_slope'
         return self.g.figure, fname
 
     def _format_df(self, corpus_filepath) -> pd.DataFrame:
@@ -256,7 +256,7 @@ class BarPlotTempoSlope(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_tempo_slope'
+        fname = f'{self.output_dir}/barplot_tempo_slope'
         return self.fig, fname
 
     def _create_plot(self):
@@ -269,8 +269,9 @@ class BarPlotTempoSlope(vutils.BasePlot):
                 s=6, marker='.', jitter=0.1, ax=self.ax[num],
             )
             _ = sns.barplot(
-                data=self.df, x=var, y='tempo_slope', hue='trial', ax=self.ax[num], errorbar='se', errcolor='#3953a3',
-                palette=vutils.DUO_CMAP, errwidth=5, estimator=np.mean, edgecolor=vutils.BLACK, lw=2
+                data=self.df, x=var, y='tempo_slope', hue='trial', ax=self.ax[num], errorbar='se',
+                palette=vutils.DUO_CMAP, estimator=np.mean, edgecolor=vutils.BLACK, lw=2,
+                err_kws={"linewidth": 5, 'color': '#3953a3'}
             )
 
     def _format_ax(self):
@@ -310,7 +311,7 @@ def generate_tempo_slope_plots(
         df.append(pcm.keys_dic)
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
-    figures_output_dir = output_dir + '\\figures\\tempo_slopes_plots'
+    figures_output_dir = output_dir + '/figures/tempo_slopes_plots'
     bp = BarPlotTempoSlope(df=df, output_dir=figures_output_dir)
     bp.create_plot()
     lp = LinePlotTempoSlopes(df=df, output_dir=figures_output_dir)

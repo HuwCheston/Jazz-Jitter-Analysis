@@ -43,7 +43,7 @@ class BarPlotInterpolatedIOIs(vutils.BasePlot):
         self._add_total_beats_to_plot()
         self._format_ax()
         self._format_plot()
-        fname = f'{self.output_dir}\\barplot_total_vs_interpolated_beats'
+        fname = f'{self.output_dir}/barplot_total_vs_interpolated_beats'
         return self.fig, fname
 
     def _format_plot(self):
@@ -135,7 +135,7 @@ class LinePlotZoomCall(vutils.BasePlot):
         self.g = self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\lineplot_zoom_call'
+        fname = f'{self.output_dir}/lineplot_zoom_call'
         return self.g.figure, fname
 
     def _create_plot(
@@ -234,7 +234,7 @@ class LinePlotAllConditions(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\lineplot_all_conditions'
+        fname = f'{self.output_dir}/lineplot_all_conditions'
         return self.fig, fname
 
     def _create_plot(
@@ -337,7 +337,7 @@ class BarPlotCouplingExperimentalSessions(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_{self.yvar}_experimental_sessions'
+        fname = f'{self.output_dir}/barplot_{self.yvar}_experimental_sessions'
         return self.fig, fname
 
     def _create_plot(
@@ -412,7 +412,7 @@ class BarPlotCouplingPieceParts(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_{self.yvar}_piece_parts'
+        fname = f'{self.output_dir}/barplot_{self.yvar}_piece_parts'
         return self.fig, fname
 
     def _create_plot(
@@ -500,7 +500,7 @@ class BarPlotHigherOrderModelComparison(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\barplot_higher_order_model_comparison'
+        fname = f'{self.output_dir}/barplot_higher_order_model_comparison'
         return self.fig, fname
 
     def _create_plot(self):
@@ -580,7 +580,7 @@ class BarPlotQuestionnaireCorrelation(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_questionnaire_correlation'
+        fname = f'{self.output_dir}/barplot_questionnaire_correlation'
         return self.fig, fname
 
     def _create_plot(
@@ -736,7 +736,7 @@ class HeatmapNoteChoice(vutils.BasePlot):
         self._create_keys_plot()
         self._add_cbar()
         self._format_plot()
-        fname = f'{self.output_dir}\\heatmap_note_choice'
+        fname = f'{self.output_dir}/heatmap_note_choice'
         return self.fig, fname
 
     def _create_drms_plot(self):
@@ -908,7 +908,7 @@ class CountPlotListenerDemographics(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\countplot_listener_demographics'
+        fname = f'{self.output_dir}/countplot_listener_demographics'
         return self.fig, fname
 
     def _create_plot(self):
@@ -971,7 +971,7 @@ class RegPlotCouplingSessions(vutils.BasePlot):
         self._format_main_ax()
         self._format_marginal_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\regplot_coupling_experimental_sessions'
+        fname = f'{self.output_dir}/regplot_coupling_experimental_sessions'
         return self.g.fig, fname
 
     def _create_joint_plot(
@@ -1078,7 +1078,7 @@ class RegPlotCouplingHalves(vutils.BasePlot):
         self._format_main_ax()
         self._format_marginal_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\regplot_coupling_piece_halves'
+        fname = f'{self.output_dir}/regplot_coupling_piece_halves'
         return self.g.fig, fname
 
     def _create_joint_plot(
@@ -1170,7 +1170,7 @@ def generate_misc_plots(
         df.append(pcm.keys_dic)
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
-    figures_output_dir = output_dir + '\\figures\\misc_plots'
+    figures_output_dir = output_dir + '/figures/misc_plots'
     cp = CountPlotListenerDemographics(df=df, output_dir=figures_output_dir)
     cp.create_plot()
     lp_all = LinePlotAllConditions(df=df, output_dir=figures_output_dir)

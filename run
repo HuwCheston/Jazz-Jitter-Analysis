@@ -1,0 +1,22 @@
+#!/bin/bash
+
+echo "Installing required packages..."
+poetry install
+
+# Activate the virtual environment
+eval $(poetry env activate)
+
+# Optional: Set environment variable to ignore outdated warnings (Linux/macOS)
+export OUTDATED_IGNORE=1
+
+echo "Setup completed successfully!"
+
+# Run project scripts
+poetry run python src/clean/make_dataset.py -i "data/raw" -o "data/processed" -r "references"
+poetry run python src/analyse/run_analysis.py -i "data/processed" -o "models"
+poetry run python src/visualise/run_visualisations.py -i "models" -o "reports" -r "references"
+
+echo "Build successful! Cleaning up..."
+
+# Deactivate virtual environment
+deactivate

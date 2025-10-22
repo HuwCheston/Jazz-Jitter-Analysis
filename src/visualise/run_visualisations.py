@@ -4,7 +4,6 @@
 import click
 import logging
 from pathlib import Path
-from dotenv import find_dotenv, load_dotenv
 
 # Import our helper objects
 import src.visualise.visualise_utils as vutils
@@ -22,9 +21,9 @@ from src.visualise.simulations_graphs import *
 
 
 @click.command()
-@click.option('-i', 'input_filepath', type=click.Path(exists=True), default='models')
-@click.option('-o', 'output_filepath', type=click.Path(exists=True), default=r'reports\figures')
-@click.option('-r', 'references_filepath', type=click.Path(exists=True), default=r'references')
+@click.option('-i', 'input_filepath', type=click.Path(exists=True), default='../../models')
+@click.option('-o', 'output_filepath', type=click.Path(exists=True), default='../../reports/figures')
+@click.option('-r', 'references_filepath', type=click.Path(exists=True), default='../../references')
 def main(input_filepath, output_filepath, references_filepath):
     """
     Runs data processing scripts to turn raw data from (../raw) into
@@ -40,7 +39,8 @@ def main(input_filepath, output_filepath, references_filepath):
     logger.info(f'... loaded {len(mds)} models!')
     logger.info(f'loading simulations...')
     sims_params = vutils.load_from_disc(input_filepath, filename='phase_correction_sims.p')
-    logger.info(f'... loaded {len(sims_params)} simulations!')
+    if sims_params is not None:
+        logger.info(f'... loaded {len(sims_params)} simulations!')
 
     # GENERATE PERFORMANCE SUCCESS PLOTS #
     # ALL METRICS TOGETHER #
@@ -48,16 +48,16 @@ def main(input_filepath, output_filepath, references_filepath):
     generate_all_metrics_plots(mds, output_filepath)
     logger.info(f'... done!')
     # TEMPO SLOPE #
-    logger.info(f'generating plots for tempo slope metric using {references_filepath}\corpus.xlsx...')
-    generate_tempo_slope_plots(mds, output_filepath, corpus_dir=f'{references_filepath}\corpus.xlsx')
+    logger.info(f'generating plots for tempo slope metric using {references_filepath}/corpus.xlsx...')
+    generate_tempo_slope_plots(mds, output_filepath, corpus_dir=f'{references_filepath}/corpus.xlsx')
     logger.info(f'... done!')
     # TIMING IRREGULARITY #
     logger.info(f'generating plots for timing irregularity metric...')
     generate_tempo_stability_plots(mds, output_filepath)
     logger.info(f'... done!')
     # ASYNCHRONY #
-    logger.info(f'generating plots for asynchrony metric using {references_filepath}\corpus.xlsx...')
-    generate_asynchrony_plots(mds, output_filepath, corpus_dir=f'{references_filepath}\corpus.xlsx')
+    logger.info(f'generating plots for asynchrony metric using {references_filepath}/corpus.xlsx...')
+    generate_asynchrony_plots(mds, output_filepath, corpus_dir=f'{references_filepath}/corpus.xlsx')
     logger.info(f'... done!')
     # SUCCESS #
     logger.info(f'generating plots for self-reported success metric...')
@@ -72,7 +72,8 @@ def main(input_filepath, output_filepath, references_filepath):
     # GENERATE SIMULATION PLOTS #
     logger.info(f'generating plots for simulations...')
     # generate_plots_for_individual_performance_simulations(sims_indiv, output_filepath)
-    generate_plots_for_simulations_with_coupling_parameters(sims_params, output_filepath)
+    if sims_params is not None:
+        generate_plots_for_simulations_with_coupling_parameters(sims_params, output_filepath)
     logger.info(f'... done!')
 
 
@@ -82,9 +83,5 @@ if __name__ == '__main__':
 
     # not used in this stub but often useful for finding various files
     project_dir = Path(__file__).resolve().parents[2]
-
-    # find .env automagically by walking up directories until it's found, then
-    # load up the .env entries as environment variables
-    load_dotenv(find_dotenv())
 
     main()

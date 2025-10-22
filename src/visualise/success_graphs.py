@@ -43,7 +43,7 @@ class ScatterPlotQuestionnaire(vutils.BasePlot):
         self._map_facetgrid_plots()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\scatterplot_{self.ax_var}_{self.marker_var}'
+        fname = f'{self.output_dir}/scatterplot_{self.ax_var}_{self.marker_var}'
         return self.g.figure, fname
 
     def _format_df(self) -> pd.DataFrame:
@@ -146,7 +146,7 @@ class HeatmapQuestionnaire(vutils.BasePlot):
     def create_plot(self):
         self._create_plot()
         self._format_fig()
-        fname = f'{self.output_dir}\\heatmap_duo_correlations'
+        fname = f'{self.output_dir}/heatmap_duo_correlations'
         return self.fig, fname
 
     def _format_ax(self, g, i):
@@ -224,7 +224,7 @@ class BarPlotTestRetestReliability(vutils.BasePlot):
         self.g = self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_test_retest_reliability'
+        fname = f'{self.output_dir}/barplot_test_retest_reliability'
         return self.g.figure, fname
 
     def _create_plot(self):
@@ -273,7 +273,7 @@ class NumberLineSuccess(vutils.BasePlot):
         self.g = self._create_plot()
         self._add_annotations()
         self._format_plot()
-        fname = f'{self.output_dir}\\numberline_success'
+        fname = f'{self.output_dir}/numberline_success'
         return self.g.figure, fname
 
     def _format_df(self) -> pd.DataFrame:
@@ -371,7 +371,7 @@ class NumberLineListenerSuccess(vutils.BasePlot):
         self.g = self._create_plot()
         self._add_annotations()
         self._format_plot()
-        fname = f'{self.output_dir}\\numberline_listener_success'
+        fname = f'{self.output_dir}/numberline_listener_success'
         return self.g.figure, fname
 
     def _format_df(self) -> pd.DataFrame:
@@ -474,7 +474,7 @@ class BarPlotListenerEvaluations(vutils.BasePlot):
         self._create_marginal_ax()
         self._format_fig()
         self._format_marginal_ax()
-        fname = f'{self.output_dir}\\barplot_listener_evaluations'
+        fname = f'{self.output_dir}/barplot_listener_evaluations'
         return self.fig, fname
 
     def _create_main_ax(self):
@@ -534,7 +534,7 @@ class PairGridListenerRatings(vutils.BasePlot):
         self._create_facetgrid()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\pairgrid_listener_reported_success'
+        fname = f'{self.output_dir}/pairgrid_listener_reported_success'
         return self.fig, fname
 
     @staticmethod
@@ -608,7 +608,7 @@ def generate_questionnaire_plots(
         df.append(pcm.keys_dic)
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
-    figures_output_dir = output_dir + '\\figures\\success_plots'
+    figures_output_dir = output_dir + '/figures/success_plots'
     pg = PairGridListenerRatings(df=df, output_dir=figures_output_dir)
     pg.create_plot()
     bp = BarPlotListenerEvaluations(df=df, output_dir=figures_output_dir)

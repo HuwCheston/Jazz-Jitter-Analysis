@@ -305,9 +305,10 @@ class Simulation:
             Function used to calculate the pairwise asynchrony for a single simulation, in milliseconds
             """
             # Concatenate the two asynchrony columns together
-            conc = np.concatenate((keys[async_col].to_numpy(), drms[async_col].to_numpy()))
+            # conc = np.concatenate((keys[async_col].to_numpy(), drms[async_col].to_numpy()))
             # Square the values, take the mean, then the square root, then convert to miliseconds and return
-            return np.sqrt(np.nanmean(np.square(conc))) * 1000
+            return np.mean([keys[async_col].std(), drms[async_col].std()]) * 1000
+            # return np.sqrt(np.nanmean(np.square(conc))) * 1000
 
         # Calculate the mean pairwise async across all performances
         return func([pw_async(k_, d_) for k_, d_ in zip(self.keys_simulations, self.drms_simulations)], **kwargs)
@@ -412,7 +413,7 @@ def generate_phase_correction_simulations_for_individual_conditions(
         # Append the simulation to our list
         all_sims.append(sim)
     # Pickle the result -- this will be quite large, depending on the number of simulations!
-    pickle.dump(all_sims, open(f"{output_dir}\\phase_correction_sims_orig.p", "wb"))
+    pickle.dump(all_sims, open(f"{output_dir}/phase_correction_sims_orig.p", "wb"))
     return all_sims
 
 
@@ -440,7 +441,7 @@ def generate_phase_correction_simulations_for_coupling_parameters(
             if len(all_sims) != 0:
                 return (
                     all_sims,
-                    f'... skipping, simulations loaded from {output_dir}\\phase_correction_sims.p'
+                    f'... skipping, simulations loaded from {output_dir}/phase_correction_sims.p'
                 )
     # Create the dataframe
     df = pd.concat(
@@ -498,8 +499,8 @@ def generate_phase_correction_simulations_for_coupling_parameters(
             sim.create_all_simulations()
             all_sims.append(sim)
     # Pickle the result -- this can be quite large, if we're creating lots of simulations!
-    pickle.dump(all_sims, open(f"{output_dir}\\phase_correction_sims.p", "wb"))
-    return all_sims, f'...simulations saved in {output_dir}\\phase_correction_sims.p'
+    pickle.dump(all_sims, open(f"{output_dir}/phase_correction_sims.p", "wb"))
+    return all_sims, f'...simulations saved in {output_dir}/phase_correction_sims.p'
 
 
 if __name__ == '__main__':

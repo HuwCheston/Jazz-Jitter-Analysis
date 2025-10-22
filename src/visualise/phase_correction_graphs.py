@@ -49,7 +49,7 @@ class PairGrid(vutils.BasePlot):
         self.g = self._create_facetgrid()
         self._format_pairgrid_ax()
         self._format_pairgrid_fig()
-        fname = f'{self.output_dir}\\pairgrid_condition_vs_{self.xvar}_vs_{self.cvar}'
+        fname = f'{self.output_dir}/pairgrid_condition_vs_{self.xvar}_vs_{self.cvar}'
         if self.average:
             fname += '_average'
         return self.g.fig, fname
@@ -181,7 +181,7 @@ class BoxPlot(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\boxplot_{self.yvar}_vs_{self.xvar}'
+        fname = f'{self.output_dir}/boxplot_{self.yvar}_vs_{self.xvar}'
         return self.g.figure, fname
 
     def _format_df(self):
@@ -265,7 +265,7 @@ class SingleConditionPlot:
         # Format the figure and save
         self.fig.suptitle(f'Duo {self.metadata[0]} (session {self.metadata[1]}): '
                           f'latency {self.metadata[2]}ms, jitter {self.metadata[3]}x')
-        fname = f'{self.output_dir}\\duo{self.metadata[0]}_repeat{self.metadata[1]}' \
+        fname = f'{self.output_dir}/duo{self.metadata[0]}_repeat{self.metadata[1]}' \
                 f'_latency{self.metadata[2]}_jitter{self.metadata[3]}'
         return self.fig, fname
 
@@ -455,7 +455,7 @@ class SingleConditionAnimation:
         anim = animation.FuncAnimation(self.fig, self.animate, init_func=self.init, frames=int(self.act.index.max()),
                                        interval=1000 / vutils.VIDEO_FPS, blit=True)
         anim.save(
-            f'{self.output}\\duo{self.metadata[0]}_measure{self.metadata[1]}'
+            f'{self.output}/duo{self.metadata[0]}_measure{self.metadata[1]}'
             f'_latency{self.metadata[2]}_jitter{self.metadata[3]}.mp4',
             writer='ffmpeg', fps=vutils.VIDEO_FPS
         )
@@ -485,7 +485,7 @@ class RegPlot(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\regplot_coupling_balance'
+        fname = f'{self.output_dir}/regplot_coupling_balance'
         return self.fig, fname
 
     def _create_plot(self):
@@ -539,7 +539,7 @@ class BarPlot(vutils.BasePlot):
         self.g = self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_{self.yvar}_vs_instrument'
+        fname = f'{self.output_dir}/barplot_{self.yvar}_vs_instrument'
         return self.fig, fname
 
     def _create_plot(self):
@@ -553,7 +553,7 @@ class BarPlot(vutils.BasePlot):
             )
         if self.errorbar:
             kwargs = dict(
-                errorbar=('ci', 95), errcolor=vutils.BLACK, errwidth=2, n_boot=vutils.N_BOOT, seed=1, capsize=0.1,
+                errorbar=('ci', 95), err_kws={'color': vutils.BLACK, 'linewidth':2}, n_boot=vutils.N_BOOT, seed=1, capsize=0.1,
             )
         else:
             kwargs = dict(errorbar=None)
@@ -612,7 +612,7 @@ class HistPlotR2(vutils.BasePlot):
         """
         self.g = self._create_plot()
         self._format_plot()
-        fname = f'{self.output_dir}\\histplot_{self.xvar}'
+        fname = f'{self.output_dir}/histplot_{self.xvar}'
         return self.g.figure, fname
 
     def _create_plot(self):
@@ -654,7 +654,7 @@ class BoxPlotR2WindowSize(vutils.BasePlot):
         """
         self.g = self._create_plot()
         self._format_plot()
-        fname = f'{self.output_dir}\\boxplot_r2_vs_windowsize'
+        fname = f'{self.output_dir}/boxplot_r2_vs_windowsize'
         return self.g.figure, fname
 
     def _format_df(self):
@@ -706,7 +706,7 @@ class RegPlotGrid(vutils.BasePlot):
         self.xlabs: list[str] = kwargs.get(
             'xlab', [
                 'Absolute tempo slope (BPM/s)', 'Timing irregularity (SD, ms)',
-                'Asynchrony (RMS, ms)', 'Self-reported success'
+                'Asynchrony (SD, ms)', 'Self-reported success'
             ]
         )
         # Format the dataframe
@@ -790,7 +790,7 @@ class RegPlotGrid(vutils.BasePlot):
         self._format_fig()
         # Format the marginal axes after the figure, otherwise this will affect their position
         self._format_marginal_ax()
-        fname = f'{self.output_dir}\\regplot_grid_{self.error_bar}'
+        fname = f'{self.output_dir}/regplot_grid_{self.error_bar}'
         if self.abs_slope:
             fname += '_abs_slope'
         return self.fig, fname
@@ -1011,8 +1011,8 @@ class RegPlotGrid(vutils.BasePlot):
         if self.abs_slope:
             leg.set_bbox_to_anchor((0.5, 0.45))
         for handle in leg.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
-            handle.set_sizes([200])
+            handle.set_color(vutils.BLACK)
+            handle.set_markersize([200])
         plt.setp(leg.get_title(), fontsize=20)
         # Adjust subplot positioning a bit: this will affect marginal positions, so we'll change these later
         self.fig.subplots_adjust(left=0.07, right=1.01, bottom=0.07, top=1.01, hspace=0.2, wspace=0.2)
@@ -1053,7 +1053,7 @@ class ArrowPlotPhaseCorrection(vutils.BasePlot):
         self._add_coordination_strategy_brackets()
         # self._add_significance_brackets()
         self._format_fig()
-        fname = f'{self.output_dir}\\arrowplot_phase_correction'
+        fname = f'{self.output_dir}/arrowplot_phase_correction'
         return self.fig, fname
 
     def _create_plot(
@@ -1173,7 +1173,7 @@ class ArrowPlotModelExplanation(vutils.BasePlot):
         """
         self._create_plot()
         self._format_fig()
-        fname = f'{self.output_dir}\\arrowplot_model_explanation'
+        fname = f'{self.output_dir}/arrowplot_model_explanation'
         return self.fig, fname
 
     def _create_plot(
@@ -1301,7 +1301,7 @@ class BarPlotCouplingStrengthAsymmetryComparison(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_coupling_strength_asymmetry_comparison'
+        fname = f'{self.output_dir}/barplot_coupling_strength_asymmetry_comparison'
         return self.fig, fname
 
     def _create_plot(self):
@@ -1430,7 +1430,7 @@ class PointPlotCouplingStrengthAsymmetry(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\pointplot_coupling_asymmetry_strength'
+        fname = f'{self.output_dir}/pointplot_coupling_asymmetry_strength'
         return self.fig, fname
 
     def _create_plot(
@@ -1532,7 +1532,7 @@ class BarPlotCouplingStrengthAsymmetry(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\barplot_coupling_asymmetry_strength'
+        fname = f'{self.output_dir}/barplot_coupling_asymmetry_strength'
         return self.fig, fname
 
     def _create_plot(
@@ -1592,7 +1592,7 @@ class BarPlotPhaseCorrectionModelComparison(vutils.BasePlot):
         self.titles: list[str] = kwargs.get('titles', [
             'Tempo slope (BPM/s)',
             'Timing irregularity (SD, ms)',
-            'Asynchrony (RMS, ms)',
+            'Asynchrony (SD, ms)',
             'Self-reported success'
         ])
 
@@ -1672,7 +1672,7 @@ class BarPlotPhaseCorrectionModelComparison(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_phase_correction_model_comparison'
+        fname = f'{self.output_dir}/barplot_phase_correction_model_comparison'
         return self.fig, fname
 
     def _create_plot(self):
@@ -1728,7 +1728,7 @@ class BarPlotMixedEffectsRegressionCoefficients(vutils.BasePlot):
         self.group_vars: list[str] = ['trial', 'block', 'latency', 'jitter']
         self.categories: list[str] = kwargs.get('categories', ['tempo_slope', 'pw_asym', 'ioi_std', ])
         self.labels: list[str] = kwargs.get('labels', [
-            'Absolute tempo slope (|BPM/s|)', 'Asynchrony (RMS, ms)', 'Timing irregularity (SD, ms)', 'Self-reported success'
+            'Absolute tempo slope (|BPM/s|)', 'Asynchrony (SD, ms)', 'Timing irregularity (SD, ms)', 'Self-reported success'
         ])
         self.averaged_vars: list[str] = kwargs.get('averaged_vars', ['tempo_slope', 'pw_asym'])
         self.predictor_ticks: list[str] = kwargs.get('predictor_ticks', [
@@ -1840,7 +1840,7 @@ class BarPlotMixedEffectsRegressionCoefficients(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\barplot_mixed_effects_regression_coefs'
+        fname = f'{self.output_dir}/barplot_mixed_effects_regression_coefs'
         return self.fig, fname
 
     def _add_errorbars(
@@ -1987,7 +1987,7 @@ class PointPlotSelfPartnerCouplingByInstrument(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\pointplot_coupling_by_instrument'
+        fname = f'{self.output_dir}/pointplot_coupling_by_instrument'
         return self.fig, fname
 
     def _create_plot(self):
@@ -2026,8 +2026,8 @@ class PointPlotSelfPartnerCouplingByInstrument(vutils.BasePlot):
             markerscale=1.6, fontsize=vutils.FONTSIZE
         )
         for handle in leg.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
-            handle.set_sizes([200])
+            handle.set_color(vutils.BLACK)
+            handle.set_markersize([200])
         plt.setp(leg.get_title(), fontsize=20)
         # Add in the axis labels
         self.fig.supxlabel('Difference in means')
@@ -2331,7 +2331,7 @@ class RegPlotGridStrAsyn(vutils.BasePlot):
         self._format_fig()
         # Format the marginal axes after the figure, otherwise this will affect their position
         self._format_marginal_ax()
-        fname = f'{self.output_dir}\\regplot_grid_str_asyn'
+        fname = f'{self.output_dir}/regplot_grid_str_asyn'
         return self.fig, fname
 
     def _create_plot(
@@ -2559,8 +2559,8 @@ class RegPlotGridStrAsyn(vutils.BasePlot):
         if self.abs_slope:
             leg.set_bbox_to_anchor((0.95, 0.5))
         for handle in leg.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
-            handle.set_sizes([200])
+            handle.set_color(vutils.BLACK)
+            handle.set_markersize([200])
         plt.setp(leg.get_title(), fontsize=20)
         # Adjust subplot positioning a bit: this will affect marginal positions, so we'll change these later
         self.fig.subplots_adjust(left=0.07, right=0.94, bottom=0.09, top=1.01, hspace=0.3, wspace=0.3)
@@ -2579,7 +2579,7 @@ class HistPlotModelTerms(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\histplot_model_terms'
+        fname = f'{self.output_dir}/histplot_model_terms'
         return self.fig, fname
 
     def _create_plot(self):
@@ -2637,7 +2637,7 @@ class BarPlotPerformerListenerSuccess(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_performer_listener_success_models'
+        fname = f'{self.output_dir}/barplot_performer_listener_success_models'
         return self.fig, fname
 
     def _create_plot(self):
@@ -2666,6 +2666,61 @@ class BarPlotPerformerListenerSuccess(vutils.BasePlot):
         self.fig.subplots_adjust(left=0.095, right=0.95, top=0.9, bottom=0.175, wspace=0.1)
 
 
+class RegPlotGrangerCoupling(vutils.BasePlot):
+    SCATTER_KWS = dict(
+        s=75, edgecolor=vutils.BLACK, palette=vutils.INSTR_CMAP, markers=vutils.DUO_MARKERS[:2]
+    )
+    REG_KWS = dict(
+        x_ci=95, n_boot=vutils.N_BOOT, lowess=False,
+        truncate=True, color=vutils.BLACK, line_kws={'linewidth': 3},
+    )
+    LINE_KWS = dict(
+        linewidth=3, color=vutils.BLACK, zorder=1000, linestyle="dashed"
+    )
+
+    def __init__(self, df, **kwargs):
+        super().__init__(**kwargs)
+        self.df = self._format_df(df)
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(9.4, 9.4))
+        self.corr = self.df[["coupling", "granger"]].corr().iloc[1, 0]
+
+    def _format_df(self, df):
+        def scale(x):
+            return (x - np.min(x)) / (np.max(x) - np.min(x))
+
+        df["coupling"] = scale(df["correction_partner"])
+        df["granger"] = scale(df["granger_f"])
+        df["instrument_"] = df["instrument"].str.title()
+        return df
+
+    def _create_plot(self):
+        sns.regplot(self.df, x="coupling", y="granger", scatter=False, ax=self.ax, **self.REG_KWS)
+        sns.scatterplot(data=self.df, x="coupling", y="granger", hue="instrument_", style="instrument_", ax=self.ax,
+                        **self.SCATTER_KWS)
+
+    def _format_ax(self):
+        self.ax.axline([0, 0], [1, 1], **self.LINE_KWS)
+        self.ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, 1.05], xlabel="Granger index (scaled between 0-1)",
+                    ylabel="Coupling coefficient (scaled between 0-1)")
+        sns.move_legend(self.ax, title="Instrument", loc="upper left")
+        # self.ax.grid(lw=2, alpha=vutils.ALPHA, which="both")
+        self.ax.tick_params(width=3, )
+        self.ax.text(0.875, 0.01, f"$r$(128) = {self.corr:.2f}", fontsize=vutils.FONTSIZE, ha='center', va='bottom',
+                     bbox=dict(facecolor='white', alpha=vutils.ALPHA, edgecolor=vutils.BLACK))
+        plt.setp(self.ax.spines.values(), linewidth=2)
+
+    def _format_fig(self):
+        self.fig.tight_layout()
+
+    @vutils.plot_decorator
+    def create_plot(self):
+        self._create_plot()
+        self._format_ax()
+        self._format_fig()
+        fname = f'{self.output_dir}/regplot_granger_phasecorrection'
+        return self.fig, fname
+
+
 def generate_phase_correction_plots(
     mds: list[PhaseCorrectionModel], output_dir: str,
 ) -> None:
@@ -2677,7 +2732,10 @@ def generate_phase_correction_plots(
         df.append(pcm.keys_dic)
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
-    figures_output_dir = output_dir + '\\figures\\phase_correction_plots'
+    figures_output_dir = output_dir + '/figures/phase_correction_plots'
+
+    rp_ = RegPlotGrangerCoupling(df.copy(deep=True), output_dir=figures_output_dir)
+    rp_.create_plot()
     pg_a = PairGrid(
         df=df, xvar='correction_partner', output_dir=figures_output_dir, xlim=(0, 1.25),
         xlabel='Average coupling to partner', average=True
@@ -2740,9 +2798,9 @@ if __name__ == '__main__':
     # Default location for phase correction models
     logger.info(f"Making graphs from data in {os.path.abspath(r'../../models')}")
     raw: list[PhaseCorrectionModel] = autils.load_from_disc(
-        r'..\..\models', filename='phase_correction_mds.p'
+        r'../../models', filename='phase_correction_mds.p'
     )
     # Default location to save plots
-    output = r"..\..\reports"
+    output = r"../../reports"
     # Generate phase correction plots from models
     generate_phase_correction_plots(mds=raw, output_dir=output)

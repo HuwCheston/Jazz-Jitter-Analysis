@@ -32,7 +32,7 @@ class PairPlotAllVariables(vutils.BasePlot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.labels: list[str] = kwargs.get(
-            'labels', ['|Tempo slope|\n(|BPM/s|)', 'Asynchrony\n(RMS, ms)',
+            'labels', ['|Tempo slope|\n(|BPM/s|)', 'Asynchrony\n(SD, ms)',
                        'Timing\nirregularity\n(SD, ms)', 'Performer-\nreported\nsuccess', 'Listener-\nreported\nsuccess']
         )
         self._jitter_success: bool = kwargs.get('jitter_success', True)
@@ -82,7 +82,7 @@ class PairPlotAllVariables(vutils.BasePlot):
         self.g = self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\pairplot_all_variables'
+        fname = f'{self.output_dir}/pairplot_all_variables'
         return self.g.figure, fname
 
     # noinspection PyUnusedLocal
@@ -176,10 +176,10 @@ class PairPlotAllVariables(vutils.BasePlot):
         ast = vutils.get_significance_asterisks(p)
         # Create the format string, with additional escape characters for nicer kerning between asterisks
         if ast != '':
-            s = "${{{}}}".format(round(r, 2)) + ''.join([r"^{{{}}}\,\!".format(a) for a in ast]) + "$"
+            s = "${{{}}}".format(f"{r:.2f}") + ''.join([r"^{{{}}}\,\!".format(a) for a in ast]) + "$"
         # If our correlation is not significant, we won't return any asterisks, so need to catch this
         else:
-            s = "${{{}}}$".format(round(r, 2))
+            s = "${{{}}}$".format(f"{r:.2f}")
         # Add the format string to the middle of the axis, with fontsize scaled to match the absolute r value
         scaling = abs(r)
         if scaling < 0.3:
@@ -231,7 +231,7 @@ class PairPlotAllVariables(vutils.BasePlot):
         # If we're using absolute slope, we need to define a different axis limit
         slope_lim = (0, 0.5) if self._abs_slope else (-0.5, 0.5)
         # Iterate through all rows and columns and set required axis limits and step values
-        for i, lim, step in zip(range(0, len(self.vars)), [slope_lim, (0, 400), (0, 100), (1, 9), (1, 9)], [3, 5, 5, 3, 3]):
+        for i, lim, step in zip(range(0, len(self.vars)), [slope_lim, (0, 200), (0, 100), (1, 9), (1, 9)], [3, 5, 5, 3, 3]):
             ticks = np.linspace(lim[0], lim[1], step)
             self.g.axes[i, i].set(ylim=lim, xlim=lim, yticks=ticks, xticks=ticks)
         # If using absolute tempo slope, adjust axis limit slightly, so we don't cut off some markers
@@ -267,7 +267,7 @@ class RegressionTableAllMetrics:
     def create_tables(self):
         for k, v in self.model_list.items():
             tab = self._output_regression_table(v)
-            with open(f"{self.output_dir}\\regress_{k}.html", "w") as f:
+            with open(f"{self.output_dir}/regress_{k}.html", "w") as f:
                 f.write(tab.render_html())
 
     @staticmethod
@@ -369,7 +369,7 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
         self.metrics = ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean']
         self.titles = [
             'Tempo slope (BPM/s)',
-            'Asynchrony (RMS, ms)',
+            'Asynchrony (SD, ms)',
             'Timing irregularity (SD, ms)',
             'Performer-reported Success',
             'Listener-reported Success'
@@ -417,7 +417,7 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\pointplot_repeat_comparisons'
+        fname = f'{self.output_dir}/pointplot_repeat_comparisons'
         return self.fig, fname
 
     def _create_plot(
@@ -479,8 +479,8 @@ class PointPlotRepeatComparisons(vutils.BasePlot):
             fontsize=vutils.FONTSIZE + 3, edgecolor=vutils.BLACK, bbox_to_anchor=(0.65, 0.55),
         )
         for handle in lgnd.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
-            handle.set_sizes([100])
+            handle.set_color(vutils.BLACK)
+            handle.set_markersize([100])
         # Add in the axis labels
         self.fig.suptitle('Objective evaluations', fontsize=vutils.FONTSIZE + 7)
         self.fig.text(0.4, 0.475, 'Subjective evaluations', fontsize=vutils.FONTSIZE + 7)
@@ -499,14 +499,14 @@ class BarPlotRegressionCoefficients(vutils.BasePlot):
         # Get parameters for table from kwargs
         self.categories: list[str] = kwargs.get('categories', ['tempo_slope', 'pw_asym', 'ioi_std', 'success', 'perceptual_answer_mean'])
         self.labels: list[str] = kwargs.get('labels', [
-            'Tempo slope (BPM/s)', 'Asynchrony (RMS, ms)', 'Timing irregularity (SD, ms)', 'Performer-reported Success', 'Listener-reported Success'
+            'Tempo slope (BPM/s)', 'Asynchrony (SD, ms)', 'Timing irregularity (SD, ms)', 'Performer-reported Success', 'Listener-reported Success'
         ])
         self.averaged_vars: list[str] = kwargs.get('averaged_vars', ['tempo_slope', 'pw_asym', 'perceptual_answer_mean'])
         self.predictor_ticks: list[str] = kwargs.get('predictor_ticks', [
             'Reference\n(0ms, 0.0x, Drums)', 'Latency (ms)', 'Jitter', 'Instrument'
         ])
         self.levels: list[str] = kwargs.get('levels', ['Intercept', '23', '45', '90', '180', '0.5', '1.0', 'Keys'])
-        self.yticks = kwargs.get('yticks', [(-0.6, 0.6, 7), (-50, 200, 6), (-10, 40, 6), (-5, 10, 4), (-5, 10, 4)])
+        self.yticks = kwargs.get('yticks', [(-0.6, 0.6, 7), (-50, 150, 5), (-10, 40, 6), (-5, 10, 4), (-5, 10, 4)])
         self.alpha: float = kwargs.get('alpha', 0.05)
         # Format dataframe to get regression results
         self.df = self._format_df()
@@ -617,7 +617,7 @@ class BarPlotRegressionCoefficients(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\barplot_regression_coefs'
+        fname = f'{self.output_dir}/barplot_regression_coefs'
         return self.fig, fname
 
     def _add_errorbars(
@@ -712,7 +712,7 @@ class BarPlotRegressionCoefficients(vutils.BasePlot):
         """
         Applies required axis formatting
         """
-        ylims = [(-0.7, 0.7), (-50, 250), (-20, 50), (-9, 12), (-9, 12)]
+        ylims = [(-0.7, 0.7), (-50, 150), (-20, 50), (-9, 12), (-9, 12)]
         # Iterate through each axis and label, with a counter
         for count, ax, lab, yt, yl in zip(
                 range(self.df['var'].nunique()), self.ax.flatten(), self.labels, self.yticks, ylims
@@ -769,7 +769,7 @@ class BarPlotModelComparison(vutils.BasePlot):
         # Dataframe formatting attributes
         self.categories: list[str] = kwargs.get('categories', ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean', ])
         self.labels: list[str] = kwargs.get('labels', [
-            'Tempo slope (BPM/s)', 'Timing irregularity (SD, ms)',  'Asynchrony (RMS, ms)', 'Performer-reported success', 'Listener-reported success',
+            'Tempo slope (BPM/s)', 'Timing irregularity (SD, ms)',  'Asynchrony (SD, ms)', 'Performer-reported success', 'Listener-reported success',
         ])
         self.averaged_vars: list[str] = kwargs.get('averaged_vars', ['tempo_slope', 'pw_asym', 'perceptual_answer_mean'])
         self.full_mds = [
@@ -850,7 +850,7 @@ class BarPlotModelComparison(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\barplot_model_comparison'
+        fname = f'{self.output_dir}/barplot_model_comparison'
         return self.fig, fname
 
     def _create_plot(
@@ -869,7 +869,7 @@ class BarPlotModelComparison(vutils.BasePlot):
             g = sns.barplot(
                 data=grp, x='md', y='value', ax=ax, estimator=np.mean,
                 errorbar=self.ci, edgecolor=vutils.BLACK, lw=2, saturation=0.8, alpha=0.8,
-                color=col, errwidth=2, capsize=0.05, width=0.8, errcolor=vutils.BLACK
+                color=col, err_kws={'linewidth': 2, 'color': vutils.BLACK}, capsize=0.05, width=0.8,
             )
             if grp['md'].str.contains('instrument').sum() > 0:
                 self._add_bar_labels(grp, g, 'C(latency)+C(jitter)+C(instrument)', self.full_mds)
@@ -950,8 +950,8 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
         self.vars = ['tempo_slope', 'ioi_std', 'pw_asym', 'success', 'perceptual_answer_mean']
         self.main_ax, self.top_marginal_ax, self.right_marginal_ax = self._init_gridspec_subplots()
         self.handles, self.labels = None, None
-        self.lims = [(-0.6, 0.35), (0, 80), (0, 250), (0, 10), (0, 10)]
-        self.ticks = [(-0.5, 0.0), (0, 50), (0, 100, 200), (1, 5, 9), (1, 5, 9)]
+        self.lims = [(-0.6, 0.35), (0, 80), (0, 150), (0, 10), (0, 10)]
+        self.ticks = [(-0.5, 0.0), (0, 50), (0, 75, 150), (1, 5, 9), (1, 5, 9)]
         self.titles = [
             'Tempo slope',
             'Timing irregularity',
@@ -1023,7 +1023,8 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
         self._format_fig()
         self._move_marginal_ax()
         self._move_marginal_ax_y()
-        fname = f'{self.output_dir}\\regplot_test_retest_reliability'
+        fname = f'{self.output_dir}/regplot_test_retest_reliability'
+        print(fname)
         return self.fig, fname
 
     def _create_plot(
@@ -1135,8 +1136,8 @@ class RegPlotTestRetestReliability(vutils.BasePlot):
         plt.setp(lgnd.get_title(), fontsize=vutils.FONTSIZE + 3)
         # Set the legend marker size and edge color
         for handle in lgnd.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
-            handle.set_sizes([100])
+            handle.set_color(vutils.BLACK)
+            handle.set_markersize([100])
         # Adjust subplots positioning a bit to fit in the legend we've just created
         self.fig.subplots_adjust(left=0.075, right=0.985, bottom=0.075, top=0.95)
 
@@ -1191,7 +1192,7 @@ class PointPlotDuoStats(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\pointplot_duo_stats'
+        fname = f'{self.output_dir}/pointplot_duo_stats'
         return self.fig, fname
 
     def _create_plot(self):
@@ -1218,7 +1219,7 @@ class PointPlotDuoStats(vutils.BasePlot):
         titles = [
             'Tempo slope (BPM/s)',
             'Timing irregularity (SD, ms)',
-            'Asynchrony (RMS, ms)',
+            'Asynchrony (SD, ms)',
             'Performer-reported Success',
             'Listener-reported Success'
         ]
@@ -1245,15 +1246,15 @@ def generate_all_metrics_plots(
         df.append(pcm.keys_dic)
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
-    figures_output_dir = output_dir + '\\figures\\all_metrics_plots'
-    ppds = PointPlotDuoStats(df=df, output_dir=figures_output_dir)
-    ppds.create_plot()
-    pp_ = PointPlotRepeatComparisons(df=df, output_dir=figures_output_dir)
-    pp_.create_plot()
-    rp = RegPlotTestRetestReliability(df=df, output_dir=figures_output_dir,)
+    figures_output_dir = output_dir + '/figures/all_metrics_plots'
+    # pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir, error_bar='ci')
+    # pp.create_plot()
+    # ppds = PointPlotDuoStats(df=df, output_dir=figures_output_dir)
+    # ppds.create_plot()
+    # pp_ = PointPlotRepeatComparisons(df=df, output_dir=figures_output_dir)
+    # pp_.create_plot()
+    rp = RegPlotTestRetestReliability(df=df, output_dir=figures_output_dir)
     rp.create_plot()
-    pp = PairPlotAllVariables(df=df, output_dir=figures_output_dir, error_bar='ci')
-    pp.create_plot()
     bp = BarPlotRegressionCoefficients(df=df, output_dir=figures_output_dir)
     bp.create_plot()
     bp = BarPlotModelComparison(df=df, output_dir=figures_output_dir)
@@ -1273,9 +1274,9 @@ if __name__ == '__main__':
     # Default location for phase correction models
     logger.info(f"Making graphs from data in {os.path.abspath(r'../../models')}")
     raw = autils.load_from_disc(
-        r'..\..\models', filename='phase_correction_mds.p'
+        '../../models', filename='phase_correction_mds.p'
     )
     # Default location to save plots
-    output = r"..\..\reports"
+    output = r"../.../reports"
     # Generate phase correction plots from models
     generate_all_metrics_plots(mds=raw, output_dir=output)

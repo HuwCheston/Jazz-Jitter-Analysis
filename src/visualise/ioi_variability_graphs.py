@@ -61,7 +61,7 @@ class HeatmapLaggedLatency(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\heatmap_lagged_latency'
+        fname = f'{self.output_dir}/heatmap_lagged_latency'
         return self.fig, fname
 
     def _create_plot(self):
@@ -146,7 +146,7 @@ class LinePlotLaggedLatency(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Create filename and return to save
-        fname = f'{self.output_dir}\\lineplot_lagged_latency_{self.errorbar}'
+        fname = f'{self.output_dir}/lineplot_lagged_latency_{self.errorbar}'
         return self.fig, fname
 
     def _format_df(
@@ -278,7 +278,7 @@ class NumberLineIOIVariability(vutils.BasePlot):
         self.g = self._create_plot()
         self._add_annotations()
         self._format_plot()
-        fname = f'{self.output_dir}\\numberline_ioi_variability'
+        fname = f'{self.output_dir}/numberline_ioi_variability'
         return self.g.figure, fname
 
     def _format_df(self) -> pd.DataFrame:
@@ -373,7 +373,7 @@ def generate_tempo_stability_plots(
         df.append(pcm.keys_dic)
         df.append(pcm.drms_dic)
     df = pd.DataFrame(df)
-    figures_output_dir = output_dir + '\\figures\\ioi_variability_plots'
+    figures_output_dir = output_dir + '/figures/ioi_variability_plots'
     lp = LinePlotLaggedLatency(df=df, output_dir=figures_output_dir, errorbar='sd')
     lp.create_plot()
     lp = LinePlotLaggedLatency(df=df, output_dir=figures_output_dir, errorbar='ci')

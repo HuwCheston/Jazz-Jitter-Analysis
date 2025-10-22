@@ -101,7 +101,7 @@ class LinePlotAllParameters(vutils.BasePlot):
             self._plot_original_performance()
         self._format_ax()
         self._format_fig()
-        fname = f"{self.output_dir}\\lineplot_all_parameters_{self.params['trial']}_" \
+        fname = f"{self.output_dir}/lineplot_all_parameters_{self.params['trial']}_" \
                 f"{self.params['block']}_{self.params['latency']}_{self.params['jitter']}"
         return self.fig, fname
 
@@ -210,7 +210,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\barplot_simulation_by_parameter'
+        fname = f'{self.output_dir}/barplot_simulation_by_parameter'
         return self.fig, fname
 
     def _create_plot(
@@ -256,7 +256,7 @@ class BarPlotSimulationParameters(vutils.BasePlot):
         t = [1, 10, 100, 1000, 10000]
         self.ax[2].set_yscale('log')
         self.ax[2].set(xlabel='', ylim=(1, 10000), yticks=t, yticklabels=t)
-        self.ax[2].set_ylabel('Asynchrony (RMS, ms)', fontsize=vutils.FONTSIZE + 3, labelpad=-2)
+        self.ax[2].set_ylabel('Asynchrony (SD, ms)', fontsize=vutils.FONTSIZE + 3, labelpad=-2)
         # Apply joint formatting to both axes
         for ax in self.ax:
             # Adjust width of each bar on the bar plot
@@ -322,7 +322,7 @@ class RegPlotSlopeComparisons(vutils.BasePlot):
         self._add_correlation_results()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\regplot_simulation_slope_comparison_original_noise_{self.original_noise}'
+        fname = f'{self.output_dir}/regplot_simulation_slope_comparison_original_noise_{self.original_noise}'
         return self.g.fig, fname
 
     def _create_plot(
@@ -465,8 +465,8 @@ class RegPlotSlopeComparisons(vutils.BasePlot):
         plt.setp(lgnd.get_title(), fontsize=vutils.FONTSIZE + 3)
         # Set the legend marker size and edge color
         for handle in lgnd.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
-            handle.set_sizes([100])
+            handle.set_color(vutils.BLACK)
+            handle.set_markersize([100])
         # Adjust subplots positioning a bit to fit in the legend we've just created
         self.g.fig.subplots_adjust(bottom=0.11, top=0.96, left=0.13, right=0.98,)
 
@@ -513,7 +513,7 @@ class ArrowPlotParams(vutils.BasePlot):
         """
         self._create_plot()
         self._format_fig()
-        fname = f'{self.output_dir}\\arrowplot_simulation_params'
+        fname = f'{self.output_dir}/arrowplot_simulation_params'
         return self.fig, fname
 
     def _create_plot(
@@ -604,7 +604,7 @@ class DistPlotParams(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\distplot_simulation_params'
+        fname = f'{self.output_dir}/distplot_simulation_params'
         return self.fig, fname
 
     def _create_plot(
@@ -669,7 +669,7 @@ class DistPlotParams(vutils.BasePlot):
         """
         # Add axis labels
         self.fig.supxlabel('Tempo slope (BPM/s)', y=0.03,)
-        self.fig.supylabel('Asynchrony (RMS, ms)', x=0.01,)
+        self.fig.supylabel('Asynchrony (SD, ms)', x=0.01,)
         # Adjust subplot positioning slightly. Use hspace to adjust positioning between broken axis
         self.fig.subplots_adjust(left=0.07, right=0.98, bottom=0.175, top=0.9, wspace=0.15, hspace=0.2)
 
@@ -702,7 +702,7 @@ class DistPlotAverage(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\distplot_simulation_params_average'
+        fname = f'{self.output_dir}/distplot_simulation_params_average'
         return self.fig, fname
 
     def _create_plot(
@@ -802,7 +802,7 @@ class DistPlotAverage(vutils.BasePlot):
         """
         # Add in axis labels
         self.fig.supxlabel('Tempo slope (BPM/s)')
-        self.fig.supylabel('Asynchrony (RMS, ms)', x=0.01)
+        self.fig.supylabel('Asynchrony (SD, ms)', x=0.01)
         # Add in legend
         self.fig.legend(loc='center right', frameon=False, title='Duo')
         # Adjust plot spacing a bit -- hspace adjusts broken axis
@@ -882,7 +882,7 @@ class RegPlotSlopeAsynchrony(vutils.BasePlot):
         self._format_main_ax()
         self._format_marginal_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\regplot_simulation_slope_comparison_original_noise_{self.original_noise}'
+        fname = f'{self.output_dir}/regplot_simulation_slope_comparison_original_noise_{self.original_noise}'
         return self.fig, fname
 
     def _create_plot(
@@ -950,7 +950,7 @@ class RegPlotSlopeAsynchrony(vutils.BasePlot):
     def _format_marginal_ax(self):
         for top_margin, right_margin, lim, tit in zip(
                 self.marginal_ax.flatten()[:2], self.marginal_ax.flatten()[2:], [(-0.6, 0.6), (0, 275)],
-                ['Tempo slope (BPM/s)', 'Asynchrony (RMS, ms)']
+                ['Tempo slope (BPM/s)', 'Asynchrony (SD, ms)']
         ):
             top_margin.set(xlim=lim, ylabel='', xlabel='', xticklabels=[], yticks=[])
             top_margin.set_title(tit, fontsize=vutils.FONTSIZE + 5, y=1.1)
@@ -979,8 +979,8 @@ class RegPlotSlopeAsynchrony(vutils.BasePlot):
         plt.setp(lgnd.get_title(), fontsize=vutils.FONTSIZE + 3)
         # Set the legend marker size and edge color
         for handle in lgnd.legendHandles:
-            handle.set_edgecolor(vutils.BLACK)
-            handle.set_sizes([100])
+            handle.set_color(vutils.BLACK)
+            handle.set_markersize([100])
         # Adjust subplots positioning a bit to fit in the legend we've just created
         self.fig.subplots_adjust(bottom=0.1, top=0.91, left=0.075, right=0.92, )
 
@@ -991,7 +991,7 @@ def generate_plots_for_individual_performance_simulations(
     """
     Deprecated(?)
     """
-    figures_output_dir = output_dir + '\\figures\\simulations_plots'
+    figures_output_dir = output_dir + '/figures/simulations_plots'
     df = pd.DataFrame([sim.results_dic for sim in sims])
     dp = DistPlotParams(df, output_dir=figures_output_dir)
     dp.create_plot()
@@ -1045,7 +1045,7 @@ class DistPlotAll(vutils.BasePlot):
         self._create_plot()
         self._format_ax()
         self._format_fig()
-        fname = f'{self.output_dir}\\distplot_simulation_params_all'
+        fname = f'{self.output_dir}/distplot_simulation_params_all'
         return self.fig, fname
 
     def _create_plot(
@@ -1131,7 +1131,7 @@ class DistPlotAll(vutils.BasePlot):
         """
         # Add in axis labels
         self.fig.supxlabel('Tempo slope (BPM/s)', fontsize=vutils.FONTSIZE + 8)
-        self.fig.supylabel('Asynchrony (RMS, ms)', x=0.01, fontsize=vutils.FONTSIZE + 8)
+        self.fig.supylabel('Asynchrony (SD, ms)', x=0.01, fontsize=vutils.FONTSIZE + 8)
         # Add in legend
         hand, lab = self.top_ax[0].get_legend_handles_labels()
         for h in self.bottom_ax[0].get_legend_handles_labels()[0]:
@@ -1151,7 +1151,7 @@ def generate_plots_for_simulations_with_coupling_parameters(
     """
     Generates all plots in this file, with required arguments and inputs
     """
-    figures_output_dir = output_dir + '\\figures\\simulations_plots'
+    figures_output_dir = output_dir + '/figures/simulations_plots'
     df_avg = pd.DataFrame([sim.results_dic for sim in sims_params])
     dp = DistPlotAll(df=df_avg, output_dir=figures_output_dir)
     dp.create_plot()

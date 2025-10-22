@@ -15,7 +15,7 @@ import dill as pickle
 from pathlib import Path
 
 # This is necessary to solve issues with unpickling our phase_correction_mds and phase_correction_sims
-sys.path.append(os.path.join(Path(__file__).parents[2], 'src\\analyse'))
+sys.path.append(os.path.join(Path(__file__).parents[2], 'src/analyse'))
 
 # Ignore annoying matplotlib INFO warnings created even though I'm doing nothing wrong
 plt.set_loglevel('WARNING')
@@ -34,7 +34,7 @@ RED = '#FF0000'
 OFFSET = 8
 VIDEO_FPS = 30
 CBAR_BINS = np.linspace(-0.5, 0.3, 9, endpoint=True)
-N_BOOT = 10000
+N_BOOT = 1000
 
 
 # Define the colour palettes
@@ -245,7 +245,7 @@ def load_from_disc(
     Try and load models from disc
     """
     try:
-        mds = pickle.load(open(f"{output_dir}\\{filename}", "rb"))
+        mds = pickle.load(open(f"{output_dir}/{filename}", "rb"))
     # If we haven't generated the models in the first place, return None
     except FileNotFoundError:
         return None

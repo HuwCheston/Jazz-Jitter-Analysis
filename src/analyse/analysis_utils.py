@@ -37,7 +37,7 @@ def load_data(
     """
     Loads all pickled data from the processed data folder
     """
-    return [pickle.load(open(f'{input_filepath}\\{f}', "rb")) for f in os.listdir(input_filepath) if f.endswith('.p')]
+    return [pickle.load(open(f'{input_filepath}/{f}', "rb")) for f in os.listdir(input_filepath) if f.endswith('.p')]
 
 
 def generate_df(
@@ -281,19 +281,19 @@ def extract_interpolated_beats(
     return total, num_interpolated
 
 
-def extract_pairwise_asynchrony(
-    keys_nn: pd.DataFrame, drms_nn: pd.DataFrame
-) -> float:
-    """
-    Extracts pairwise asynchrony from two matched dataframes.
-
-    Rasch (2015) defines pairwise asynchrony as as the root-mean-square of the standard deviations of the onset time
-    differences for all pairs of voice parts. We can calculate this for each condition, using the nearest-neighbour
-    model for both the keyboard and drummer.
-    """
-
-    std = lambda i: (i.asynchrony * 1000).std()
-    return np.sqrt(np.mean(np.square([std(keys_nn), std(drms_nn)])))
+# def extract_pairwise_asynchrony(
+#     keys_nn: pd.DataFrame, drms_nn: pd.DataFrame
+# ) -> float:
+#     """
+#     Extracts pairwise asynchrony from two matched dataframes.
+#
+#     Rasch (2015) defines pairwise asynchrony as as the root-mean-square of the standard deviations of the onset time
+#     differences for all pairs of voice parts. We can calculate this for each condition, using the nearest-neighbour
+#     model for both the keyboard and drummer.
+#     """
+#
+#     std = lambda i: (i.asynchrony * 1000).std()
+#     return np.sqrt(np.mean(np.square([std(keys_nn), std(drms_nn)])))
 
 
 def extract_npvi(
@@ -343,7 +343,7 @@ def load_from_disc(
     Try and load models from disc
     """
     try:
-        mds = pickle.load(open(f"{output_dir}\\{filename}", "rb"))
+        mds = pickle.load(open(f"{output_dir}/{filename}", "rb"))
     # If we haven't generated the models in the first place, return None
     except FileNotFoundError:
         return None

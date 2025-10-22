@@ -126,7 +126,7 @@ class LinePlotJitterMeasurement(vutils.BasePlot):
         self._format_ax()
         self._format_fig()
         # Save the plot
-        fname = f'{self.output_dir}\\lineplot_latency_tests'
+        fname = f'{self.output_dir}/lineplot_latency_tests'
         return self.fig, fname
 
     def _create_plot(
