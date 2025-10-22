@@ -4,7 +4,9 @@ version = "0.1.0"
 description = ""
 authors = ["Huw Cheston <h.cheston@qmul.ac.uk>"]
 readme = "README.md"
+license = "MIT"
 packages = [{ include = "src" }]
+description = "Analysis of a series of performances by five professional jazz duos made under varying amounts of network latency and jitter."
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
